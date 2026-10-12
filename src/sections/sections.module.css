@@ -1,0 +1,78 @@
+.lead {
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: clamp(1.3rem, 3.5vw, 1.7rem);
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.text {
+  text-align: center;
+  color: var(--card-muted);
+  margin: 0 0 1.5rem;
+}
+
+.text strong {
+  color: var(--card-text);
+}
+
+.venues {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.venue {
+  text-align: center;
+}
+
+.venue + .venue {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--card-border);
+}
+
+.venueLabel {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--card-accent);
+}
+
+.venueName {
+  margin: 0.2rem 0;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.address {
+  font-style: normal;
+  color: var(--card-muted);
+  margin-bottom: 1rem;
+}
+
+.map {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+}
+
+.linkButton {
+  display: inline-block;
+  margin-top: 0.9rem;
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--card-accent);
+  color: var(--card-accent);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.linkButton:hover {
+  background: var(--card-accent);
+  color: var(--card-bg);
+}

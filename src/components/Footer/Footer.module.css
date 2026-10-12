@@ -1,0 +1,47 @@
+.footer {
+  text-align: center;
+  padding: 4rem 1.5rem 2.5rem;
+  color: var(--text);
+}
+
+.names {
+  font-family: var(--font-script);
+  font-size: 2.6rem;
+  margin: 0;
+}
+
+.hashtag {
+  margin: 0.25rem 0 1.5rem;
+  color: var(--pink-600);
+  letter-spacing: 0.1em;
+}
+
+.privateLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.6rem;
+  border: 1.5px solid var(--pink-600);
+  border-radius: 999px;
+  color: var(--pink-600);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.privateLink::before {
+  content: '🔒';
+  font-size: 0.9em;
+}
+
+.privateLink:hover {
+  background: var(--pink-600);
+  color: #fff;
+}
+
+.copy {
+  margin: 2rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}

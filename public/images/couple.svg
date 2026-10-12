@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" role="img" aria-label="The couple">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4a7c0"/><stop offset="1" stop-color="#fff3f7"/></linearGradient></defs>
+  <rect width="1600" height="1000" fill="url(#g)"/>
+  <circle cx="660" cy="400" r="120" fill="#fff" fill-opacity="0.55"/>
+  <circle cx="940" cy="400" r="120" fill="#fff" fill-opacity="0.55"/>
+  <path d="M440 1000c0-170 100-330 220-330s220 160 220 330zM720 1000c0-170 100-330 220-330s220 160 220 330z" fill="#fff" fill-opacity="0.55"/>
+  <text x="800" y="960" font-family="Georgia, serif" font-size="40" text-anchor="middle" fill="#7a3b55">Replace with your couple photo (public/images)</text>
+</svg>
