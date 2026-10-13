@@ -8,9 +8,17 @@ export interface Photo {
   alt: string;
 }
 
+/** Exactly two photos per side: enforced by the type, not by convention. */
+export type PhotoPair = readonly [Photo, Photo];
+
+/**
+ * Photos framing an info card.
+ * Desktop: `left` pair on the left, `right` pair on the right.
+ * Mobile:  `left` pair above the card, `right` pair below it.
+ */
 export interface SectionPhotos {
-  left: Photo;
-  right: Photo;
+  left: PhotoPair;
+  right: PhotoPair;
 }
 
 export interface WeddingConfig {
@@ -84,20 +92,20 @@ export const wedding: WeddingConfig = {
   },
   photos: {
     date: {
-      left: photo('bride-1.svg', 'Giulia as a child'),
-      right: photo('groom-1.svg', 'Marco as a child'),
+      left: [photo('bride-1.svg', 'Giulia as a child'), photo('bride-2.svg', 'Giulia at graduation')],
+      right: [photo('groom-1.svg', 'Marco as a child'), photo('groom-2.svg', 'Marco at graduation')],
     },
     location: {
-      left: photo('together-1.svg', 'Giulia and Marco on holiday'),
-      right: photo('bride-2.svg', 'Giulia laughing'),
+      left: [photo('together-1.svg', 'Giulia and Marco on holiday'), photo('bride-2.svg', 'Giulia laughing')],
+      right: [photo('groom-1.svg', 'Marco at the beach'), photo('together-2.svg', 'Our first trip')],
     },
     rsvp: {
-      left: photo('groom-2.svg', 'Marco hiking'),
-      right: photo('together-2.svg', 'The proposal'),
+      left: [photo('groom-2.svg', 'Marco hiking'), photo('bride-1.svg', 'Giulia reading')],
+      right: [photo('together-2.svg', 'The proposal'), photo('together-1.svg', 'Dancing together')],
     },
     gift: {
-      left: photo('bride-1.svg', 'Giulia'),
-      right: photo('groom-1.svg', 'Marco'),
+      left: [photo('bride-1.svg', 'Giulia'), photo('together-1.svg', 'Our home')],
+      right: [photo('groom-1.svg', 'Marco'), photo('together-2.svg', 'Dreaming of the honeymoon')],
     },
   },
 };

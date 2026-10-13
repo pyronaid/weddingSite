@@ -30,14 +30,47 @@
   z-index: 1;
 }
 
+.column {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 250px);
+}
+
+.left {
+  grid-column: 1;
+  justify-self: end;
+  align-items: flex-end;
+}
+
+.right {
+  grid-column: 3;
+  justify-self: start;
+  align-items: flex-start;
+  padding-top: 5rem;
+}
+
 .photo {
   margin: 0;
-  grid-row: 1;
+  width: 88%;
   background: #fff;
-  padding: 10px 10px 36px;
+  padding: 8px 8px 30px;
   border-radius: 6px;
   box-shadow: var(--shadow-photo);
   will-change: transform, opacity;
+}
+
+/* Second photo overlaps the first and shifts sideways: collage effect. */
+.photo + .photo {
+  margin-top: -2.5rem;
+}
+
+.left .photo + .photo {
+  margin-right: 12%;
+}
+
+.right .photo:first-child {
+  margin-left: 12%;
 }
 
 .photo img {
@@ -47,50 +80,59 @@
   border-radius: 2px;
 }
 
-.left {
-  grid-column: 1;
-  justify-self: end;
-  width: min(100%, 280px);
-}
-
-.right {
-  grid-column: 3;
-  justify-self: start;
-  width: min(100%, 280px);
-  margin-top: 8rem;
-}
-
-/* Tablet / mobile: photos become a pair of polaroids peeking above the card. */
+/* Tablet / mobile: left pair above the card, right pair below it. */
 @media (max-width: 900px) {
   .section {
-    min-height: 120vh;
+    min-height: 140vh;
   }
 
   .layout {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
     row-gap: 0;
   }
 
-  .card {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    margin-top: -3rem;
-  }
-
-  .left,
-  .right {
-    grid-row: 1;
-    width: min(100%, 190px);
-    margin-top: 0;
+  .column {
+    grid-column: 1;
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 1rem;
+    padding-top: 0;
   }
 
   .left {
+    grid-row: 1;
+  }
+
+  .card {
     grid-column: 1;
+    grid-row: 2;
+    margin: -2.5rem 0;
   }
 
   .right {
-    grid-column: 2;
-    margin-top: 2rem;
+    grid-row: 3;
+    align-items: flex-end;
+  }
+
+  .photo {
+    width: min(42%, 180px);
+  }
+
+  .photo + .photo,
+  .left .photo + .photo,
+  .right .photo:first-child {
+    margin: 0;
+  }
+
+  /* Stagger the pair vertically so it still feels hand-placed. */
+  .left .photo + .photo {
+    margin-top: 1.5rem;
+  }
+
+  .right .photo:first-child {
+    margin-top: 1.5rem;
   }
 }
