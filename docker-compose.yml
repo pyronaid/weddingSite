@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    image: wedding-site:latest
+    ports:
+      - "8080:8080"
+    environment:
+      SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+      PRIVATE_AREA_URL: ${VITE_PRIVATE_AREA_URL:-https://www.google.it}
+    restart: unless-stopped

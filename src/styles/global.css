@@ -1,0 +1,90 @@
+/* Design tokens: change these to re-theme the whole site. */
+:root {
+  --pink-100: #fde7ef;
+  --pink-200: #f9cfdd;
+  --pink-400: #e88aa8;
+  --pink-600: #c24f78;
+  --white-warm: #fffaf7;
+
+  /* Info cards use a contrasting fill for easy reading on the gradient. */
+  --card-bg: #6d3350;
+  --card-text: #fff7f2;
+  --card-muted: #f3d6e1;
+  --card-accent: #ffc2d6;
+  --card-surface: rgba(255, 255, 255, 0.1);
+  --card-border: rgba(255, 255, 255, 0.22);
+
+  --text: #4a2537;
+  --danger: #ffb3b3;
+  --success: #c7f5d5;
+
+  --font-script: 'Great Vibes', 'Brush Script MT', cursive;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Lato', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --radius-lg: 24px;
+  --radius-md: 14px;
+  --shadow-card: 0 30px 60px -20px rgba(109, 51, 80, 0.45), 0 10px 20px -10px rgba(0, 0, 0, 0.2);
+  --shadow-photo: 0 20px 40px -15px rgba(109, 51, 80, 0.5);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text);
+  /* Pink -> warm white -> pink gradient that spans the whole page. */
+  background: linear-gradient(
+    180deg,
+    var(--pink-200) 0%,
+    var(--white-warm) 30%,
+    var(--pink-100) 60%,
+    var(--white-warm) 80%,
+    var(--pink-200) 100%
+  );
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--pink-400);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

@@ -1,0 +1,96 @@
+.section {
+  position: relative;
+  /* Extra height gives the scroll animation room to play out. */
+  min-height: 130vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10vh 1.25rem;
+  overflow: hidden;
+}
+
+.layout {
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 600px) 1fr;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 3rem);
+}
+
+.card {
+  grid-column: 2;
+  grid-row: 1;
+  background: var(--card-bg);
+  color: var(--card-text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: clamp(1.75rem, 4vw, 3rem);
+  position: relative;
+  z-index: 1;
+}
+
+.photo {
+  margin: 0;
+  grid-row: 1;
+  background: #fff;
+  padding: 10px 10px 36px;
+  border-radius: 6px;
+  box-shadow: var(--shadow-photo);
+  will-change: transform, opacity;
+}
+
+.photo img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.left {
+  grid-column: 1;
+  justify-self: end;
+  width: min(100%, 280px);
+}
+
+.right {
+  grid-column: 3;
+  justify-self: start;
+  width: min(100%, 280px);
+  margin-top: 8rem;
+}
+
+/* Tablet / mobile: photos become a pair of polaroids peeking above the card. */
+@media (max-width: 900px) {
+  .section {
+    min-height: 120vh;
+  }
+
+  .layout {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 0;
+  }
+
+  .card {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: -3rem;
+  }
+
+  .left,
+  .right {
+    grid-row: 1;
+    width: min(100%, 190px);
+    margin-top: 0;
+  }
+
+  .left {
+    grid-column: 1;
+  }
+
+  .right {
+    grid-column: 2;
+    margin-top: 2rem;
+  }
+}
