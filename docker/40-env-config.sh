@@ -13,9 +13,7 @@ sanitize() {
 
 cat > "$TARGET" <<JS
 window.__APP_CONFIG__ = {
-  supabaseUrl: "$(sanitize "${SUPABASE_URL:-}")",
-  supabaseAnonKey: "$(sanitize "${SUPABASE_ANON_KEY:-}")",
-  privateAreaUrl: "$(sanitize "${PRIVATE_AREA_URL:-}")"
+  pocketbaseUrl: "$(sanitize "${POCKETBASE_URL:-}")"
 };
 JS
 

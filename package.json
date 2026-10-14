@@ -13,10 +13,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.3",
     "framer-motion": "^14.1.0",
+    "pocketbase": "^0.28.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router": "^8.4.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

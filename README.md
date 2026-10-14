@@ -1,14 +1,11 @@
 # 💍 Wedding Site
 
-A single-page wedding website with scroll animations. It covers the **date (with a live countdown)**, **location**, the **RSVP form** and the **IBAN for gifts**. It is built with **React + TypeScript + Vite** and uses **Supabase** as a Backend-as-a-Service.
+A wedding website with two parts:
 
-- Hero section with the couple's photo (parallax zoom on scroll)
-- Pictures of the bride and groom slide in and out as you scroll past each section
-- Pink → warm-white gradient background, with info shown on contrasting cards for easy reading
-- RSVP form saved to Supabase (insert-only, protected by Row Level Security)
-- IBAN with a one-click "copy" button
-- Footer link to the future private area (currently `https://www.google.it`)
-- Responsive, keyboard-accessible, respects `prefers-reduced-motion`
+- **Public page:** a single page with scroll animations. It covers the **date (with a live countdown)**, **location**, the **RSVP form** and the **IBAN for gifts**.
+- **Private area** (`/area`): login, sign-up with **e-mail confirmation**, and **forgot / reset password**. The forms sit on a centered card surrounded by floating photos. After login, a placeholder page is shown.
+
+It is built with **React + TypeScript + Vite** and uses **[PocketBase](https://pocketbase.io)** (Go + SQLite in a single binary) as the Backend-as-a-Service.
 
 ---
 
@@ -17,154 +14,216 @@ A single-page wedding website with scroll animations. It covers the **date (with
 1. [Tech stack](#tech-stack)
 2. [Project structure](#project-structure)
 3. [Customising the content](#customising-the-content)
-4. [Setting up Supabase](#setting-up-supabase)
-5. [Running locally (Node)](#running-locally-node)
-6. [Running locally (Docker)](#running-locally-docker)
-7. [Configuration reference](#configuration-reference)
-8. [Scripts](#scripts)
-9. [Architecture notes](#architecture-notes)
+4. [Quick start: full stack with Docker](#quick-start-full-stack-with-docker)
+5. [Local development (Node + PocketBase binary)](#local-development-node--pocketbase-binary)
+6. [The private area](#the-private-area)
+7. [PocketBase backend](#pocketbase-backend)
+8. [Configuration reference](#configuration-reference)
+9. [Deploying to production](#deploying-to-production)
+10. [Scripts](#scripts)
+11. [Architecture notes](#architecture-notes)
 
 ---
 
 ## Tech stack
 
-| Concern         | Choice                                          |
-| --------------- | ----------------------------------------------- |
-| UI              | React 19 + TypeScript                           |
-| Build tool      | Vite                                            |
-| Animations      | framer-motion (scroll-linked `useScroll`)       |
-| Styling         | CSS Modules + CSS custom properties (tokens)    |
-| Backend / DB    | Supabase (Postgres + RLS)                       |
-| Tests           | Vitest + Testing Library                        |
-| Lint            | oxlint                                          |
-| Container       | Multi-stage Docker → unprivileged nginx         |
+| Concern         | Choice                                                      |
+| --------------- | ----------------------------------------------------------- |
+| UI              | React 19 + TypeScript                                       |
+| Routing         | React Router (private area is lazy-loaded)                  |
+| Build tool      | Vite                                                        |
+| Animations      | framer-motion                                               |
+| Styling         | CSS Modules + CSS custom properties (tokens)                |
+| Backend / DB    | PocketBase (auth, RSVP collection, e-mails, rate limiting)  |
+| Tests           | Vitest + Testing Library                                    |
+| Lint            | oxlint                                                      |
+| Containers      | Frontend: multi-stage → unprivileged nginx · Backend: PocketBase on Alpine |
 
 ## Project structure
 
 ```
 .
-├── public/
-│   ├── images/              # ← put your photos here
-│   └── env-config.js        # runtime config (overwritten in Docker)
+├── public/images/                 # ← your photos
 ├── src/
-│   ├── config/
-│   │   ├── wedding.ts       # ← ALL the wedding content lives here
-│   │   └── runtimeConfig.ts # env / runtime configuration loader
-│   ├── components/          # reusable UI (Hero, ScrollSection, RsvpForm, ...)
-│   ├── sections/            # page sections: Date, Location, RSVP, Gift
-│   ├── services/rsvp/       # RSVP domain: types, validation, repositories
-│   ├── hooks/               # useCountdown, useCopyToClipboard
-│   ├── lib/                 # Supabase client, formatters
-│   └── styles/global.css    # design tokens + gradient background
-├── supabase/migrations/     # SQL to create the RSVP table + policies
-├── docker/                  # nginx config + runtime env script
-├── Dockerfile
-└── docker-compose.yml
+│   ├── config/wedding.ts          # ← ALL the wedding content lives here
+│   ├── config/runtimeConfig.ts    # env / runtime configuration loader
+│   ├── router.tsx                 # routes: "/" and "/area/*"
+│   ├── pages/HomePage.tsx         # the public single page
+│   ├── sections/                  # public page sections (Date, Location, RSVP, Gift)
+│   ├── components/                # shared UI (Hero, ScrollSection, Form fields, ...)
+│   ├── features/private-area/     # private area: layout, guards, auth context, pages
+│   ├── services/
+│   │   ├── auth/                  # AuthService interface + PocketBase implementation
+│   │   └── rsvp/                  # RsvpRepository interface + PocketBase implementation
+│   ├── lib/pocketbase.ts          # shared PocketBase client
+│   └── styles/global.css          # design tokens + gradient background
+├── pocketbase/                    # backend
+│   ├── Dockerfile                 # PocketBase image (pinned + checksum-verified)
+│   ├── docker-entrypoint.sh
+│   ├── pb_migrations/             # schema as code (rsvps collection, users hardening)
+│   └── pb_hooks/                  # settings-from-env, RSVP validation
+├── docker/                        # nginx config + runtime env script (frontend)
+├── Dockerfile                     # frontend image
+└── docker-compose.yml             # frontend + PocketBase + Mailpit
 ```
 
 ## Customising the content
 
-1. **Text & data**: edit [`src/config/wedding.ts`](src/config/wedding.ts). It holds the names, date, venues, RSVP deadline, IBAN and which photo shows in each section. No component needs to change.
-   - Write the `date` in ISO-8601 **with the UTC offset** (e.g. `2027-06-19T16:00:00+02:00`), so the countdown is correct for guests in any time zone.
-2. **Photos**: put your pictures in `public/images/` (`.jpg`/`.webp` recommended, about 1200 px on the long side for section photos and 2400 px for the hero), then update the paths in `wedding.ts`. The SVG files shipped in the repo are placeholders.
-3. **Colours & fonts**: change the CSS variables at the top of [`src/styles/global.css`](src/styles/global.css). `--card-bg` is the card fill colour.
+1. **Text & data**: edit [`src/config/wedding.ts`](src/config/wedding.ts). It holds the names, date, venues, RSVP deadline, IBAN, the photos of each section, and the photos floating in the private area. No component needs to change.
+   - Write the `date` in ISO-8601 **with the UTC offset** (e.g. `2027-06-19T16:00:00+02:00`).
+2. **Photos**: put them in `public/images/` (`.jpg`/`.webp`, about 1200 px on the long side) and update the paths. The SVG files shipped in the repo are placeholders.
+3. **Colours & fonts**: change the CSS variables at the top of [`src/styles/global.css`](src/styles/global.css).
 
-## Setting up Supabase
+## Quick start: full stack with Docker
 
-1. Create a free project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run [`supabase/migrations/20261012000000_create_rsvps.sql`](supabase/migrations/20261012000000_create_rsvps.sql). If you use the Supabase CLI, run `supabase db push` instead.
-3. Go to **Project Settings → API** and copy the **Project URL** and the **anon public key**.
-
-> 🔐 **Security model.** The anon key is meant to be public. The migration enables Row Level Security, and anonymous visitors can **only insert** RSVPs. They can never read, update or delete them. You can read the answers in the Supabase dashboard (Table editor → `rsvps`). The future private area can read them through an authenticated role.
-
-> 💡 You can run the site **without Supabase** while working on the design. The form then logs the submission to the browser console and shows a warning instead of saving it.
-
-## Running locally (Node)
-
-Prerequisites: **Node.js ≥ 20** and npm.
+Prerequisites: Docker with Compose v2.
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Configure environment
-cp .env.example .env
-#    then edit .env with your Supabase URL and anon key
-
-# 3. Start the dev server (hot reload)
-npm run dev
-```
-
-Open http://localhost:5173.
-
-To try the production build:
-
-```bash
-npm run build
-npm run preview   # http://localhost:4173
-```
-
-## Running locally (Docker)
-
-Prerequisites: Docker (with Compose v2).
-
-### Option A: docker compose (recommended)
-
-```bash
-cp .env.example .env      # fill in your Supabase values
+cp .env.example .env        # then change PB_ADMIN_PASSWORD at least
 docker compose up --build
 ```
 
-Open http://localhost:8080.
+| URL                          | What                                          |
+| ---------------------------- | --------------------------------------------- |
+| http://localhost:8080        | Wedding site (`/area` = private area)         |
+| http://localhost:8090/_/     | PocketBase admin dashboard (RSVPs, users)     |
+| http://localhost:8025        | **Mailpit**: catches every e-mail sent locally |
 
-### Option B: plain docker
+Try it: open the private area, create an account, then open Mailpit and click the confirmation link. The same works for "Forgot password".
+
+> Data lives in the `pb_data` Docker volume. `docker compose down -v` wipes it.
+
+## Local development (Node + PocketBase binary)
+
+Prerequisites: **Node.js ≥ 20**.
+
+**1. Start the backend.** Either use Docker for the backend services only:
 
 ```bash
-docker build -t wedding-site .
-
-docker run --rm -p 8080:8080 \
-  -e SUPABASE_URL="https://your-project-ref.supabase.co" \
-  -e SUPABASE_ANON_KEY="your-anon-public-key" \
-  -e PRIVATE_AREA_URL="https://www.google.it" \
-  wedding-site
+docker compose up --build pocketbase mailpit
 ```
 
-How the image works:
+…or download the [PocketBase binary](https://github.com/pocketbase/pocketbase/releases) (v0.40.x) and run:
 
-- **Multi-stage build.** Node builds the site and runs the type-check and tests (a broken commit cannot produce an image). Only the static files are copied into `nginx-unprivileged`, which runs as a **non-root** user on port **8080**.
-- **Runtime configuration.** The environment variables are read **when the container starts** and written to `/env-config.js`. The same image works for every environment without a rebuild.
-- `GET /healthz` returns `ok` and is used by the Docker `HEALTHCHECK`.
-- Fingerprinted assets are cached for one year. `index.html` and `env-config.js` are never cached, so new deploys show up immediately.
+```bash
+cd pocketbase
+FRONTEND_URL=http://localhost:5173 ./pocketbase serve \
+  --migrationsDir=./pb_migrations --hooksDir=./pb_hooks
+# first run: create the admin user
+./pocketbase superuser upsert admin@example.com 'a-strong-password'
+```
+
+Without SMTP, the binary cannot send e-mails. For local testing, either run Mailpit (`docker compose up mailpit`) and set `PB_SMTP_HOST=localhost PB_SMTP_PORT=1025`, or mark users as verified by hand in the admin UI.
+
+**2. Start the frontend:**
+
+```bash
+npm install
+cp .env.example .env         # VITE_POCKETBASE_URL=http://localhost:8090
+npm run dev                  # http://localhost:5173
+```
+
+> 💡 Without `VITE_POCKETBASE_URL` the public page still works. RSVPs are then only logged to the console, and the private area shows "not available".
+
+## The private area
+
+| Route                        | Page                                    | Access          |
+| ---------------------------- | --------------------------------------- | --------------- |
+| `/area`                      | Placeholder dashboard                   | logged-in only  |
+| `/area/login`                | Login                                   | guests only     |
+| `/area/signup`               | Sign up → "check your inbox"            | guests only     |
+| `/area/forgot-password`      | Request a reset e-mail                  | guests only     |
+| `/area/reset-password?token` | Choose a new password (link in e-mail)  | anyone          |
+| `/area/verify-email?token`   | Confirms the e-mail (link in e-mail)    | anyone          |
+
+Flows and security choices:
+
+- **Sign up** creates the user and sends a confirmation e-mail. **Only verified users can log in**: this is enforced by the server (`authRule = "verified = true"`), not just by the UI.
+- Logging in **before confirming** shows "please confirm your e-mail", with a **resend** button (60 s cooldown).
+- **Forgot password** always shows the same message, whether or not the account exists, so nobody can find out which e-mails are registered.
+- Reset links work **only once**. Expired or reused links show a clear "request a new link" page.
+- The session is stored by the PocketBase SDK (localStorage), stays in sync across tabs, and is **re-validated with the server** each time the private area opens.
+- PocketBase's **rate limiter** is on (e.g. 2 auth attempts per 3 s per IP).
+- The private area JavaScript is **code-split**: public visitors never download it.
+
+## PocketBase backend
+
+Everything the backend needs is in code, so a fresh instance is ready on first start:
+
+- **Migrations** (`pocketbase/pb_migrations/`), applied automatically at start:
+  - `rsvps` collection: **anyone can create**; list/view/update/delete are superuser-only. It has field constraints (lengths, guests 0–10).
+  - `users` hardening: only verified users can log in, minimum password length 8, users cannot delete their own account through the API.
+- **Hooks** (`pocketbase/pb_hooks/`):
+  - `settings.pb.js` syncs app name, sender, SMTP and the rate limiter from environment variables **on every start**. It also points the confirmation/reset e-mail links at the React pages (`FRONTEND_URL/area/...`).
+  - `rsvps.pb.js` adds cross-field validation (a declining guest cannot bring people).
+
+> Because the hook rewrites the e-mail templates on every start, **edit them in `settings.pb.js`**, not in the admin UI.
+
+The **image** ([`pocketbase/Dockerfile`](pocketbase/Dockerfile)):
+
+- **Pinned version** (`PB_VERSION` build arg) with **SHA-256 checksum verification** of the download.
+- Multi-architecture (`TARGETARCH`), a **non-root** user, a `/pb/pb_data` volume, and a health check on `/api/health`.
+- The entrypoint applies migrations, creates/updates the superuser from `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`, then `exec`s the server (so it receives stop signals cleanly).
+
+Build and run it on its own:
+
+```bash
+docker build -t wedding-pocketbase ./pocketbase
+docker run -p 8090:8090 -v pb_data:/pb/pb_data \
+  -e PB_ADMIN_EMAIL=admin@example.com -e PB_ADMIN_PASSWORD='a-strong-password' \
+  -e FRONTEND_URL=https://your-site.example \
+  wedding-pocketbase
+```
 
 ## Configuration reference
 
-| Dev (`.env`)             | Docker env var       | Description                            | Default                 |
-| ------------------------ | -------------------- | -------------------------------------- | ----------------------- |
-| `VITE_SUPABASE_URL`      | `SUPABASE_URL`       | Supabase project URL                   | _(empty: console mode)_ |
-| `VITE_SUPABASE_ANON_KEY` | `SUPABASE_ANON_KEY`  | Supabase anon public key               | _(empty: console mode)_ |
-| `VITE_PRIVATE_AREA_URL`  | `PRIVATE_AREA_URL`   | Target of the footer "Private area" link | `https://www.google.it` |
+**Frontend**
 
-`docker-compose.yml` maps the `VITE_*` values from `.env` to the container variables, so a single `.env` file covers both workflows.
+| Dev (`.env`)           | Docker env var    | Description                                       |
+| ---------------------- | ----------------- | ------------------------------------------------- |
+| `VITE_POCKETBASE_URL`  | `POCKETBASE_URL`  | PocketBase URL **as reachable from the browser**  |
+
+The frontend container reads it **at start-up** (written to `/env-config.js`), so one image works for every environment.
+
+**PocketBase**
+
+| Variable                                  | Description                                                       |
+| ----------------------------------------- | ----------------------------------------------------------------- |
+| `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD`     | Superuser created/updated at start (optional)                     |
+| `FRONTEND_URL`                            | Public site URL, used in e-mail links                             |
+| `PB_APP_URL`                              | Public PocketBase URL                                             |
+| `PB_APP_NAME`                             | Name shown in e-mails                                             |
+| `PB_SENDER_NAME`, `PB_SENDER_ADDRESS`     | E-mail sender                                                     |
+| `PB_SMTP_HOST`, `PB_SMTP_PORT`, `PB_SMTP_USERNAME`, `PB_SMTP_PASSWORD`, `PB_SMTP_TLS` | SMTP server (SMTP is enabled when `PB_SMTP_HOST` is set) |
+| `PB_ORIGINS`                              | Allowed CORS origins, comma separated (default `*`)               |
+| `PB_RATE_LIMIT`                           | `false` disables the built-in rate limiter (default: enabled)     |
+
+## Deploying to production
+
+- **Two services**: the frontend container (static files) and PocketBase with a **persistent volume** on `/pb/pb_data`. Run **only one** PocketBase instance; it is SQLite-based.
+- Put both behind HTTPS (Caddy, Traefik, or your platform's load balancer), e.g. `www.example.com` → web and `api.example.com` → PocketBase.
+- Set `POCKETBASE_URL=https://api.example.com`, `FRONTEND_URL=https://www.example.com` and `PB_ORIGINS=https://www.example.com`.
+- Configure a real SMTP provider. Use a sender domain with SPF/DKIM so e-mails don't land in spam.
+- **Back up** `pb_data` regularly. The admin UI has a built-in backup feature, and it can upload backups to S3.
 
 ## Scripts
 
-| Command              | What it does                         |
-| -------------------- | ------------------------------------ |
-| `npm run dev`        | Dev server with hot reload           |
-| `npm run build`      | Type-check + production build        |
-| `npm run preview`    | Serve the production build locally   |
-| `npm test`           | Run the unit/component tests once    |
-| `npm run test:watch` | Tests in watch mode                  |
-| `npm run typecheck`  | TypeScript project check             |
-| `npm run lint`       | Lint with oxlint                     |
+| Command              | What it does                       |
+| -------------------- | ---------------------------------- |
+| `npm run dev`        | Dev server with hot reload         |
+| `npm run build`      | Type-check + production build      |
+| `npm run preview`    | Serve the production build locally |
+| `npm test`           | Run the unit/component tests       |
+| `npm run test:watch` | Tests in watch mode                |
+| `npm run typecheck`  | TypeScript project check           |
+| `npm run lint`       | Lint with oxlint                   |
 
 ## Architecture notes
 
-- **Content separate from code.** Everything a couple wants to change lives in `wedding.ts` and `public/images`.
-- **Backend abstraction.** The UI depends only on the `RsvpRepository` interface (`src/services/rsvp/types.ts`).
-  - Supabase is one implementation, and it is **lazy-loaded** on the first submission, which keeps about 200 kB off the initial page load.
-  - **Switching to PocketBase:** add a `PocketBaseRsvpRepository` that implements `submit()` (e.g. `pb.collection('rsvps').create(...)`, with a create-only API rule) and return it from `createRsvpRepository()`. No component changes are needed.
-- **Defence in depth on input.** The same limits are enforced in three places: the browser (`maxLength`), client-side validation (`validation.ts`, unit-tested) and Postgres `CHECK` constraints. A honeypot field filters out simple bots.
-  - For heavy spam you can add Cloudflare Turnstile/hCaptcha with a Supabase Edge Function.
-- **Accessibility.** The page uses semantic landmarks and labelled inputs. Errors are linked with `aria-describedby`, and focus moves to the first invalid field. The countdown text is screen-reader friendly. All motion is disabled when `prefers-reduced-motion` is set.
-- **Private area.** It is only a link for now. A natural next step is Supabase Auth (magic link) plus an authenticated route that lists the RSVPs.
+- **Content separate from code.** Couples only touch `wedding.ts` and `public/images`.
+- **Backend behind interfaces.** Pages depend on `AuthService` and `RsvpRepository`, never on the PocketBase SDK directly.
+  - The PocketBase classes are one implementation each. Tests use in-memory fakes.
+  - Server errors are mapped to typed `AuthError` codes (`invalid_credentials`, `email_not_verified`, `invalid_token`, …), so the UI never parses backend payloads.
+- **Defence in depth.** The same rules apply in the browser (validation), in collection rules and field constraints, and in server hooks. A honeypot field filters simple bots on the RSVP form.
+- **Performance.** The private area is lazy-loaded. Vendor code (React, framer-motion, PocketBase) sits in separate chunks that stay cached across deploys.
+- **Accessibility.** Inputs are labelled, errors are linked with `aria-describedby`, and messages use `role="alert"` / `role="status"`. Floating photos are hidden from screen readers. All animations respect `prefers-reduced-motion`.

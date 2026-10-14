@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import styles from './Footer.module.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -5,18 +6,16 @@ const CURRENT_YEAR = new Date().getFullYear();
 interface FooterProps {
   coupleNames: string;
   hashtag?: string;
-  privateAreaUrl: string;
 }
 
-export function Footer({ coupleNames, hashtag, privateAreaUrl }: FooterProps) {
+export function Footer({ coupleNames, hashtag }: FooterProps) {
   return (
     <footer className={styles.footer}>
       <p className={styles.names}>{coupleNames}</p>
       {hashtag && <p className={styles.hashtag}>{hashtag}</p>}
-      <a className={styles.privateLink} href={privateAreaUrl} target="_blank" rel="noopener noreferrer">
+      <Link className={styles.privateLink} to="/area">
         Private area
-        <span className="visually-hidden"> (opens in a new tab)</span>
-      </a>
+      </Link>
       <p className={styles.copy}>Made with ♥ · {CURRENT_YEAR}</p>
     </footer>
   );

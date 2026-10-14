@@ -1,57 +1,3 @@
-.form {
-  display: grid;
-  gap: 1.1rem;
-}
-
-.field {
-  display: grid;
-  gap: 0.35rem;
-  border: none;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-}
-
-.field label,
-.field legend {
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
-  color: var(--card-muted);
-  padding: 0;
-}
-
-.field legend {
-  margin-bottom: 0.35rem;
-}
-
-.field input:not([type='radio']),
-.field select,
-.field textarea {
-  width: 100%;
-  font: inherit;
-  color: var(--text);
-  background: var(--white-warm);
-  border: 2px solid transparent;
-  border-radius: 10px;
-  padding: 0.7rem 0.85rem;
-  transition: border-color 0.15s ease;
-}
-
-.field textarea {
-  resize: vertical;
-}
-
-.field input:focus,
-.field select:focus,
-.field textarea:focus {
-  outline: none;
-  border-color: var(--card-accent);
-}
-
-.field [aria-invalid='true'] {
-  border-color: var(--danger);
-}
-
 .choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -92,42 +38,12 @@
   outline-offset: 2px;
 }
 
-.error,
-.submitError {
-  color: var(--danger);
-  font-size: 0.85rem;
-  margin: 0;
-}
-
 .honeypot {
   position: absolute;
   left: -10000px;
   width: 1px;
   height: 1px;
   overflow: hidden;
-}
-
-.submit {
-  margin-top: 0.5rem;
-  padding: 0.95rem 1rem;
-  border: none;
-  border-radius: 999px;
-  background: var(--card-accent);
-  color: var(--card-bg);
-  font: 700 1rem var(--font-sans);
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
-}
-
-.submit:hover:not(:disabled) {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-}
-
-.submit:disabled {
-  opacity: 0.6;
-  cursor: progress;
 }
 
 .success {

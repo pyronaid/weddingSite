@@ -1,3 +1,8 @@
+# Local full stack: frontend + PocketBase + Mailpit (fake SMTP inbox).
+#   docker compose up --build
+#   site:      http://localhost:8080
+#   admin UI:  http://localhost:8090/_/
+#   inbox:     http://localhost:8025
 services:
   web:
     build: .
@@ -5,7 +10,40 @@ services:
     ports:
       - "8080:8080"
     environment:
-      SUPABASE_URL: ${VITE_SUPABASE_URL:-}
-      SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
-      PRIVATE_AREA_URL: ${VITE_PRIVATE_AREA_URL:-https://www.google.it}
+      POCKETBASE_URL: ${VITE_POCKETBASE_URL:-http://localhost:8090}
+    depends_on:
+      pocketbase:
+        condition: service_healthy
     restart: unless-stopped
+
+  pocketbase:
+    build: ./pocketbase
+    image: wedding-pocketbase:latest
+    ports:
+      - "8090:8090"
+    environment:
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      PB_APP_URL: ${VITE_POCKETBASE_URL:-http://localhost:8090}
+      PB_APP_NAME: ${PB_APP_NAME:-Our Wedding}
+      PB_SENDER_NAME: ${PB_SENDER_NAME:-Our Wedding}
+      PB_SENDER_ADDRESS: ${PB_SENDER_ADDRESS:-noreply@example.com}
+      PB_ORIGINS: ${PB_ORIGINS:-*}
+      PB_SMTP_HOST: ${PB_SMTP_HOST:-mailpit}
+      PB_SMTP_PORT: ${PB_SMTP_PORT:-1025}
+      PB_SMTP_USERNAME: ${PB_SMTP_USERNAME:-}
+      PB_SMTP_PASSWORD: ${PB_SMTP_PASSWORD:-}
+      PB_SMTP_TLS: ${PB_SMTP_TLS:-false}
+    volumes:
+      - pb_data:/pb/pb_data
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "8025:8025"
+    restart: unless-stopped
+
+volumes:
+  pb_data:

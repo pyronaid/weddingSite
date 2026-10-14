@@ -8,9 +8,8 @@
  * fallback, so both workflows share the same code path.
  */
 export interface RuntimeConfig {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  privateAreaUrl: string;
+  /** Public URL of the PocketBase instance, e.g. https://api.example.com */
+  pocketbaseUrl: string;
 }
 
 declare global {
@@ -18,8 +17,6 @@ declare global {
     __APP_CONFIG__?: Partial<RuntimeConfig>;
   }
 }
-
-const DEFAULT_PRIVATE_AREA_URL = 'https://www.google.it';
 
 /** Empty strings (unset env vars in the container) count as "not provided". */
 function pick(...values: Array<string | undefined>): string {
@@ -30,10 +27,7 @@ function loadConfig(): RuntimeConfig {
   const runtime = typeof window !== 'undefined' ? (window.__APP_CONFIG__ ?? {}) : {};
 
   return Object.freeze({
-    supabaseUrl: pick(runtime.supabaseUrl, import.meta.env.VITE_SUPABASE_URL),
-    supabaseAnonKey: pick(runtime.supabaseAnonKey, import.meta.env.VITE_SUPABASE_ANON_KEY),
-    privateAreaUrl:
-      pick(runtime.privateAreaUrl, import.meta.env.VITE_PRIVATE_AREA_URL) || DEFAULT_PRIVATE_AREA_URL,
+    pocketbaseUrl: pick(runtime.pocketbaseUrl, import.meta.env.VITE_POCKETBASE_URL).replace(/\/+$/, ''),
   });
 }
 

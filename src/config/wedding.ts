@@ -40,6 +40,8 @@ export interface WeddingConfig {
     bankName?: string;
     paymentReason?: string;
   };
+  /** Decorative photos floating around the private area forms (up to 8). */
+  privateAreaPhotos: Photo[];
   photos: {
     date: SectionPhotos;
     location: SectionPhotos;
@@ -90,6 +92,16 @@ export const wedding: WeddingConfig = {
     bankName: 'Banca Esempio',
     paymentReason: 'Wedding gift Giulia & Marco',
   },
+  privateAreaPhotos: [
+    photo('together-1.svg', ''),
+    photo('bride-1.svg', ''),
+    photo('groom-2.svg', ''),
+    photo('together-2.svg', ''),
+    photo('bride-2.svg', ''),
+    photo('groom-1.svg', ''),
+    photo('together-1.svg', ''),
+    photo('bride-1.svg', ''),
+  ],
   photos: {
     date: {
       left: [photo('bride-1.svg', 'Giulia as a child'), photo('bride-2.svg', 'Giulia at graduation')],

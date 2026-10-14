@@ -1,0 +1,173 @@
+/* Shared form styles for every form placed on a dark info card. */
+
+.form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.field label,
+.field legend {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--card-muted);
+  padding: 0;
+}
+
+.field legend {
+  margin-bottom: 0.35rem;
+}
+
+.field input:not([type='radio']),
+.field select,
+.field textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--white-warm);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  transition: border-color 0.15s ease;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--card-accent);
+}
+
+.field [aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.error,
+.submitError {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.submit {
+  margin-top: 0.5rem;
+  padding: 0.95rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--card-accent);
+  color: var(--card-bg);
+  font: 700 1rem var(--font-sans);
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
+}
+
+.submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* ---- Additions used by the private area forms ---- */
+
+.passwordWrap {
+  position: relative;
+}
+
+.passwordWrap input {
+  padding-right: 4.5rem !important;
+}
+
+.toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--card-bg);
+  font: 700 0.75rem var(--font-sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--card-muted);
+  opacity: 0.85;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.noticeError {
+  border-color: var(--danger);
+}
+
+.noticeSuccess {
+  border-color: var(--success);
+}
+
+.textButton {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--card-accent);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.textButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+  text-decoration: none;
+}
+
+.secondary {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 0.85rem 1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--card-accent);
+  background: transparent;
+  color: var(--card-accent);
+  font: 700 0.95rem var(--font-sans);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* Lets a router <Link> look like the primary button. */
+a.submit {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
