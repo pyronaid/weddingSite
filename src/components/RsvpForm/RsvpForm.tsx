@@ -8,6 +8,7 @@ import {
   type RsvpRepository,
   type RsvpSubmission,
 } from '../../services/rsvp';
+import formStyles from '../Form/Form.module.css';
 import styles from './RsvpForm.module.css';
 
 interface RsvpFormProps {
@@ -95,14 +96,14 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
   const describedBy = (name: keyof RsvpSubmission) => (errors[name] ? fieldId(`${name}-error`) : undefined);
   const errorText = (name: keyof RsvpSubmission) =>
     errors[name] ? (
-      <span id={fieldId(`${name}-error`)} className={styles.error}>
+      <span id={fieldId(`${name}-error`)} className={formStyles.error}>
         {errors[name]}
       </span>
     ) : null;
 
   return (
-    <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      <div className={styles.field}>
+    <form className={formStyles.form} onSubmit={handleSubmit} noValidate>
+      <div className={formStyles.field}>
         <label htmlFor={fieldId('fullName')}>Full name *</label>
         <input
           id={fieldId('fullName')}
@@ -118,7 +119,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
         {errorText('fullName')}
       </div>
 
-      <div className={styles.field}>
+      <div className={formStyles.field}>
         <label htmlFor={fieldId('email')}>E-mail *</label>
         <input
           id={fieldId('email')}
@@ -136,7 +137,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
         {errorText('email')}
       </div>
 
-      <fieldset className={styles.field}>
+      <fieldset className={formStyles.field}>
         <legend>Will you attend? *</legend>
         <div className={styles.choices}>
           <label className={styles.choice}>
@@ -159,7 +160,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
 
       {isAttending && (
         <>
-          <div className={styles.field}>
+          <div className={formStyles.field}>
             <label htmlFor={fieldId('guests')}>Number of guests (you included) *</label>
             <select
               id={fieldId('guests')}
@@ -178,7 +179,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
             {errorText('guests')}
           </div>
 
-          <div className={styles.field}>
+          <div className={formStyles.field}>
             <label htmlFor={fieldId('dietaryNotes')}>Allergies or dietary requirements</label>
             <input
               id={fieldId('dietaryNotes')}
@@ -194,7 +195,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
         </>
       )}
 
-      <div className={styles.field}>
+      <div className={formStyles.field}>
         <label htmlFor={fieldId('message')}>A message for us</label>
         <textarea
           id={fieldId('message')}
@@ -222,12 +223,12 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
       </div>
 
       {status === 'error' && (
-        <p className={styles.submitError} role="alert">
+        <p className={formStyles.submitError} role="alert">
           {submitError}
         </p>
       )}
 
-      <button className={styles.submit} type="submit" disabled={status === 'submitting'}>
+      <button className={formStyles.submit} type="submit" disabled={status === 'submitting'}>
         {status === 'submitting' ? 'Sending…' : 'Send confirmation'}
       </button>
     </form>

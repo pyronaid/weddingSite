@@ -1,0 +1,48 @@
+.layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.photo {
+  position: absolute;
+  top: var(--top);
+  left: var(--left);
+  width: var(--size);
+  margin: 0;
+  background: #fff;
+  padding: 8px 8px 28px;
+  border-radius: 6px;
+  box-shadow: var(--shadow-photo);
+  will-change: transform;
+}
+
+.photo img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+/* Medium screens: keep photos clear of the centered card. */
+@media (max-width: 1100px) {
+  .photo {
+    width: calc(var(--size) * 0.75);
+  }
+}
+
+@media (max-width: 760px) {
+  .desktopOnly {
+    display: none;
+  }
+
+  .photo {
+    top: var(--m-top);
+    left: var(--m-left);
+    width: 120px;
+    padding: 6px 6px 20px;
+    opacity: 0.9;
+  }
+}

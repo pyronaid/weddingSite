@@ -1,0 +1,75 @@
+.page {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.header,
+.main,
+.footer {
+  position: relative;
+  z-index: 1;
+}
+
+.header {
+  text-align: center;
+  padding: 2rem 1rem 0;
+}
+
+.brand {
+  font-family: var(--font-script);
+  font-size: clamp(2rem, 6vw, 2.8rem);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand span {
+  color: var(--pink-600);
+}
+
+.main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem 1.25rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--card-bg);
+  color: var(--card-text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: clamp(1.75rem, 5vw, 2.5rem);
+}
+
+.footer {
+  text-align: center;
+  padding: 0 1rem 2rem;
+  font-size: 0.9rem;
+}
+
+.footer a {
+  color: var(--pink-600);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* Leave room for the photos peeking from the top/bottom on phones. */
+@media (max-width: 760px) {
+  .header {
+    padding-top: 6.5rem;
+  }
+
+  .footer {
+    padding-bottom: 6rem;
+  }
+}

@@ -1,0 +1,56 @@
+.intro {
+  text-align: center;
+  color: var(--card-muted);
+  margin: -0.5rem 0 1.5rem;
+  font-size: 0.95rem;
+}
+
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.links {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 0.5rem;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--card-muted);
+}
+
+.links a {
+  color: var(--card-accent);
+  font-weight: 700;
+}
+
+.inlineRight {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -0.4rem;
+  font-size: 0.85rem;
+}
+
+.inlineRight a {
+  color: var(--card-accent);
+}
+
+.icon {
+  display: block;
+  text-align: center;
+  font-size: 2.6rem;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.center {
+  text-align: center;
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--card-muted);
+  display: grid;
+  gap: 0.3rem;
+}

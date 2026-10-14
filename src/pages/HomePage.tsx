@@ -1,16 +1,17 @@
 import { useMemo } from 'react';
-import { Footer } from './components/Footer/Footer';
-import { Hero } from './components/Hero/Hero';
-import { runtimeConfig } from './config/runtimeConfig';
-import { wedding } from './config/wedding';
-import { formatWeddingDate } from './lib/format';
-import { DateSection } from './sections/DateSection';
-import { GiftSection } from './sections/GiftSection';
-import { LocationSection } from './sections/LocationSection';
-import { RsvpSection } from './sections/RsvpSection';
-import { createRsvpRepository } from './services/rsvp';
+import { Footer } from '../components/Footer/Footer';
+import { Hero } from '../components/Hero/Hero';
+import { wedding } from '../config/wedding';
+import { formatWeddingDate } from '../lib/format';
+import { DateSection } from '../sections/DateSection';
+import { GiftSection } from '../sections/GiftSection';
+import { LocationSection } from '../sections/LocationSection';
+import { RsvpSection } from '../sections/RsvpSection';
+import { createRsvpRepository } from '../services/rsvp';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
-export default function App() {
+export function HomePage() {
+  useDocumentTitle();
   // Created once; components receive it via props (easy to mock in tests).
   const rsvpRepository = useMemo(() => createRsvpRepository(), []);
   const { couple, location, photos } = wedding;
@@ -39,7 +40,6 @@ export default function App() {
       <Footer
         coupleNames={`${couple.partnerOne} & ${couple.partnerTwo}`}
         hashtag={couple.hashtag}
-        privateAreaUrl={runtimeConfig.privateAreaUrl}
       />
     </>
   );
