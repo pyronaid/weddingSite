@@ -130,8 +130,7 @@ npm run dev                  # http://localhost:5173
 | Route                        | Page                                    | Access          |
 | ---------------------------- | --------------------------------------- | --------------- |
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
-| `/area/suits/clubs`          | Clubs: flip cards + secret phrase       | logged-in only  |
-| `/area/suits/:suit`          | Other suits (placeholder for now)       | logged-in only  |
+| `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
 | `/area/forgot-password`      | Request a reset e-mail                  | guests only     |
@@ -154,7 +153,7 @@ Flows and security choices:
 The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number of cards the guest collected out of the cards in the deck, e.g. `3/13`. Each card links to its suit page.
 
 - Data comes from PocketBase through [`src/services/game`](src/services/game) (a `GameRepository` interface, like the RSVP and auth services). The totals are read from the deck too, so changing the deck needs no frontend release.
-- **Suit page** (clubs for now): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`).
+- **Suit pages** (one per suit, same behaviour; each suit has its own letters and phrase): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`).
 - **Letters** are set per card in the admin UI (`cards` → `letter`, one character). The field is *hidden*: the server sends it only for cards the guest collected (`pb_hooks/cards.pb.js`), and guests cannot filter or sort on it, so letters cannot be guessed through the API.
 - Card faces are static SVGs in [`public/cards/`](public/cards/CREDITS.md) (CC0 artwork by Adrian Kennard), loaded lazily and cached by nginx.
 - To **give a card to a guest** for now: admin UI → `collected_cards` → New record → pick the user and the card. Guests cannot do this themselves.
