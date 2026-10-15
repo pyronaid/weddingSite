@@ -8,14 +8,11 @@ import { SUIT_META } from '../../game/suits';
 import { AREA_HOME } from '../../guards';
 import { FlipCard } from '../FlipCard/FlipCard';
 import { SecretPhrase } from '../SecretPhrase/SecretPhrase';
+import { SuitRules } from '../SuitRules/SuitRules';
 import styles from './SuitCollection.module.css';
 
 interface SuitCollectionProps {
   suit: Suit;
-  /** Replaces the default "how to play" paragraph. */
-  intro?: ReactNode;
-  /** Extra block under the intro (e.g. the game rules). */
-  rules?: ReactNode;
   /** Rendered under each card (e.g. the photo challenge button). `refresh` reloads the cards. */
   renderCardAction?: (card: PlayingCard, refresh: () => void) => ReactNode;
   /** Rendered after the cards (e.g. a link to the gallery). */
@@ -23,7 +20,7 @@ interface SuitCollectionProps {
 }
 
 /** All the cards of a suit, the collected ones highlighted, and the secret phrase. */
-export function SuitCollection({ suit, intro, rules, renderCardAction, footer }: SuitCollectionProps) {
+export function SuitCollection({ suit, renderCardAction, footer }: SuitCollectionProps) {
   const { label, symbol } = SUIT_META[suit];
   const query = useSuitCards(suit);
   const cards = query.status === 'success' ? query.data : undefined;
@@ -34,10 +31,10 @@ export function SuitCollection({ suit, intro, rules, renderCardAction, footer }:
     <div className={styles.page} data-layout="wide">
       <CardHeader id="suit-title" eyebrow={`${symbol} Your collection`} title={label} />
       <p className={styles.intro}>
-        {intro ??
-          'Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to discover the secret phrase.'}
+        Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to discover
+        the secret phrase.
       </p>
-      {rules}
+      <SuitRules suit={suit} />
 
       {query.status === 'loading' && (
         <p className={styles.status} role="status">
