@@ -98,11 +98,13 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
   };
 
   const replacing = card.collected || (draw.status === 'ready' && draw.draw.locked);
+  const label = `${replacing ? 'Change the photo' : 'Photo challenge'} for the ${name}`;
 
   return (
     <>
-      <button type="button" className={styles.trigger} onClick={open} aria-label={`${replacing ? 'Change the photo' : 'Photo challenge'} for the ${name}`}>
-        <span aria-hidden="true">📷</span> {replacing ? 'Change' : 'Photo'}
+      {/* Icon only: the label is announced by screen readers and shown as a tooltip. */}
+      <button type="button" className={styles.trigger} onClick={open} aria-label={label} title={label}>
+        <span aria-hidden="true">📷</span>
       </button>
 
       <Modal open={draw.status !== 'closed'} onClose={close} title={`Photo challenge · ${name}`}>
