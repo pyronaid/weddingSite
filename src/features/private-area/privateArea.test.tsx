@@ -78,6 +78,7 @@ function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository
     uploadPhoto: vi.fn(async () => {}),
     getGallery: vi.fn(async () => ({ items: [], hasMore: false })),
     getGalleryUpdates: vi.fn(async () => []),
+    getFileToken: vi.fn(async () => ({ token: 'file-token', expiresAt: Date.now() + 3_600_000 })),
     ...overrides,
   };
 }
@@ -439,9 +440,25 @@ describe('private area', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent('This photo cannot be uploaded.');
       });
 
-      it('links to the gallery; other suits have no photo buttons', async () => {
+      it('shows the rules and links to the gallery', async () => {
         renderArea(await loggedIn(), '/area/suits/hearts');
-        expect(await screen.findByRole('link', { name: /see everyone's photos/i })).toHaveAttribute('href', '/area/gallery');
+        const rules = await screen.findByRole('region', { name: 'Photo challenge rules' });
+        expect(rules).toHaveTextContent(/checked against the scene it was assigned/i);
+        expect(screen.getByRole('link', { name: /see everyone's photos/i })).toHaveAttribute('href', '/area/gallery');
+      });
+
+      it('explains why a file that is not a photo is refused', async () => {
+        const game = createFakeGame();
+        renderArea(await loggedIn(), '/area/suits/hearts', game);
+        const user = userEvent.setup({ applyAccept: false });
+        await user.click(await screen.findByRole('button', { name: 'Photo challenge for the 2 of hearts' }));
+        await user.upload(
+          await screen.findByLabelText('Take or choose a photo'),
+          new File(['%PDF'], 'invite.pdf', { type: 'application/pdf' }),
+        );
+        await user.click(screen.getByRole('button', { name: 'Upload photo' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(/not a photo/i);
+        expect(game.uploadPhoto).not.toHaveBeenCalled();
       });
 
       it('has no photo challenge on the other suits', async () => {
@@ -481,7 +498,8 @@ describe('private area', () => {
 
         await user.click(within(list).getByRole('button', { name: 'Scene 3, by Guest3 (3 of hearts)' }));
         const dialog = await screen.findByRole('dialog', { name: 'Scene 3' });
-        expect(within(dialog).getByRole('img', { name: 'Scene 3' })).toHaveAttribute('src', 'http://pb/3-1200.jpg');
+        // Protected files: the URL carries the file token.
+        expect(within(dialog).getByRole('img', { name: 'Scene 3' })).toHaveAttribute('src', 'http://pb/3-1200.jpg?token=file-token');
       });
 
       it('adds new and replaced photos at the top every few seconds', async () => {

@@ -26,13 +26,23 @@ routerAdd(
   $apis.requireAuth('users'),
 );
 
-// Uploading (or replacing) the photo must leave a photo in place.
-// Superusers may remove one from the admin UI (moderation).
+// Uploading (or replacing) the photo must leave a real photo in place.
+// The file field already checks the type from the file CONTENT (JPEG, PNG or
+// WebP; a renamed text/SVG/GIF file is rejected) and the 10 MB limit.
+// Superusers may remove a photo from the admin UI (moderation).
 onRecordUpdateRequest((e) => {
-  // A just-uploaded file is still pending here: count it as well.
-  const hasPhoto = e.record.getString('photo') || e.record.getUnsavedFiles('photo').length > 0;
-  if (!e.hasSuperuserAuth() && !hasPhoto) {
+  if (e.hasSuperuserAuth()) return e.next();
+
+  // A just-uploaded file is still pending here.
+  const uploaded = e.record.getUnsavedFiles('photo');
+  if (!e.record.getString('photo') && uploaded.length === 0) {
     throw new BadRequestError('Please choose a photo to upload.');
+  }
+  // A real photo, even shrunk to 2048 px, weighs well over 10 KB: this rejects
+  // icons, 1x1 pixels and empty images.
+  const MIN_BYTES = 10 * 1024;
+  if (uploaded.length > 0 && uploaded[0].size < MIN_BYTES) {
+    throw new BadRequestError('This file is too small to be a photo.');
   }
   e.next();
 }, 'photo_submissions');

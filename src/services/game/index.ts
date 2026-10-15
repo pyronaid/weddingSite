@@ -20,5 +20,6 @@ export function createGameRepository(): GameRepository {
     uploadPhoto: () => Promise.reject(gameError('not_configured')),
     getGallery: () => Promise.reject(gameError('not_configured')),
     getGalleryUpdates: () => Promise.reject(gameError('not_configured')),
+    getFileToken: () => Promise.reject(gameError('not_configured')),
   };
 }

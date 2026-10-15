@@ -14,6 +14,8 @@ interface SuitCollectionProps {
   suit: Suit;
   /** Replaces the default "how to play" paragraph. */
   intro?: ReactNode;
+  /** Extra block under the intro (e.g. the game rules). */
+  rules?: ReactNode;
   /** Rendered under each card (e.g. the photo challenge button). `refresh` reloads the cards. */
   renderCardAction?: (card: PlayingCard, refresh: () => void) => ReactNode;
   /** Rendered after the cards (e.g. a link to the gallery). */
@@ -21,7 +23,7 @@ interface SuitCollectionProps {
 }
 
 /** All the cards of a suit, the collected ones highlighted, and the secret phrase. */
-export function SuitCollection({ suit, intro, renderCardAction, footer }: SuitCollectionProps) {
+export function SuitCollection({ suit, intro, rules, renderCardAction, footer }: SuitCollectionProps) {
   const { label, symbol } = SUIT_META[suit];
   const query = useSuitCards(suit);
   const cards = query.status === 'success' ? query.data : undefined;
@@ -35,6 +37,7 @@ export function SuitCollection({ suit, intro, renderCardAction, footer }: SuitCo
         {intro ??
           'Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to discover the secret phrase.'}
       </p>
+      {rules}
 
       {query.status === 'loading' && (
         <p className={styles.status} role="status">

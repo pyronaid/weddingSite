@@ -3,6 +3,7 @@ import { gameError, toGameError } from './errors';
 import {
   isSuit,
   SUITS,
+  type FileToken,
   type GalleryPage,
   type GalleryPhoto,
   type GameProgress,
@@ -21,6 +22,8 @@ const SUBMISSIONS = 'photo_submissions';
 // Thumbnail sizes declared on the photo field (see the photo challenge migration).
 const THUMB_GRID = '480x0';
 const THUMB_LARGE = '1200x0';
+/** Renew file tokens this long before they expire. */
+const TOKEN_RENEW_MARGIN_MS = 5 * 60 * 1000;
 const GALLERY_FIELDS =
   'id,collectionId,collectionName,photo,scene_text,player,updated,expand.card.suit,expand.card.rank';
 
@@ -84,8 +87,20 @@ function countBySuit(suits: Iterable<string>): Record<Suit, number> {
   return counts;
 }
 
+/** Expiry (ms) read from the token itself, so the server's setting is the only source of truth. */
+function tokenExpiry(token: string): number {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (typeof payload.exp === 'number') return payload.exp * 1000;
+  } catch {
+    // Not a readable JWT: fall through.
+  }
+  return Date.now() + 2 * 60 * 1000;
+}
+
 export class PocketBaseGameRepository implements GameRepository {
   private readonly pb: PocketBase;
+  private fileToken: (FileToken & { userId: string }) | null = null;
 
   constructor(pb: PocketBase) {
     this.pb = pb;
@@ -190,11 +205,12 @@ export class PocketBaseGameRepository implements GameRepository {
         method: 'POST',
       });
       const record = { id: data.submissionId, collectionId: data.collectionId, collectionName: SUBMISSIONS };
+      const token = data.photo ? (await this.getFileToken()).token : '';
       return {
         submissionId: data.submissionId,
         scene: data.scene,
         locked: data.locked,
-        photoUrl: data.photo ? this.pb.files.getURL(record, data.photo, { thumb: THUMB_GRID }) : null,
+        photoUrl: data.photo ? this.pb.files.getURL(record, data.photo, { thumb: THUMB_GRID, token }) : null,
       };
     } catch (error) {
       throw toGameError(error);
@@ -241,6 +257,21 @@ export class PocketBaseGameRepository implements GameRepository {
         skipTotal: true,
       });
       return result.items.map(this.toGalleryPhoto);
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async getFileToken({ force = false }: { force?: boolean } = {}): Promise<FileToken> {
+    const userId = this.requireUserId();
+    const cached = this.fileToken;
+    if (!force && cached && cached.userId === userId && cached.expiresAt - Date.now() > TOKEN_RENEW_MARGIN_MS) {
+      return { token: cached.token, expiresAt: cached.expiresAt };
+    }
+    try {
+      const token = await this.pb.files.getToken();
+      this.fileToken = { token, expiresAt: tokenExpiry(token), userId };
+      return { token, expiresAt: this.fileToken.expiresAt };
     } catch (error) {
       throw toGameError(error);
     }

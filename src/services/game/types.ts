@@ -52,7 +52,7 @@ export interface PhotoDraw {
   scene: string;
   /** A photo was already uploaded: the scene no longer changes. */
   locked: boolean;
-  /** The current photo (thumbnail), if any. */
+  /** The current photo (thumbnail, already signed with a file token), if any. */
   photoUrl: string | null;
 }
 
@@ -63,12 +63,18 @@ export interface GalleryPhoto {
   rank: Rank;
   scene: string;
   player: string;
-  /** Small version for the grid. */
+  /** Small version for the grid (protected: add a file token, see signFileUrl). */
   thumbUrl: string;
-  /** Larger version for the enlarged view. */
+  /** Larger version for the enlarged view (protected). */
   largeUrl: string;
   /** Last change (ISO-like string, sortable): newest first. */
   updated: string;
+}
+
+/** Permission to load protected photos, valid until `expiresAt` (ms since epoch). */
+export interface FileToken {
+  token: string;
+  expiresAt: number;
 }
 
 export interface GalleryPage {
@@ -97,6 +103,8 @@ export interface GameRepository {
   getGallery(page: number, perPage: number): Promise<GalleryPage>;
   /** Photos added or replaced after `since` (an `updated` value), newest first. */
   getGalleryUpdates(since: string): Promise<GalleryPhoto[]>;
+  /** A token to load protected photos; cached until close to expiry unless `force`. */
+  getFileToken(options?: { force?: boolean }): Promise<FileToken>;
 }
 
 export type GameErrorCode =

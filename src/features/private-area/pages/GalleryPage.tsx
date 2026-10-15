@@ -4,8 +4,9 @@ import formStyles from '../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { Modal } from '../../../components/Modal/Modal';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
-import { rankName, type GalleryPhoto } from '../../../services/game';
+import { rankName, signFileUrl, type GalleryPhoto } from '../../../services/game';
 import { SUIT_META, suitPath } from '../game/suits';
+import { useFileToken } from '../game/useFileToken';
 import { useGalleryFeed } from '../game/useGalleryFeed';
 import styles from './GalleryPage.module.css';
 
@@ -17,6 +18,8 @@ const shortCard = (photo: GalleryPhoto) =>
 export function GalleryPage() {
   useDocumentTitle('Gallery');
   const feed = useGalleryFeed();
+  // Photos are protected files: every URL needs a (renewed) token.
+  const { token, renew } = useFileToken();
   const [selected, setSelected] = useState<GalleryPhoto | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const { loadMore, hasMore } = feed;
@@ -70,7 +73,17 @@ export function GalleryPage() {
                 onClick={() => setSelected(photo)}
                 aria-label={`${photo.scene}, by ${photo.player} (${cardLabel(photo)})`}
               >
-                <img src={photo.thumbUrl} alt="" loading="lazy" decoding="async" width={480} height={480} />
+                {token && (
+                  <img
+                    src={signFileUrl(photo.thumbUrl, token)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    width={480}
+                    height={480}
+                    onError={renew}
+                  />
+                )}
                 <span className={styles.caption} aria-hidden="true">
                   <span className={styles.badge}>{shortCard(photo)}</span> {photo.player}
                 </span>
@@ -95,7 +108,7 @@ export function GalleryPage() {
       <Modal open={selected !== null} onClose={() => setSelected(null)} title={selected?.scene ?? ''} size="wide">
         {selected && (
           <figure className={styles.large}>
-            <img src={selected.largeUrl} alt={selected.scene} />
+            {token && <img src={signFileUrl(selected.largeUrl, token)} alt={selected.scene} onError={renew} />}
             <figcaption>
               Caught by <strong>{selected.player}</strong> · {cardLabel(selected)}
             </figcaption>

@@ -165,7 +165,9 @@ The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number
   - Numbered cards: the scene is drawn **at random on the server** from the card's own bucket (`photo_scenes`, edit them in the admin UI; higher cards get harder scenes). **Every press draws a new scene**, so photos cannot be prepared in advance.
   - Jack, Queen and King: the scene is told in person ("The King of hearts will tell you the scene…").
   - Uploading the photo **collects the card**. Once a photo exists, the scene is **locked**: pressing the button again shows the same scene and only lets the guest replace the photo.
-  - Photos are shrunk in the browser before upload (max 2048 px, JPEG): ~0.5 MB instead of the 3–8 MB of a phone photo.
+  - **Only real photos are accepted.** In the browser: the file must be an image that decodes as a photo, at least 320 px on each side; it is then shrunk (max 2048 px, ~0.5 MB instead of 3–8 MB) and re-encoded as JPEG, which also **removes the EXIF metadata (GPS location, phone model)** before the photo is shared. On the server: the type is detected from the file **content** (JPEG, PNG or WebP only, so a renamed text, SVG or GIF file is refused), 10 KB–10 MB.
+  - A **rules** box on the hearts page explains the draws and warns that the photos of whoever claims victory are checked against their assigned scenes, so fake pictures are useless.
+  - Photos are **protected files**: a photo URL only works with a file token, which only logged-in guests get. Tokens last 1 hour (a leaked link stops working) and the gallery renews them automatically.
 - **Gallery** (`/area/gallery`, linked at the bottom of the hearts page): every player's photos, with the scene, the first name and the card. Built to stay light with many photos:
   - the grid loads **480 px thumbnails** (generated once by PocketBase, then cached); the 1200 px version only when a photo is opened, never the original;
   - **pages of 24**, the next page loading as you scroll; images load lazily and off-screen tiles skip rendering (`content-visibility`);
@@ -236,7 +238,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `cards`: the 52-card deck (`suit` + `rank` 1–13, unique together), seeded by the migration. Logged-in users can read it, only superusers can change it.
     It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
   - `photo_scenes`: the scenes of each hearts card (admin only; seeded with examples).
-  - `photo_submissions`: one row per (user, card) with the drawn scene and the photo (thumbnails 480 px and 1200 px). Logged-in users see the rows that have a photo (the gallery); the owner can only replace the photo, never the scene.
+  - `photo_submissions`: one row per (user, card) with the drawn scene and the photo (protected file, thumbnails 480 px and 1200 px). Logged-in users see the rows that have a photo (the gallery); the owner can only replace the photo, never the scene.
   - `collected_cards`: one row per (user, card), unique. **Users can only read their own rows**; creating/editing them is superuser-only until the collecting mechanics are defined. Rows are deleted with their user or card.
 - **Hooks** (`pocketbase/pb_hooks/`):
   - `settings.pb.js` syncs app name, sender, SMTP and the rate limiter from environment variables **on every start**. It also points the confirmation/reset e-mail links at the React pages (`FRONTEND_URL/area/...`).

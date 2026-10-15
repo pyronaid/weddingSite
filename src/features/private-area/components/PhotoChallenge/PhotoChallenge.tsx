@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Modal } from '../../../../components/Modal/Modal';
 import formStyles from '../../../../components/Form/Form.module.css';
-import { resizeImage } from '../../../../lib/resizeImage';
+import { PhotoCheckError, preparePhoto } from '../../../../lib/preparePhoto';
 import { rankName, toGameError, type PhotoDraw, type PlayingCard } from '../../../../services/game';
 import { useGameRepository } from '../../game/GameRepositoryContext';
 import { SUIT_META } from '../../game/suits';
@@ -88,11 +88,12 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
     if (draw.status !== 'ready' || !file || upload.status === 'uploading') return;
     setUpload({ status: 'uploading' });
     try {
-      await repository.uploadPhoto(draw.draw.submissionId, await resizeImage(file));
+      await repository.uploadPhoto(draw.draw.submissionId, await preparePhoto(file));
       setUpload({ status: 'done' });
       onUploaded();
     } catch (reason) {
-      setUpload({ status: 'error', message: handleFailure(reason) });
+      const message = reason instanceof PhotoCheckError ? reason.message : handleFailure(reason);
+      setUpload({ status: 'error', message });
     }
   };
 
