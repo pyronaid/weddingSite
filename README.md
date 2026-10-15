@@ -179,6 +179,42 @@ The script reads each card's secret code from PocketBase (as superuser) and writ
 
 The QR codes use 25% error correction (level Q) and are 11 cm wide, so they scan from a couple of metres even with some glare. The script refuses a `localhost` `FRONTEND_URL` (phones at the venue could not open it). **The files contain the secret codes: don't commit or share them.** Generate the posters only after the final deploy, as codes differ between databases.
 
+Options (with `npm run`, put them after `--`; they can be combined):
+
+| Option              | Default    | Description                                                                 |
+| ------------------- | ---------- | --------------------------------------------------------------------------- |
+| `--suit <suit>`     | `clubs`    | `hearts`, `diamonds`, `spades` or `clubs`                                   |
+| `--pdf`             | off        | Also writes `<suit>-posters.pdf` (needs Playwright)                         |
+| `--out <dir>`       | `posters/` | Output folder                                                               |
+| `--allow-localhost` | off        | Accepts a `localhost` / `127.x` / `0.0.0.0` `FRONTEND_URL`: **local tests only** |
+
+#### Testing the posters locally
+
+By default the script stops with *"FRONTEND_URL is http://localhost:…: guests' phones cannot open it"*. That protects you from printing posters that only work on your computer. For a local test, pass `--allow-localhost`:
+
+```bash
+# Full stack with Docker (`docker compose up`): the values in .env already match
+#   VITE_POCKETBASE_URL=http://localhost:8090  FRONTEND_URL=http://localhost:8080
+npm run posters -- --allow-localhost
+
+# Frontend with `npm run dev` (port 5173): override FRONTEND_URL for this run only
+FRONTEND_URL=http://localhost:5173 npm run posters -- --allow-localhost --suit hearts
+```
+
+Then open `posters/clubs-posters.html` to check the layout. To try a riddle, open the URL printed under the QR code in your browser: the QR itself points to `localhost`, which a phone resolves to *itself*, not to your computer.
+
+**To scan the QR with a real phone**, use your computer's LAN IP instead of `localhost` (e.g. `192.168.1.20`; find it with `ipconfig` / `ip addr`). A LAN IP does not need `--allow-localhost`. Phone and computer must be on the same Wi-Fi:
+
+```bash
+# .env: the browser on the phone must reach PocketBase too
+#   VITE_POCKETBASE_URL=http://192.168.1.20:8090
+#   PB_ORIGINS=...,http://192.168.1.20:5173     (then restart PocketBase)
+npm run dev -- --host                            # serves the site on the LAN
+FRONTEND_URL=http://192.168.1.20:5173 npm run posters
+```
+
+> ⚠️ Posters made this way only work with your **local** database and URL. Delete them (`rm -rf posters`) when you are done, and for the real print run the script again against production **without** `--allow-localhost`.
+
 ## PocketBase backend
 
 Everything the backend needs is in code, so a fresh instance is ready on first start:
