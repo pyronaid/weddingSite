@@ -131,4 +131,44 @@ describe('PocketBaseGameRepository', () => {
     fetchMock.mockImplementation(async () => json({ status: 404, message: 'Riddle not found.', data: {} }, 404));
     await expect(repository.getRiddle('unknown123')).rejects.toMatchObject({ code: 'not_found' });
   });
+
+  it('reuses the file token until close to expiry, then renews it', async () => {
+    pb.authStore.save(fakeToken(), user);
+    const encode = (value: object) => btoa(JSON.stringify(value)).replace(/=+$/, '');
+    let exp = Math.floor(Date.now() / 1000) + 3600;
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ token: `${encode({ alg: 'HS256' })}.${encode({ exp })}.sig` }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    const repository = new PocketBaseGameRepository(pb);
+
+    const first = await repository.getFileToken();
+    expect(first.expiresAt).toBe(exp * 1000);
+    await repository.getFileToken();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // A token about to expire (or a forced renewal) asks the server again.
+    await repository.getFileToken({ force: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    exp = Math.floor(Date.now() / 1000) + 60;
+    await repository.getFileToken({ force: true });
+    await repository.getFileToken();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('signs the current photo of a locked scene with the file token', async () => {
+    pb.authStore.save(fakeToken(), user);
+    const json = (body: object) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes('/api/files/token')
+        ? json({ token: 'tkn' })
+        : json({ submissionId: 's1', collectionId: 'col1', scene: 'Dance', locked: true, photo: 'p.jpg' }),
+    );
+
+    const draw = await new PocketBaseGameRepository(pb).drawPhotoScene('card1');
+    expect(draw).toMatchObject({ submissionId: 's1', scene: 'Dance', locked: true });
+    expect(draw.photoUrl).toBe('http://pocketbase.test/api/files/col1/s1/p.jpg?thumb=480x0&token=tkn');
+  });
 });

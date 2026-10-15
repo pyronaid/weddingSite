@@ -20,6 +20,7 @@ export const router = createBrowserRouter([
           { path: 'suits/:suit', lazy: async () => ({ Component: (await pages()).SuitPage }) },
           // Opened from the QR codes on the card posters.
           { path: 'riddles/:code', lazy: async () => ({ Component: (await pages()).RiddlePage }) },
+          { path: 'gallery', lazy: async () => ({ Component: (await pages()).GalleryPage }) },
         ],
       },
       {

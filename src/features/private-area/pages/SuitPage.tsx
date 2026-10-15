@@ -1,6 +1,7 @@
 import { Navigate, useParams } from 'react-router';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { isSuit } from '../../../services/game';
+import { HeartsCollection } from '../components/HeartsCollection/HeartsCollection';
 import { SuitCollection } from '../components/SuitCollection/SuitCollection';
 import { SUIT_META } from '../game/suits';
 import { AREA_HOME } from '../guards';
@@ -14,5 +15,7 @@ export function SuitPage() {
   if (!isSuit(suit)) return <Navigate to={AREA_HOME} replace />;
 
   // Keyed by suit: switching suit starts from a fresh state (no flipped cards carried over).
-  return <SuitCollection key={suit} suit={suit} />;
+  // Hearts are collected with photos; the other suits with riddles.
+  const Collection = suit === 'hearts' ? HeartsCollection : SuitCollection;
+  return <Collection key={suit} suit={suit} />;
 }

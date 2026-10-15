@@ -28,3 +28,10 @@ export function buildPhrase(cards: readonly PlayingCard[]): string {
 export function normalizeAnswer(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
+
+/** Adds the file token to a protected file URL. */
+export function signFileUrl(url: string, token: string): string {
+  const signed = new URL(url, window.location.href);
+  signed.searchParams.set('token', token);
+  return signed.toString();
+}

@@ -5,6 +5,8 @@
  * runtimes, so they `require()` this module instead of sharing top-level code.
  */
 
+const { isCollected, collect } = require(`${__hooks}/lib/collection.js`);
+
 const CODE_PATTERN = /^[a-z0-9]{8,32}$/;
 
 /** Uppercase, letters and digits only: "  apple " and "A P P L E" both become "APPLE". */
@@ -28,29 +30,6 @@ function findRiddleCard(app, code) {
     throw new NotFoundError('This riddle is not available yet.');
   }
   return card;
-}
-
-function isCollected(app, userId, cardId) {
-  try {
-    app.findFirstRecordByFilter('collected_cards', 'user = {:user} && card = {:card}', { user: userId, card: cardId });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Collects the card for the user; a duplicate (double submit) is not an error. */
-function collect(app, userId, cardId) {
-  if (isCollected(app, userId, cardId)) return;
-  const record = new Record(app.findCollectionByNameOrId('collected_cards'));
-  record.set('user', userId);
-  record.set('card', cardId);
-  try {
-    app.save(record);
-  } catch (error) {
-    // Lost a race with a concurrent request: the unique index kept one row.
-    if (!isCollected(app, userId, cardId)) throw error;
-  }
 }
 
 /** Public view of a riddle: never includes the solution or the code. */

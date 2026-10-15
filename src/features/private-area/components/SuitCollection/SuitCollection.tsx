@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import formStyles from '../../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../../components/InfoCard/CardHeader';
-import { buildPhrase, type Suit } from '../../../../services/game';
+import { buildPhrase, type PlayingCard, type Suit } from '../../../../services/game';
 import { useSuitCards } from '../../game/useGameProgress';
 import { SUIT_META } from '../../game/suits';
 import { AREA_HOME } from '../../guards';
@@ -12,10 +12,18 @@ import styles from './SuitCollection.module.css';
 
 interface SuitCollectionProps {
   suit: Suit;
+  /** Replaces the default "how to play" paragraph. */
+  intro?: ReactNode;
+  /** Extra block under the intro (e.g. the game rules). */
+  rules?: ReactNode;
+  /** Rendered under each card (e.g. the photo challenge button). `refresh` reloads the cards. */
+  renderCardAction?: (card: PlayingCard, refresh: () => void) => ReactNode;
+  /** Rendered after the cards (e.g. a link to the gallery). */
+  footer?: ReactNode;
 }
 
 /** All the cards of a suit, the collected ones highlighted, and the secret phrase. */
-export function SuitCollection({ suit }: SuitCollectionProps) {
+export function SuitCollection({ suit, intro, rules, renderCardAction, footer }: SuitCollectionProps) {
   const { label, symbol } = SUIT_META[suit];
   const query = useSuitCards(suit);
   const cards = query.status === 'success' ? query.data : undefined;
@@ -26,9 +34,10 @@ export function SuitCollection({ suit }: SuitCollectionProps) {
     <div className={styles.page} data-layout="wide">
       <CardHeader id="suit-title" eyebrow={`${symbol} Your collection`} title={label} />
       <p className={styles.intro}>
-        Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to
-        discover the secret phrase.
+        {intro ??
+          'Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to discover the secret phrase.'}
       </p>
+      {rules}
 
       {query.status === 'loading' && (
         <p className={styles.status} role="status">
@@ -57,11 +66,14 @@ export function SuitCollection({ suit }: SuitCollectionProps) {
             {cards.map((card) => (
               <li key={card.id}>
                 <FlipCard card={card} />
+                {renderCardAction?.(card, query.refresh)}
               </li>
             ))}
           </ul>
         </>
       )}
+
+      {footer}
 
       <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
         ← Back to your collection

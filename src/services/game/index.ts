@@ -16,5 +16,10 @@ export function createGameRepository(): GameRepository {
     getSuitCards: () => Promise.reject(gameError('not_configured')),
     getRiddle: () => Promise.reject(gameError('not_configured')),
     solveRiddle: () => Promise.reject(gameError('not_configured')),
+    drawPhotoScene: () => Promise.reject(gameError('not_configured')),
+    uploadPhoto: () => Promise.reject(gameError('not_configured')),
+    getGallery: () => Promise.reject(gameError('not_configured')),
+    getGalleryUpdates: () => Promise.reject(gameError('not_configured')),
+    getFileToken: () => Promise.reject(gameError('not_configured')),
   };
 }

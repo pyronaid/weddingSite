@@ -3,6 +3,7 @@ import { GameError, type GameErrorCode } from './types';
 const MESSAGES: Record<GameErrorCode, string> = {
   unauthenticated: 'Your session has expired. Please log in again.',
   not_found: 'This riddle does not exist or is not available yet.',
+  invalid_photo: 'This photo cannot be uploaded: use a JPEG, PNG or WebP image under 10 MB.',
   network: 'Unable to reach the server. Check your connection and try again.',
   not_configured: 'The game is not available yet.',
   unknown: 'Something went wrong. Please try again.',
