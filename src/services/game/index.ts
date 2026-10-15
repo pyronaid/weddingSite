@@ -14,5 +14,7 @@ export function createGameRepository(): GameRepository {
   return {
     getProgress: () => Promise.reject(gameError('not_configured')),
     getSuitCards: () => Promise.reject(gameError('not_configured')),
+    getRiddle: () => Promise.reject(gameError('not_configured')),
+    solveRiddle: () => Promise.reject(gameError('not_configured')),
   };
 }

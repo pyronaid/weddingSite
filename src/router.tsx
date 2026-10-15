@@ -18,6 +18,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true, lazy: async () => ({ Component: (await pages()).DashboardPage }) },
           { path: 'suits/:suit', lazy: async () => ({ Component: (await pages()).SuitPage }) },
+          // Opened from the QR codes on the card posters.
+          { path: 'riddles/:code', lazy: async () => ({ Component: (await pages()).RiddlePage }) },
         ],
       },
       {

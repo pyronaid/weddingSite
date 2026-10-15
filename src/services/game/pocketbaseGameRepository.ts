@@ -1,6 +1,15 @@
 import type PocketBase from 'pocketbase';
 import { gameError, toGameError } from './errors';
-import { isSuit, SUITS, type GameProgress, type GameRepository, type PlayingCard, type Suit } from './types';
+import {
+  isSuit,
+  SUITS,
+  type GameProgress,
+  type GameRepository,
+  type PlayingCard,
+  type Riddle,
+  type RiddleAttempt,
+  type Suit,
+} from './types';
 
 const CARDS = 'cards';
 const COLLECTED = 'collected_cards';
@@ -14,6 +23,24 @@ interface CardRecord {
   rank: number;
   letter?: string;
 }
+
+/** Payloads of the custom endpoints in pb_hooks/riddles.pb.js. */
+interface RiddleResponse {
+  suit: Suit;
+  rank: number;
+  riddle: string;
+  length: number;
+  collected: boolean;
+  letter: string;
+}
+
+interface SolveResponse {
+  correct: boolean;
+  collected: boolean;
+  letter: string;
+}
+
+const riddlePath = (code: string) => `/api/game/riddles/${encodeURIComponent(code)}`;
 
 interface CollectedRow {
   expand?: { card?: CardRow };
@@ -92,6 +119,36 @@ export class PocketBaseGameRepository implements GameRepository {
           letter: isCollected && card.letter ? card.letter : null,
         };
       });
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async getRiddle(code: string): Promise<Riddle> {
+    this.requireUserId();
+    try {
+      const data = await this.pb.send<RiddleResponse>(riddlePath(code), { method: 'GET' });
+      return {
+        suit: data.suit,
+        rank: data.rank,
+        text: data.riddle,
+        length: data.length,
+        collected: data.collected,
+        letter: data.letter || null,
+      };
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async solveRiddle(code: string, answer: string): Promise<RiddleAttempt> {
+    this.requireUserId();
+    try {
+      const data = await this.pb.send<SolveResponse>(`${riddlePath(code)}/solve`, {
+        method: 'POST',
+        body: { answer },
+      });
+      return { correct: data.correct, collected: data.collected, letter: data.letter || null };
     } catch (error) {
       throw toGameError(error);
     }

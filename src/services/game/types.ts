@@ -27,6 +27,24 @@ export interface PlayingCard {
   letter: string | null;
 }
 
+/** A riddle, reached from the QR code printed on a card poster. */
+export interface Riddle {
+  suit: Suit;
+  rank: Rank;
+  text: string;
+  /** Number of letters/digits in the solution: one input box each. */
+  length: number;
+  collected: boolean;
+  /** The card's secret letter, once collected. */
+  letter: string | null;
+}
+
+export interface RiddleAttempt {
+  correct: boolean;
+  collected: boolean;
+  letter: string | null;
+}
+
 /**
  * Backend-agnostic access to the card game. Pages depend only on this, so the
  * PocketBase implementation can be replaced (or faked in tests) freely.
@@ -36,9 +54,13 @@ export interface GameRepository {
   getProgress(): Promise<GameProgress>;
   /** Every card of a suit, sorted by rank, with the user's collected state. */
   getSuitCards(suit: Suit): Promise<PlayingCard[]>;
+  /** The riddle behind a QR code (fails with `not_found` if unknown or not ready). */
+  getRiddle(code: string): Promise<Riddle>;
+  /** Checks an answer on the server; a correct one collects the card. */
+  solveRiddle(code: string, answer: string): Promise<RiddleAttempt>;
 }
 
-export type GameErrorCode = 'unauthenticated' | 'network' | 'not_configured' | 'unknown';
+export type GameErrorCode = 'unauthenticated' | 'not_found' | 'network' | 'not_configured' | 'unknown';
 
 /** Normalised error so the UI never parses backend-specific payloads. */
 export class GameError extends Error {

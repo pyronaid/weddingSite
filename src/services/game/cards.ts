@@ -23,3 +23,8 @@ export function buildPhrase(cards: readonly PlayingCard[]): string {
     .map((card) => (card.collected && card.letter ? card.letter : MISSING_LETTER))
     .join('');
 }
+
+/** Letters and digits only, uppercase: the format of riddle answers. */
+export function normalizeAnswer(value: string): string {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}

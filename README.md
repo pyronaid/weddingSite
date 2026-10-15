@@ -131,6 +131,7 @@ npm run dev                  # http://localhost:5173
 | ---------------------------- | --------------------------------------- | --------------- |
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
 | `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase | logged-in only  |
+| `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
 | `/area/forgot-password`      | Request a reset e-mail                  | guests only     |
@@ -156,7 +157,63 @@ The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number
 - **Suit pages** (one per suit, same behaviour; each suit has its own letters and phrase): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`).
 - **Letters** are set per card in the admin UI (`cards` → `letter`, one character). The field is *hidden*: the server sends it only for cards the guest collected (`pb_hooks/cards.pb.js`), and guests cannot filter or sort on it, so letters cannot be guessed through the API.
 - Card faces are static SVGs in [`public/cards/`](public/cards/CREDITS.md) (CC0 artwork by Adrian Kennard), loaded lazily and cached by nginx.
-- To **give a card to a guest** for now: admin UI → `collected_cards` → New record → pick the user and the card. Guests cannot do this themselves.
+- **Riddles (collecting cards)**: each card has a secret `code`, a `riddle` and a `solution` (hidden fields, admin UI). A poster with the card and a QR code to `/area/riddles/<code>` is put up at the venue. The guest scans it (logging in first if needed, then coming straight back), reads the riddle and types the answer in one box per letter: the focus moves to the next box automatically, Backspace goes back, pasting fills all boxes. The answer is checked **on the server** (`pb_hooks/riddles.pb.js`, case-insensitive, letters and digits only) and a correct one collects the card. The solution never reaches the browser.
+  - The clubs come with placeholder riddles. **Solutions are not seeded** (this repository is the source): set them in the admin UI. A riddle without a solution shows "not available yet".
+  - Changing a card's `code` in the admin UI invalidates its printed poster.
+- To **give a card to a guest by hand**: admin UI → `collected_cards` → New record → pick the user and the card. Guests cannot do this themselves.
+
+### Printing the card posters
+
+```bash
+# .env must point to the PRODUCTION PocketBase and site
+#   VITE_POCKETBASE_URL (or PB_URL), PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD, FRONTEND_URL=https://your-site
+npm run posters                    # clubs (default)
+npm run posters -- --suit hearts
+npm run posters -- --pdf           # also a PDF (needs Playwright installed)
+```
+
+The script reads each card's secret code from PocketBase (as superuser) and writes to `posters/` (git-ignored):
+
+- one **A3 vector SVG** per card (`clubs-07-7.svg`): the card, a QR code and a short caption. Vector means it prints sharp at A3 or any other size.
+- `clubs-posters.html`: all posters, one A3 page each. Open it in Chrome → Print → *Save as PDF*, paper **A3**, margins **None**.
+
+The QR codes use 25% error correction (level Q) and are 11 cm wide, so they scan from a couple of metres even with some glare. The script refuses a `localhost` `FRONTEND_URL` (phones at the venue could not open it). **The files contain the secret codes: don't commit or share them.** Generate the posters only after the final deploy, as codes differ between databases.
+
+Options (with `npm run`, put them after `--`; they can be combined):
+
+| Option              | Default    | Description                                                                 |
+| ------------------- | ---------- | --------------------------------------------------------------------------- |
+| `--suit <suit>`     | `clubs`    | `hearts`, `diamonds`, `spades` or `clubs`                                   |
+| `--pdf`             | off        | Also writes `<suit>-posters.pdf` (needs Playwright)                         |
+| `--out <dir>`       | `posters/` | Output folder                                                               |
+| `--allow-localhost` | off        | Accepts a `localhost` / `127.x` / `0.0.0.0` `FRONTEND_URL`: **local tests only** |
+
+#### Testing the posters locally
+
+By default the script stops with *"FRONTEND_URL is http://localhost:…: guests' phones cannot open it"*. That protects you from printing posters that only work on your computer. For a local test, pass `--allow-localhost`:
+
+```bash
+# Full stack with Docker (`docker compose up`): the values in .env already match
+#   VITE_POCKETBASE_URL=http://localhost:8090  FRONTEND_URL=http://localhost:8080
+npm run posters -- --allow-localhost
+
+# Frontend with `npm run dev` (port 5173): override FRONTEND_URL for this run only
+FRONTEND_URL=http://localhost:5173 npm run posters -- --allow-localhost --suit hearts
+```
+
+Then open `posters/clubs-posters.html` to check the layout. To try a riddle, open the URL printed under the QR code in your browser: the QR itself points to `localhost`, which a phone resolves to *itself*, not to your computer.
+
+**To scan the QR with a real phone**, use your computer's LAN IP instead of `localhost` (e.g. `192.168.1.20`; find it with `ipconfig` / `ip addr`). A LAN IP does not need `--allow-localhost`. Phone and computer must be on the same Wi-Fi:
+
+```bash
+# .env: the browser on the phone must reach PocketBase too
+#   VITE_POCKETBASE_URL=http://192.168.1.20:8090
+#   PB_ORIGINS=...,http://192.168.1.20:5173     (then restart PocketBase)
+npm run dev -- --host                            # serves the site on the LAN
+FRONTEND_URL=http://192.168.1.20:5173 npm run posters
+```
+
+> ⚠️ Posters made this way only work with your **local** database and URL. Delete them (`rm -rf posters`) when you are done, and for the real print run the script again against production **without** `--allow-localhost`.
 
 ## PocketBase backend
 
@@ -166,12 +223,13 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `rsvps` collection: **anyone can create**; list/view/update/delete are superuser-only. It has field constraints (lengths, guests 0–10).
   - `users` hardening: only verified users can log in, minimum password length 8, users cannot delete their own account through the API.
   - `cards`: the 52-card deck (`suit` + `rank` 1–13, unique together), seeded by the migration. Logged-in users can read it, only superusers can change it.
-    It also has a hidden `letter` field (see the card game above).
+    It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
   - `collected_cards`: one row per (user, card), unique. **Users can only read their own rows**; creating/editing them is superuser-only until the collecting mechanics are defined. Rows are deleted with their user or card.
 - **Hooks** (`pocketbase/pb_hooks/`):
   - `settings.pb.js` syncs app name, sender, SMTP and the rate limiter from environment variables **on every start**. It also points the confirmation/reset e-mail links at the React pages (`FRONTEND_URL/area/...`).
   - `rsvps.pb.js` adds cross-field validation (a declining guest cannot bring people).
   - `cards.pb.js` reveals a card's hidden `letter` only to the guests who collected it.
+  - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
 
 > Because the hook rewrites the e-mail templates on every start, **edit them in `settings.pb.js`**, not in the admin UI.
 
