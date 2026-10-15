@@ -2,10 +2,13 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
+import { GameError, type GameProgress, type GameRepository } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
+import { GameRepositoryProvider } from './game/GameRepositoryContext';
 import { GuestOnly, RequireAuth } from './guards';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { SuitPage } from './pages/SuitPage';
 
 /** In-memory AuthService: lets us drive the UI without a backend. */
 function createFakeAuth(overrides: Partial<AuthService> = {}) {
@@ -35,7 +38,18 @@ function createFakeAuth(overrides: Partial<AuthService> = {}) {
   return service;
 }
 
-function renderArea(service: AuthService, initialPath: string) {
+const progress: GameProgress = {
+  hearts: { collected: 3, total: 13 },
+  diamonds: { collected: 0, total: 13 },
+  spades: { collected: 13, total: 13 },
+  clubs: { collected: 1, total: 13 },
+};
+
+function createFakeGame(getProgress: GameRepository['getProgress'] = vi.fn(async () => progress)): GameRepository {
+  return { getProgress };
+}
+
+function renderArea(service: AuthService, initialPath: string, game: GameRepository = createFakeGame()) {
   const router = createMemoryRouter(
     [
       {
@@ -43,11 +57,19 @@ function renderArea(service: AuthService, initialPath: string) {
         // Stand-in for PrivateAreaRoot: same provider, no animations/photos.
         element: (
           <AuthProvider service={service}>
-            <Outlet />
+            <GameRepositoryProvider value={game}>
+              <Outlet />
+            </GameRepositoryProvider>
           </AuthProvider>
         ),
         children: [
-          { element: <RequireAuth />, children: [{ index: true, element: <DashboardPage /> }] },
+          {
+            element: <RequireAuth />,
+            children: [
+              { index: true, element: <DashboardPage /> },
+              { path: 'suits/:suit', element: <SuitPage /> },
+            ],
+          },
           { element: <GuestOnly />, children: [{ path: 'login', element: <LoginPage /> }] },
         ],
       },
@@ -107,5 +129,65 @@ describe('private area', () => {
     renderArea(auth, '/area');
     await userEvent.setup().click(await screen.findByRole('button', { name: /log out/i }));
     expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
+  });
+
+  describe('card game', () => {
+    async function loggedIn() {
+      const auth = createFakeAuth();
+      await auth.login('anna@example.com', 'x');
+      return auth;
+    }
+
+    it('shows the collected cards of each suit, linking to the suit page', async () => {
+      const router = renderArea(await loggedIn(), '/area');
+
+      const hearts = await screen.findByRole('link', { name: 'Hearts: 3 of 13 cards collected' });
+      expect(hearts).toHaveTextContent('3/13');
+      expect(screen.getByRole('link', { name: 'Diamonds: 0 of 13 cards collected' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Spades: 13 of 13 cards collected' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Clubs: 1 of 13 cards collected' })).toBeInTheDocument();
+
+      await userEvent.setup().click(hearts);
+      expect(await screen.findByRole('heading', { name: 'Hearts' })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area/suits/hearts');
+    });
+
+    it('requires a login for suit pages, then returns to the requested one', async () => {
+      const router = renderArea(createFakeAuth(), '/area/suits/spades');
+      expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
+      await fillAndSubmit();
+      expect(await screen.findByRole('heading', { name: 'Spades' })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area/suits/spades');
+    });
+
+    it('redirects an unknown suit to the dashboard', async () => {
+      const router = renderArea(await loggedIn(), '/area/suits/jokers');
+      expect(await screen.findByRole('heading', { name: /hello, anna/i })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area');
+    });
+
+    it('shows an error with a retry when the progress cannot be loaded', async () => {
+      const getProgress = vi
+        .fn<GameRepository['getProgress']>()
+        .mockRejectedValueOnce(new GameError('network', 'Unable to reach the server.'))
+        .mockResolvedValueOnce(progress);
+      renderArea(await loggedIn(), '/area', createFakeGame(getProgress));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/unable to reach the server/i);
+      expect(screen.getByRole('link', { name: 'Hearts: progress not available' })).toHaveTextContent('–/–');
+
+      await userEvent.setup().click(screen.getByRole('button', { name: /try again/i }));
+      expect(await screen.findByRole('link', { name: 'Hearts: 3 of 13 cards collected' })).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(getProgress).toHaveBeenCalledTimes(2);
+    });
+
+    it('logs out when the server rejects the session', async () => {
+      const auth = await loggedIn();
+      const game = createFakeGame(vi.fn().mockRejectedValue(new GameError('unauthenticated', 'Session expired.')));
+      renderArea(auth, '/area', game);
+      expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
+      expect(auth.logout).toHaveBeenCalled();
+    });
   });
 });

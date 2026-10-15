@@ -54,3 +54,33 @@
   display: grid;
   gap: 0.3rem;
 }
+
+/* ---- Card game ---- */
+
+.sectionTitle {
+  margin: 0.5rem 0 0.9rem;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--card-accent);
+}
+
+.sectionNotice {
+  margin-bottom: 1rem;
+}
+
+.suitGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+/* Suit symbol shown on the dark card: lighter shades for contrast. */
+.red {
+  color: var(--pink-400);
+}
+
+.black {
+  color: var(--card-text);
+}

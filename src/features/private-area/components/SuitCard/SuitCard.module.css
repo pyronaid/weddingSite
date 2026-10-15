@@ -1,0 +1,100 @@
+/* Light "playing card" tile placed on the dark private area card. */
+.card {
+  --suit-colour: var(--text);
+
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.15rem;
+  aspect-ratio: 3 / 4;
+  padding: 1rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  background: var(--white-warm);
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: 0 10px 20px -12px rgba(0, 0, 0, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 26px -12px rgba(0, 0, 0, 0.5);
+}
+
+.red {
+  --suit-colour: var(--pink-600);
+}
+
+.black {
+  --suit-colour: var(--text);
+}
+
+.complete {
+  border-color: var(--pink-400);
+}
+
+.symbol {
+  font-size: clamp(2.6rem, 12vw, 3.4rem);
+  line-height: 1;
+  color: var(--suit-colour);
+}
+
+.label {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.counter {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+}
+
+.bar {
+  width: 70%;
+  height: 4px;
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  background: var(--pink-100);
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--suit-colour);
+  transition: width 0.4s ease;
+}
+
+/* Small suit symbols in the corners, like a real card. */
+.corner {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.6rem;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--suit-colour);
+}
+
+.cornerBottom {
+  top: auto;
+  left: auto;
+  bottom: 0.45rem;
+  right: 0.6rem;
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .bar > span {
+    transition: none;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+}
