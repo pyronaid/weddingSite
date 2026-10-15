@@ -1,0 +1,68 @@
+/// <reference path="../../pb_data/types.d.ts" />
+
+/**
+ * Shared helpers for pb_hooks/riddles.pb.js. JSVM handlers run in isolated
+ * runtimes, so they `require()` this module instead of sharing top-level code.
+ */
+
+const CODE_PATTERN = /^[a-z0-9]{8,32}$/;
+
+/** Uppercase, letters and digits only: "  apple " and "A P P L E" both become "APPLE". */
+function normalize(value) {
+  return String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+/** The card behind a QR code, or a 404 when unknown or not playable yet. */
+function findRiddleCard(app, code) {
+  if (!CODE_PATTERN.test(code || '')) throw new NotFoundError('Riddle not found.');
+
+  let card;
+  try {
+    card = app.findFirstRecordByFilter('cards', 'code = {:code}', { code });
+  } catch {
+    throw new NotFoundError('Riddle not found.');
+  }
+  if (!card.getString('riddle') || !normalize(card.getString('solution'))) {
+    throw new NotFoundError('This riddle is not available yet.');
+  }
+  return card;
+}
+
+function isCollected(app, userId, cardId) {
+  try {
+    app.findFirstRecordByFilter('collected_cards', 'user = {:user} && card = {:card}', { user: userId, card: cardId });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Collects the card for the user; a duplicate (double submit) is not an error. */
+function collect(app, userId, cardId) {
+  if (isCollected(app, userId, cardId)) return;
+  const record = new Record(app.findCollectionByNameOrId('collected_cards'));
+  record.set('user', userId);
+  record.set('card', cardId);
+  try {
+    app.save(record);
+  } catch (error) {
+    // Lost a race with a concurrent request: the unique index kept one row.
+    if (!isCollected(app, userId, cardId)) throw error;
+  }
+}
+
+/** Public view of a riddle: never includes the solution or the code. */
+function toRiddleResponse(card, collected) {
+  return {
+    suit: card.getString('suit'),
+    rank: card.getInt('rank'),
+    riddle: card.getString('riddle'),
+    length: normalize(card.getString('solution')).length,
+    collected,
+    letter: collected ? card.getString('letter') : '',
+  };
+}
+
+module.exports = { normalize, findRiddleCard, isCollected, collect, toRiddleResponse };

@@ -1,0 +1,47 @@
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(0.3rem, 1.5vw, 0.55rem);
+}
+
+.box {
+  width: clamp(2.3rem, 11vw, 3rem);
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: var(--white-warm);
+  color: var(--text);
+  font: 700 clamp(1.3rem, 6vw, 1.7rem) / 1 var(--font-serif);
+  text-align: center;
+  text-transform: uppercase;
+  caret-color: transparent;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.box:focus {
+  outline: none;
+  border-color: var(--card-accent);
+  transform: translateY(-2px);
+}
+
+.filled {
+  background: #fff;
+}
+
+.box[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.box:disabled {
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .box,
+  .box:focus {
+    transition: none;
+    transform: none;
+  }
+}

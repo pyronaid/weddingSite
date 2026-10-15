@@ -1,0 +1,110 @@
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.status {
+  margin: 2rem 0;
+  text-align: center;
+  color: var(--card-muted);
+}
+
+.card {
+  width: 96px;
+  aspect-ratio: 5 / 7;
+  justify-self: center;
+  margin-bottom: -0.5rem;
+  border-radius: 8px;
+  box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.6);
+  transform: rotate(-4deg);
+}
+
+.riddle {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-left: 3px solid var(--card-accent);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--card-surface);
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.legend {
+  width: 100%;
+  margin-bottom: 0.6rem;
+  padding: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--card-muted);
+}
+
+.feedback {
+  min-height: 1.3em;
+  margin: 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--danger);
+}
+
+.solved {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.1rem;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--collected);
+  background: var(--card-surface);
+  text-align: center;
+}
+
+.solved p {
+  margin: 0;
+}
+
+.solvedTitle {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.letter {
+  display: inline-grid;
+  place-items: center;
+  width: 2.2em;
+  height: 2.2em;
+  margin-left: 0.3em;
+  border-radius: 50%;
+  background: var(--white-warm);
+  color: var(--card-bg);
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+}
+
+.star {
+  color: var(--star);
+  font-size: 1.6rem;
+}
+
+.links {
+  text-align: center;
+  font-size: 0.92rem;
+}
+
+.links a {
+  color: var(--card-accent);
+  font-weight: 700;
+}

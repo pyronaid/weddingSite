@@ -30,3 +30,6 @@ dist-ssr
 
 # PocketBase local data
 pb_data
+
+# Generated card posters: they contain the secret riddle codes
+/posters/

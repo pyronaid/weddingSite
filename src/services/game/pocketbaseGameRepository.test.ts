@@ -97,4 +97,38 @@ describe('PocketBaseGameRepository', () => {
     const collectedUrl = urls.find((u) => u.pathname.includes('collected_cards'))!;
     expect(collectedUrl.searchParams.get('filter')).toBe('user = "u1" && card.suit = "clubs"');
   });
+
+  it('loads a riddle and submits answers through the custom endpoints', async () => {
+    pb.authStore.save(fakeToken(), user);
+    const json = (body: object, status = 200) =>
+      new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'POST'
+        ? json({ correct: true, collected: true, letter: 'G' })
+        : json({ suit: 'clubs', rank: 7, riddle: 'Lorem', length: 5, collected: false, letter: '' }),
+    );
+    const repository = new PocketBaseGameRepository(pb);
+
+    await expect(repository.getRiddle('abc123xyz789')).resolves.toEqual({
+      suit: 'clubs',
+      rank: 7,
+      text: 'Lorem',
+      length: 5,
+      collected: false,
+      letter: null,
+    });
+    await expect(repository.solveRiddle('abc123xyz789', 'APPLE')).resolves.toEqual({
+      correct: true,
+      collected: true,
+      letter: 'G',
+    });
+
+    const [getCall, postCall] = fetchMock.mock.calls;
+    expect(String(getCall[0])).toBe('http://pocketbase.test/api/game/riddles/abc123xyz789');
+    expect(String(postCall[0])).toBe('http://pocketbase.test/api/game/riddles/abc123xyz789/solve');
+    expect(JSON.parse(String(postCall[1].body))).toEqual({ answer: 'APPLE' });
+
+    fetchMock.mockImplementation(async () => json({ status: 404, message: 'Riddle not found.', data: {} }, 404));
+    await expect(repository.getRiddle('unknown123')).rejects.toMatchObject({ code: 'not_found' });
+  });
 });

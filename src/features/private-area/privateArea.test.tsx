@@ -2,12 +2,13 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
-import { GameError, type GameProgress, type GameRepository, type PlayingCard, type Suit } from '../../services/game';
+import { GameError, type GameProgress, type GameRepository, type PlayingCard, type Riddle, type Suit } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
 import { GuestOnly, RequireAuth } from './guards';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { RiddlePage } from './pages/RiddlePage';
 import { SuitPage } from './pages/SuitPage';
 
 /** In-memory AuthService: lets us drive the UI without a backend. */
@@ -55,10 +56,23 @@ const suitCards = (suit: Suit): PlayingCard[] =>
   });
 const clubs = suitCards('clubs');
 
+const riddle: Riddle = {
+  suit: 'clubs',
+  rank: 7,
+  text: 'Lorem ipsum dolor sit amet.',
+  length: 5,
+  collected: false,
+  letter: null,
+};
+
 function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository {
   return {
     getProgress: vi.fn(async () => progress),
     getSuitCards: vi.fn(async (suit: Suit) => suitCards(suit)),
+    getRiddle: vi.fn(async () => riddle),
+    solveRiddle: vi.fn(async (_code: string, answer: string) =>
+      answer === 'APPLE' ? { correct: true, collected: true, letter: 'G' } : { correct: false, collected: false, letter: null },
+    ),
     ...overrides,
   };
 }
@@ -82,6 +96,7 @@ function renderArea(service: AuthService, initialPath: string, game: GameReposit
             children: [
               { index: true, element: <DashboardPage /> },
               { path: 'suits/:suit', element: <SuitPage /> },
+              { path: 'riddles/:code', element: <RiddlePage /> },
             ],
           },
           { element: <GuestOnly />, children: [{ path: 'login', element: <LoginPage /> }] },
@@ -273,6 +288,76 @@ describe('private area', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent(/unable to reach the server/i);
         await userEvent.setup().click(screen.getByRole('button', { name: /try again/i }));
         expect(await screen.findByRole('list', { name: 'Clubs cards' })).toBeInTheDocument();
+      });
+    });
+
+    describe('riddle page', () => {
+      const typeAnswer = async (user: ReturnType<typeof userEvent.setup>, answer: string) => {
+        await user.click(await screen.findByRole('textbox', { name: 'Letter 1 of 5' }));
+        await user.keyboard(answer);
+      };
+
+      it('requires a login, then shows the riddle of the QR code', async () => {
+        const game = createFakeGame();
+        const router = renderArea(createFakeAuth(), '/area/riddles/abc123xyz789', game);
+        expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
+        await fillAndSubmit();
+
+        expect(await screen.findByRole('heading', { name: '7 of Clubs' })).toBeInTheDocument();
+        expect(screen.getByText('Lorem ipsum dolor sit amet.')).toBeInTheDocument();
+        expect(screen.getAllByRole('textbox')).toHaveLength(5);
+        expect(router.state.location.pathname).toBe('/area/riddles/abc123xyz789');
+        expect(game.getRiddle).toHaveBeenCalledWith('abc123xyz789');
+      });
+
+      it('collects the card when the answer is right', async () => {
+        const game = createFakeGame();
+        renderArea(await loggedIn(), '/area/riddles/abc123xyz789', game);
+        const user = userEvent.setup();
+
+        const submit = await screen.findByRole('button', { name: 'Submit' });
+        expect(submit).toBeDisabled();
+        await typeAnswer(user, 'apple');
+        expect(submit).toBeEnabled();
+        await user.click(submit);
+
+        expect(game.solveRiddle).toHaveBeenCalledWith('abc123xyz789', 'APPLE');
+        expect(await screen.findByText(/you collected the 7 of clubs/i)).toBeInTheDocument();
+        expect(screen.getByText('G')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'See your clubs' })).toHaveAttribute('href', '/area/suits/clubs');
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+      });
+
+      it('says when the answer is wrong and lets the guest try again', async () => {
+        renderArea(await loggedIn(), '/area/riddles/abc123xyz789');
+        const user = userEvent.setup();
+        await typeAnswer(user, 'pearl');
+        await user.keyboard('{Enter}');
+
+        expect(await screen.findByText(/not quite/i)).toBeInTheDocument();
+        expect(screen.getByRole('textbox', { name: 'Letter 1 of 5' })).toHaveAttribute('aria-invalid', 'true');
+
+        // Editing the answer clears the message.
+        await user.click(screen.getByRole('textbox', { name: 'Letter 1 of 5' }));
+        await user.keyboard('a');
+        expect(screen.queryByText(/not quite/i)).not.toBeInTheDocument();
+      });
+
+      it('shows the card as collected when the riddle was already solved', async () => {
+        const game = createFakeGame({ getRiddle: vi.fn(async () => ({ ...riddle, rank: 12, collected: true })) });
+        renderArea(await loggedIn(), '/area/riddles/abc123xyz789', game);
+        expect(await screen.findByText(/you collected the queen of clubs/i)).toBeInTheDocument();
+        expect(screen.getByText('★')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Submit' })).not.toBeInTheDocument();
+      });
+
+      it('explains when the QR code points to an unknown riddle', async () => {
+        const game = createFakeGame({
+          getRiddle: vi.fn().mockRejectedValue(new GameError('not_found', 'This riddle does not exist or is not available yet.')),
+        });
+        renderArea(await loggedIn(), '/area/riddles/nope', game);
+        expect(await screen.findByRole('alert')).toHaveTextContent(/does not exist/i);
+        expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
       });
     });
   });

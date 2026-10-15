@@ -12,3 +12,6 @@ Dockerfile
 docker-compose.yml
 README.md
 pocketbase
+
+# Generated card posters (secret codes)
+/posters/
