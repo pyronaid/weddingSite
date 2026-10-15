@@ -60,7 +60,7 @@ It is built with **React + TypeScript + Vite** and uses **[PocketBase](https://p
 ├── pocketbase/                    # backend
 │   ├── Dockerfile                 # PocketBase image (pinned + checksum-verified)
 │   ├── docker-entrypoint.sh
-│   ├── pb_migrations/             # schema as code (rsvps collection, users hardening)
+│   ├── pb_migrations/             # schema as code (rsvps, users hardening, card game)
 │   └── pb_hooks/                  # settings-from-env, RSVP validation
 ├── docker/                        # nginx config + runtime env script (frontend)
 ├── Dockerfile                     # frontend image
@@ -129,7 +129,8 @@ npm run dev                  # http://localhost:5173
 
 | Route                        | Page                                    | Access          |
 | ---------------------------- | --------------------------------------- | --------------- |
-| `/area`                      | Placeholder dashboard                   | logged-in only  |
+| `/area`                      | Game intro + collected cards per suit   | logged-in only  |
+| `/area/suits/:suit`          | Suit page (placeholder for now)         | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
 | `/area/forgot-password`      | Request a reset e-mail                  | guests only     |
@@ -145,6 +146,14 @@ Flows and security choices:
 - The session is stored by the PocketBase SDK (localStorage), stays in sync across tabs, and is **re-validated with the server** each time the private area opens.
 - PocketBase's **rate limiter** is on (e.g. 2 auth attempts per 3 s per IP).
 - The private area JavaScript is **code-split**: public visitors never download it.
+- **Every new content page** goes under the `RequireAuth` route in [`src/router.tsx`](src/router.tsx): anonymous visitors are sent to the login page and brought back to the page they asked for.
+
+### The card game ("find the joker")
+
+The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number of cards the guest collected out of the cards in the deck, e.g. `3/13`. Each card links to its suit page.
+
+- Data comes from PocketBase through [`src/services/game`](src/services/game) (a `GameRepository` interface, like the RSVP and auth services). The totals are read from the deck too, so changing the deck needs no frontend release.
+- To **give a card to a guest** for now: admin UI → `collected_cards` → New record → pick the user and the card. Guests cannot do this themselves.
 
 ## PocketBase backend
 
@@ -153,6 +162,8 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
 - **Migrations** (`pocketbase/pb_migrations/`), applied automatically at start:
   - `rsvps` collection: **anyone can create**; list/view/update/delete are superuser-only. It has field constraints (lengths, guests 0–10).
   - `users` hardening: only verified users can log in, minimum password length 8, users cannot delete their own account through the API.
+  - `cards`: the 52-card deck (`suit` + `rank` 1–13, unique together), seeded by the migration. Logged-in users can read it, only superusers can change it.
+  - `collected_cards`: one row per (user, card), unique. **Users can only read their own rows**; creating/editing them is superuser-only until the collecting mechanics are defined. Rows are deleted with their user or card.
 - **Hooks** (`pocketbase/pb_hooks/`):
   - `settings.pb.js` syncs app name, sender, SMTP and the rate limiter from environment variables **on every start**. It also points the confirmation/reset e-mail links at the React pages (`FRONTEND_URL/area/...`).
   - `rsvps.pb.js` adds cross-field validation (a declining guest cannot bring people).

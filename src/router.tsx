@@ -12,8 +12,13 @@ export const router = createBrowserRouter([
     lazy: async () => ({ Component: (await import('./features/private-area/PrivateAreaRoot')).PrivateAreaRoot }),
     children: [
       {
+        // Every content page of the private area goes here: anonymous visitors
+        // are sent to the login page and brought back after logging in.
         lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireAuth }),
-        children: [{ index: true, lazy: async () => ({ Component: (await pages()).DashboardPage }) }],
+        children: [
+          { index: true, lazy: async () => ({ Component: (await pages()).DashboardPage }) },
+          { path: 'suits/:suit', lazy: async () => ({ Component: (await pages()).SuitPage }) },
+        ],
       },
       {
         lazy: async () => ({ Component: (await import('./features/private-area/guards')).GuestOnly }),
