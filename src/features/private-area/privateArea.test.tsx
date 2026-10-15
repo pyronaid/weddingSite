@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
-import { GameError, type GameProgress, type GameRepository, type PlayingCard } from '../../services/game';
+import { GameError, type GameProgress, type GameRepository, type PlayingCard, type Suit } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
 import { GuestOnly, RequireAuth } from './guards';
@@ -46,17 +46,19 @@ const progress: GameProgress = {
 };
 
 const LETTERS = 'WEDDINGFUN';
-/** All clubs; the 6 (letter "N") and the King are collected. */
-const clubs: PlayingCard[] = Array.from({ length: 13 }, (_, i) => {
-  const rank = i + 1;
-  const collected = rank === 6 || rank === 13;
-  return { id: `c${rank}`, suit: 'clubs', rank, collected, letter: collected && rank <= 10 ? LETTERS[i] : null };
-});
+/** All the cards of a suit; the 6 (letter "N") and the King are collected. */
+const suitCards = (suit: Suit): PlayingCard[] =>
+  Array.from({ length: 13 }, (_, i) => {
+    const rank = i + 1;
+    const collected = rank === 6 || rank === 13;
+    return { id: `${suit}${rank}`, suit, rank, collected, letter: collected && rank <= 10 ? LETTERS[i] : null };
+  });
+const clubs = suitCards('clubs');
 
 function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository {
   return {
     getProgress: vi.fn(async () => progress),
-    getSuitCards: vi.fn(async () => clubs),
+    getSuitCards: vi.fn(async (suit: Suit) => suitCards(suit)),
     ...overrides,
   };
 }
@@ -200,6 +202,23 @@ describe('private area', () => {
       renderArea(auth, '/area', game);
       expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
       expect(auth.logout).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['hearts', 'Hearts'],
+      ['diamonds', 'Diamonds'],
+      ['spades', 'Spades'],
+      ['clubs', 'Clubs'],
+    ] as const)('shows the cards and the secret phrase on the %s page', async (suit, label) => {
+      const game = createFakeGame();
+      renderArea(await loggedIn(), `/area/suits/${suit}`, game);
+
+      const list = await screen.findByRole('list', { name: `${label} cards` });
+      expect(within(list).getAllByRole('button')).toHaveLength(13);
+      expect(screen.getByRole('heading', { name: label })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `6 of ${suit}, collected` })).toBeInTheDocument();
+      expect(screen.getByText(/-----N---- — 1 of 10 letters found/)).toBeInTheDocument();
+      expect(game.getSuitCards).toHaveBeenCalledWith(suit);
     });
 
     describe('clubs page', () => {
