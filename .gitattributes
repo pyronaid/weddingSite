@@ -1,0 +1,10 @@
+# Normalize line endings in the repository.
+* text=auto
+
+# Files executed or parsed inside Linux containers must keep LF endings,
+# even on Windows checkouts with core.autocrlf=true. A CRLF shebang
+# ("#!/bin/sh\r") makes the kernel look for "/bin/sh\r" and the container
+# fails with "exec ...: no such file or directory".
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.conf      text eol=lf
