@@ -11,12 +11,15 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 # Typecheck, test and build: a broken commit never produces an image.
 RUN npm run typecheck && npm test && npm run build
+# Defensive: strip CRLF endings (Windows checkouts) from the startup script.
+# Done here because the runtime stage runs as an unprivileged user.
+RUN sed -i 's/\r$//' docker/40-env-config.sh
 
 # ---------- Stage 2: serve with an unprivileged nginx ----------
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --chmod=755 docker/40-env-config.sh /docker-entrypoint.d/40-env-config.sh
+COPY --from=build --chmod=755 /app/docker/40-env-config.sh /docker-entrypoint.d/40-env-config.sh
 # Owned by the nginx user so env-config.js can be regenerated at startup.
 COPY --from=build --chown=101:101 /app/dist /usr/share/nginx/html
 
