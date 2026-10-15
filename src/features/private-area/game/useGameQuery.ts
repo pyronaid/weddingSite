@@ -19,7 +19,7 @@ type Loader<T> = (repository: GameRepository) => Promise<T>;
  * When the server rejects the session the user is logged out: the route
  * guard then sends them to the login page and back afterwards.
  */
-export function useGameQuery<T>(load: Loader<T>): GameQueryState<T> & { retry: () => void } {
+export function useGameQuery<T>(load: Loader<T>): GameQueryState<T> & { retry: () => void; refresh: () => void } {
   const repository = useGameRepository();
   const { user, auth } = useAuth();
   const userId = user?.id;
@@ -47,11 +47,15 @@ export function useGameQuery<T>(load: Loader<T>): GameQueryState<T> & { retry: (
     };
   }, [repository, auth, userId, load, attempt]);
 
+  /** Reloads showing the loading state (after an error). */
   const retry = useCallback(() => {
     setResult(null);
     setAttempt((n) => n + 1);
   }, []);
 
+  /** Reloads in the background: the current data stays visible until replaced. */
+  const refresh = useCallback(() => setAttempt((n) => n + 1), []);
+
   const state: GameQueryState<T> = result && result.load === load ? result.state : { status: 'loading' };
-  return { ...state, retry };
+  return { ...state, retry, refresh };
 }

@@ -3,8 +3,11 @@ import { gameError, toGameError } from './errors';
 import {
   isSuit,
   SUITS,
+  type GalleryPage,
+  type GalleryPhoto,
   type GameProgress,
   type GameRepository,
+  type PhotoDraw,
   type PlayingCard,
   type Riddle,
   type RiddleAttempt,
@@ -13,6 +16,13 @@ import {
 
 const CARDS = 'cards';
 const COLLECTED = 'collected_cards';
+const SUBMISSIONS = 'photo_submissions';
+
+// Thumbnail sizes declared on the photo field (see the photo challenge migration).
+const THUMB_GRID = '480x0';
+const THUMB_LARGE = '1200x0';
+const GALLERY_FIELDS =
+  'id,collectionId,collectionName,photo,scene_text,player,updated,expand.card.suit,expand.card.rank';
 
 interface CardRow {
   suit: string;
@@ -38,6 +48,25 @@ interface SolveResponse {
   correct: boolean;
   collected: boolean;
   letter: string;
+}
+
+interface DrawResponse {
+  submissionId: string;
+  collectionId: string;
+  scene: string;
+  locked: boolean;
+  photo: string;
+}
+
+interface SubmissionRecord {
+  id: string;
+  collectionId: string;
+  collectionName: string;
+  photo: string;
+  scene_text: string;
+  player: string;
+  updated: string;
+  expand?: { card?: { suit: Suit; rank: number } };
 }
 
 const riddlePath = (code: string) => `/api/game/riddles/${encodeURIComponent(code)}`;
@@ -153,6 +182,80 @@ export class PocketBaseGameRepository implements GameRepository {
       throw toGameError(error);
     }
   }
+
+  async drawPhotoScene(cardId: string): Promise<PhotoDraw> {
+    this.requireUserId();
+    try {
+      const data = await this.pb.send<DrawResponse>(`/api/game/photos/${encodeURIComponent(cardId)}/draw`, {
+        method: 'POST',
+      });
+      const record = { id: data.submissionId, collectionId: data.collectionId, collectionName: SUBMISSIONS };
+      return {
+        submissionId: data.submissionId,
+        scene: data.scene,
+        locked: data.locked,
+        photoUrl: data.photo ? this.pb.files.getURL(record, data.photo, { thumb: THUMB_GRID }) : null,
+      };
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async uploadPhoto(submissionId: string, photo: Blob): Promise<void> {
+    this.requireUserId();
+    const body = new FormData();
+    body.append('photo', photo, 'photo.jpg');
+    try {
+      await this.pb.collection(SUBMISSIONS).update(submissionId, body, { fields: 'id' });
+    } catch (error) {
+      // 400: rejected file (type/size), 413: body too large for the server.
+      const status = (error as { status?: number }).status;
+      throw status === 400 || status === 413 ? gameError('invalid_photo', error) : toGameError(error);
+    }
+  }
+
+  async getGallery(page: number, perPage: number): Promise<GalleryPage> {
+    this.requireUserId();
+    try {
+      const result = await this.pb.collection(SUBMISSIONS).getList<SubmissionRecord>(page, perPage, {
+        sort: '-updated,-id',
+        expand: 'card',
+        fields: GALLERY_FIELDS,
+        // The total count costs an extra COUNT query: "is there a next page" is enough.
+        skipTotal: true,
+      });
+      return { items: result.items.map(this.toGalleryPhoto), hasMore: result.items.length === perPage };
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async getGalleryUpdates(since: string): Promise<GalleryPhoto[]> {
+    this.requireUserId();
+    try {
+      const result = await this.pb.collection(SUBMISSIONS).getList<SubmissionRecord>(1, 100, {
+        filter: this.pb.filter('updated > {:since}', { since }),
+        sort: '-updated,-id',
+        expand: 'card',
+        fields: GALLERY_FIELDS,
+        skipTotal: true,
+      });
+      return result.items.map(this.toGalleryPhoto);
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  private toGalleryPhoto = (record: SubmissionRecord): GalleryPhoto => ({
+    id: record.id,
+    suit: record.expand?.card?.suit ?? 'hearts',
+    rank: record.expand?.card?.rank ?? 0,
+    scene: record.scene_text,
+    player: record.player,
+    thumbUrl: this.pb.files.getURL(record, record.photo, { thumb: THUMB_GRID }),
+    largeUrl: this.pb.files.getURL(record, record.photo, { thumb: THUMB_LARGE }),
+    updated: record.updated,
+  });
 
   private requireUserId(): string {
     const userId = this.pb.authStore.isValid ? this.pb.authStore.record?.id : undefined;

@@ -1,12 +1,13 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
-import { GameError, type GameProgress, type GameRepository, type PlayingCard, type Riddle, type Suit } from '../../services/game';
+import { GameError, type GameProgress, type GalleryPhoto, type GameRepository, type PlayingCard, type Riddle, type Suit } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
 import { GuestOnly, RequireAuth } from './guards';
 import { DashboardPage } from './pages/DashboardPage';
+import { GalleryPage } from './pages/GalleryPage';
 import { LoginPage } from './pages/LoginPage';
 import { RiddlePage } from './pages/RiddlePage';
 import { SuitPage } from './pages/SuitPage';
@@ -73,6 +74,10 @@ function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository
     solveRiddle: vi.fn(async (_code: string, answer: string) =>
       answer === 'APPLE' ? { correct: true, collected: true, letter: 'G' } : { correct: false, collected: false, letter: null },
     ),
+    drawPhotoScene: vi.fn(async () => ({ submissionId: 's1', scene: 'Someone dancing barefoot', locked: false, photoUrl: null })),
+    uploadPhoto: vi.fn(async () => {}),
+    getGallery: vi.fn(async () => ({ items: [], hasMore: false })),
+    getGalleryUpdates: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -97,6 +102,7 @@ function renderArea(service: AuthService, initialPath: string, game: GameReposit
               { index: true, element: <DashboardPage /> },
               { path: 'suits/:suit', element: <SuitPage /> },
               { path: 'riddles/:code', element: <RiddlePage /> },
+              { path: 'gallery', element: <GalleryPage /> },
             ],
           },
           { element: <GuestOnly />, children: [{ path: 'login', element: <LoginPage /> }] },
@@ -229,7 +235,7 @@ describe('private area', () => {
       renderArea(await loggedIn(), `/area/suits/${suit}`, game);
 
       const list = await screen.findByRole('list', { name: `${label} cards` });
-      expect(within(list).getAllByRole('button')).toHaveLength(13);
+      expect(within(list).getAllByRole('listitem')).toHaveLength(13);
       expect(screen.getByRole('heading', { name: label })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: `6 of ${suit}, collected` })).toBeInTheDocument();
       expect(screen.getByText(/-----N---- — 1 of 10 letters found/)).toBeInTheDocument();
@@ -358,6 +364,154 @@ describe('private area', () => {
         renderArea(await loggedIn(), '/area/riddles/nope', game);
         expect(await screen.findByRole('alert')).toHaveTextContent(/does not exist/i);
         expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+      });
+    });
+
+    describe('hearts photo challenge', () => {
+      const photoFile = () => new File(['fake-jpeg'], 'party.jpg', { type: 'image/jpeg' });
+
+      beforeEach(() => {
+        // jsdom has no object URLs (used for the preview).
+        URL.createObjectURL = vi.fn(() => 'blob:preview');
+        URL.revokeObjectURL = vi.fn();
+      });
+
+      it('draws a scene on every press and collects the card on upload', async () => {
+        const draws = ['Someone dancing barefoot', 'A group selfie with at least five people'];
+        const game = createFakeGame({
+          drawPhotoScene: vi.fn(async () => ({ submissionId: 's5', scene: draws.shift()!, locked: false, photoUrl: null })),
+        });
+        renderArea(await loggedIn(), '/area/suits/hearts', game);
+        const user = userEvent.setup();
+
+        const button = await screen.findByRole('button', { name: 'Photo challenge for the 5 of hearts' });
+        await user.click(button);
+        const dialog = await screen.findByRole('dialog', { name: 'Photo challenge · 5 of hearts' });
+        expect(await within(dialog).findByText('Someone dancing barefoot')).toBeInTheDocument();
+
+        // Closing and pressing again draws a new scene.
+        await user.click(within(dialog).getByRole('button', { name: 'Close' }));
+        await user.click(button);
+        expect(await screen.findByText('A group selfie with at least five people')).toBeInTheDocument();
+        expect(game.drawPhotoScene).toHaveBeenCalledTimes(2);
+        expect(game.drawPhotoScene).toHaveBeenCalledWith('hearts5');
+
+        const upload = screen.getByRole('button', { name: 'Upload photo' });
+        expect(upload).toBeDisabled();
+        await user.upload(screen.getByLabelText('Take or choose a photo'), photoFile());
+        expect(screen.getByRole('img', { name: 'The photo you selected' })).toBeInTheDocument();
+        await user.click(upload);
+
+        expect(await screen.findByText('Photo uploaded! 🎉')).toBeInTheDocument();
+        expect(game.uploadPhoto).toHaveBeenCalledWith('s5', expect.any(File));
+        // The cards are reloaded in the background to show the new state.
+        await waitFor(() => expect(game.getSuitCards).toHaveBeenCalledTimes(2));
+      });
+
+      it('keeps the scene of an uploaded photo: only the photo can change', async () => {
+        const game = createFakeGame({
+          drawPhotoScene: vi.fn(async () => ({
+            submissionId: 's6',
+            scene: 'The groom dancing with at least three girls',
+            locked: true,
+            photoUrl: 'http://pb/thumb.jpg',
+          })),
+        });
+        renderArea(await loggedIn(), '/area/suits/hearts', game);
+        const user = userEvent.setup();
+
+        // The 6 of hearts is collected in the fake data: "Change photo".
+        await user.click(await screen.findByRole('button', { name: 'Change the photo for the 6 of hearts' }));
+        expect(await screen.findByText(/the scene stays the same/i)).toBeInTheDocument();
+        expect(screen.getByRole('img', { name: 'Your current photo' })).toHaveAttribute('src', 'http://pb/thumb.jpg');
+        expect(screen.getByLabelText('Choose a new photo')).toBeInTheDocument();
+      });
+
+      it('shows why an upload failed', async () => {
+        const game = createFakeGame({
+          uploadPhoto: vi.fn().mockRejectedValue(new GameError('invalid_photo', 'This photo cannot be uploaded.')),
+        });
+        renderArea(await loggedIn(), '/area/suits/hearts', game);
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Photo challenge for the 2 of hearts' }));
+        await user.upload(await screen.findByLabelText('Take or choose a photo'), photoFile());
+        await user.click(screen.getByRole('button', { name: 'Upload photo' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent('This photo cannot be uploaded.');
+      });
+
+      it('links to the gallery; other suits have no photo buttons', async () => {
+        renderArea(await loggedIn(), '/area/suits/hearts');
+        expect(await screen.findByRole('link', { name: /see everyone's photos/i })).toHaveAttribute('href', '/area/gallery');
+      });
+
+      it('has no photo challenge on the other suits', async () => {
+        renderArea(await loggedIn(), '/area/suits/clubs');
+        await screen.findByRole('list', { name: 'Clubs cards' });
+        expect(screen.queryByRole('button', { name: /photo/i })).not.toBeInTheDocument();
+      });
+    });
+
+    describe('gallery', () => {
+      const photo = (n: number, updated: string): GalleryPhoto => ({
+        id: `p${n}`,
+        suit: 'hearts',
+        rank: n,
+        scene: `Scene ${n}`,
+        player: `Guest${n}`,
+        thumbUrl: `http://pb/${n}-480.jpg`,
+        largeUrl: `http://pb/${n}-1200.jpg`,
+        updated,
+      });
+
+      it('shows the photos, loads more on demand and enlarges one on click', async () => {
+        const getGallery = vi
+          .fn<GameRepository['getGallery']>()
+          .mockResolvedValueOnce({ items: [photo(3, '2026-10-15 10:03'), photo(2, '2026-10-15 10:02')], hasMore: true })
+          .mockResolvedValueOnce({ items: [photo(2, '2026-10-15 10:02'), photo(1, '2026-10-15 10:01')], hasMore: false });
+        renderArea(await loggedIn(), '/area/gallery', createFakeGame({ getGallery }));
+        const user = userEvent.setup();
+
+        const list = await screen.findByRole('list', { name: 'Photos' });
+        expect(within(list).getAllByRole('button')).toHaveLength(2);
+        await user.click(screen.getByRole('button', { name: 'Load more photos' }));
+        // Page 2 overlaps page 1 (new uploads shift pages): no duplicates.
+        await waitFor(() => expect(within(list).getAllByRole('button')).toHaveLength(3));
+        expect(getGallery).toHaveBeenLastCalledWith(2, 24);
+        expect(screen.queryByRole('button', { name: 'Load more photos' })).not.toBeInTheDocument();
+
+        await user.click(within(list).getByRole('button', { name: 'Scene 3, by Guest3 (3 of hearts)' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Scene 3' });
+        expect(within(dialog).getByRole('img', { name: 'Scene 3' })).toHaveAttribute('src', 'http://pb/3-1200.jpg');
+      });
+
+      it('adds new and replaced photos at the top every few seconds', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+          const getGalleryUpdates = vi
+            .fn<GameRepository['getGalleryUpdates']>()
+            .mockResolvedValue([photo(4, '2026-10-15 10:04'), photo(1, '2026-10-15 10:05')]);
+          const game = createFakeGame({
+            getGallery: vi.fn(async () => ({ items: [photo(2, '2026-10-15 10:02'), photo(1, '2026-10-15 10:01')], hasMore: false })),
+            getGalleryUpdates,
+          });
+          renderArea(await loggedIn(), '/area/gallery', game);
+          const list = await screen.findByRole('list', { name: 'Photos' });
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(20_000);
+          });
+          expect(getGalleryUpdates).toHaveBeenCalledWith('2026-10-15 10:02');
+          const names = within(list).getAllByRole('button').map((b) => b.getAttribute('aria-label')?.split(',')[0]);
+          expect(names).toEqual(['Scene 4', 'Scene 1', 'Scene 2']);
+          expect(screen.getByText('1 new photo')).toBeInTheDocument();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('invites to take the first photo when the gallery is empty', async () => {
+        renderArea(await loggedIn(), '/area/gallery');
+        expect(await screen.findByText(/no photos yet/i)).toBeInTheDocument();
       });
     });
   });

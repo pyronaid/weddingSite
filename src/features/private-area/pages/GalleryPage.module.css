@@ -1,0 +1,113 @@
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.intro,
+.status {
+  margin: 0;
+  text-align: center;
+  color: var(--card-muted);
+}
+
+/* 2 columns on phones, up to 5 on wide screens; square tiles. */
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.6rem;
+}
+
+.item {
+  /* The browser skips layout/paint of off-screen tiles. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+}
+
+.tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--card-surface);
+  cursor: zoom-in;
+}
+
+.tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.tile:hover img {
+  transform: scale(1.04);
+}
+
+.caption {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 1.4rem 0.5rem 0.4rem;
+  background: linear-gradient(transparent, rgba(30, 10, 20, 0.75));
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0 0.35rem;
+  margin-right: 0.2rem;
+  border-radius: 6px;
+  background: var(--white-warm);
+  color: var(--pink-600);
+}
+
+.more {
+  display: grid;
+  justify-items: center;
+}
+
+.more button {
+  max-width: 320px;
+}
+
+.large {
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.large img {
+  width: 100%;
+  max-height: 72vh;
+  max-height: 72dvh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.large figcaption {
+  color: var(--card-muted);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile img {
+    transition: none;
+  }
+
+  .tile:hover img {
+    transform: none;
+  }
+}

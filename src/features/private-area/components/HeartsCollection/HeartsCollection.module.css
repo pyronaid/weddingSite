@@ -1,0 +1,14 @@
+.gallery {
+  justify-self: center;
+  margin-top: 0.5rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 999px;
+  background: var(--card-accent);
+  color: var(--card-bg);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.gallery:hover {
+  filter: brightness(1.05);
+}

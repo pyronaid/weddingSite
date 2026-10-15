@@ -17,3 +17,6 @@ export const SUIT_META: Record<Suit, SuitMeta> = {
 };
 
 export const suitPath = (suit: Suit) => `${AREA_HOME}/suits/${suit}`;
+
+/** Shared gallery of the photo challenge. */
+export const GALLERY_PATH = `${AREA_HOME}/gallery`;

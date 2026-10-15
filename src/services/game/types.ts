@@ -45,6 +45,37 @@ export interface RiddleAttempt {
   letter: string | null;
 }
 
+/** The scene drawn for a photo challenge card (hearts). */
+export interface PhotoDraw {
+  /** The user's submission for this card: the photo is uploaded to it. */
+  submissionId: string;
+  scene: string;
+  /** A photo was already uploaded: the scene no longer changes. */
+  locked: boolean;
+  /** The current photo (thumbnail), if any. */
+  photoUrl: string | null;
+}
+
+/** A photo of the shared gallery. */
+export interface GalleryPhoto {
+  id: string;
+  suit: Suit;
+  rank: Rank;
+  scene: string;
+  player: string;
+  /** Small version for the grid. */
+  thumbUrl: string;
+  /** Larger version for the enlarged view. */
+  largeUrl: string;
+  /** Last change (ISO-like string, sortable): newest first. */
+  updated: string;
+}
+
+export interface GalleryPage {
+  items: GalleryPhoto[];
+  hasMore: boolean;
+}
+
 /**
  * Backend-agnostic access to the card game. Pages depend only on this, so the
  * PocketBase implementation can be replaced (or faked in tests) freely.
@@ -58,9 +89,23 @@ export interface GameRepository {
   getRiddle(code: string): Promise<Riddle>;
   /** Checks an answer on the server; a correct one collects the card. */
   solveRiddle(code: string, answer: string): Promise<RiddleAttempt>;
+  /** Draws a random scene for a card, or returns the locked one once a photo exists. */
+  drawPhotoScene(cardId: string): Promise<PhotoDraw>;
+  /** Uploads (or replaces) the photo of a drawn scene; this collects the card. */
+  uploadPhoto(submissionId: string, photo: Blob): Promise<void>;
+  /** One page of the gallery, newest first (pages start at 1). */
+  getGallery(page: number, perPage: number): Promise<GalleryPage>;
+  /** Photos added or replaced after `since` (an `updated` value), newest first. */
+  getGalleryUpdates(since: string): Promise<GalleryPhoto[]>;
 }
 
-export type GameErrorCode = 'unauthenticated' | 'not_found' | 'network' | 'not_configured' | 'unknown';
+export type GameErrorCode =
+  | 'unauthenticated'
+  | 'not_found'
+  | 'invalid_photo'
+  | 'network'
+  | 'not_configured'
+  | 'unknown';
 
 /** Normalised error so the UI never parses backend-specific payloads. */
 export class GameError extends Error {
