@@ -442,7 +442,7 @@ describe('private area', () => {
 
       it('shows the rules and links to the gallery', async () => {
         renderArea(await loggedIn(), '/area/suits/hearts');
-        const rules = await screen.findByRole('region', { name: 'Photo challenge rules' });
+        const rules = await screen.findByRole('region', { name: 'Rules' });
         expect(rules).toHaveTextContent(/checked against the scene it was assigned/i);
         expect(screen.getByRole('link', { name: /see everyone's photos/i })).toHaveAttribute('href', '/area/gallery');
       });
@@ -459,6 +459,16 @@ describe('private area', () => {
         await user.click(screen.getByRole('button', { name: 'Upload photo' }));
         expect(await screen.findByRole('alert')).toHaveTextContent(/not a photo/i);
         expect(game.uploadPhoto).not.toHaveBeenCalled();
+      });
+
+      it('shows each suit its own rules plus the road to the King', async () => {
+        renderArea(await loggedIn(), '/area/suits/clubs');
+        const rules = await screen.findByRole('region', { name: 'Rules' });
+        expect(rules).toHaveTextContent(/keep your eyes open/i);
+        expect(rules).toHaveTextContent(/QR code/);
+        expect(rules).toHaveTextContent(/spell the name of the Jack/i);
+        expect(rules).toHaveTextContent(/discover the name of the Queen/i);
+        expect(rules).not.toHaveTextContent(/📷|photo/i);
       });
 
       it('has no photo challenge on the other suits', async () => {
