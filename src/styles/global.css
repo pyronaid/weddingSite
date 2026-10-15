@@ -18,6 +18,10 @@
   --danger: #ffb3b3;
   --success: #c7f5d5;
 
+  /* Card game. */
+  --collected: #2f9e5b;
+  --star: #f6c945;
+
   --font-script: 'Great Vibes', 'Brush Script MT', cursive;
   --font-serif: 'Cormorant Garamond', Georgia, serif;
   --font-sans: 'Lato', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;

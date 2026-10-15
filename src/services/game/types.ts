@@ -15,6 +15,18 @@ export interface SuitProgress {
 
 export type GameProgress = Record<Suit, SuitProgress>;
 
+/** 1 = Ace, 2..10, 11 = Jack, 12 = Queen, 13 = King. */
+export type Rank = number;
+
+export interface PlayingCard {
+  id: string;
+  suit: Suit;
+  rank: Rank;
+  collected: boolean;
+  /** Secret letter: only sent by the server for collected cards. */
+  letter: string | null;
+}
+
 /**
  * Backend-agnostic access to the card game. Pages depend only on this, so the
  * PocketBase implementation can be replaced (or faked in tests) freely.
@@ -22,6 +34,8 @@ export type GameProgress = Record<Suit, SuitProgress>;
 export interface GameRepository {
   /** Collected/total cards per suit for the logged-in user. */
   getProgress(): Promise<GameProgress>;
+  /** Every card of a suit, sorted by rank, with the user's collected state. */
+  getSuitCards(suit: Suit): Promise<PlayingCard[]>;
 }
 
 export type GameErrorCode = 'unauthenticated' | 'network' | 'not_configured' | 'unknown';

@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
-import { GameError, type GameProgress, type GameRepository } from '../../services/game';
+import { GameError, type GameProgress, type GameRepository, type PlayingCard } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
 import { GuestOnly, RequireAuth } from './guards';
@@ -45,8 +45,20 @@ const progress: GameProgress = {
   clubs: { collected: 1, total: 13 },
 };
 
-function createFakeGame(getProgress: GameRepository['getProgress'] = vi.fn(async () => progress)): GameRepository {
-  return { getProgress };
+const LETTERS = 'WEDDINGFUN';
+/** All clubs; the 6 (letter "N") and the King are collected. */
+const clubs: PlayingCard[] = Array.from({ length: 13 }, (_, i) => {
+  const rank = i + 1;
+  const collected = rank === 6 || rank === 13;
+  return { id: `c${rank}`, suit: 'clubs', rank, collected, letter: collected && rank <= 10 ? LETTERS[i] : null };
+});
+
+function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository {
+  return {
+    getProgress: vi.fn(async () => progress),
+    getSuitCards: vi.fn(async () => clubs),
+    ...overrides,
+  };
 }
 
 function renderArea(service: AuthService, initialPath: string, game: GameRepository = createFakeGame()) {
@@ -171,7 +183,7 @@ describe('private area', () => {
         .fn<GameRepository['getProgress']>()
         .mockRejectedValueOnce(new GameError('network', 'Unable to reach the server.'))
         .mockResolvedValueOnce(progress);
-      renderArea(await loggedIn(), '/area', createFakeGame(getProgress));
+      renderArea(await loggedIn(), '/area', createFakeGame({ getProgress }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/unable to reach the server/i);
       expect(screen.getByRole('link', { name: 'Hearts: progress not available' })).toHaveTextContent('–/–');
@@ -184,10 +196,65 @@ describe('private area', () => {
 
     it('logs out when the server rejects the session', async () => {
       const auth = await loggedIn();
-      const game = createFakeGame(vi.fn().mockRejectedValue(new GameError('unauthenticated', 'Session expired.')));
+      const game = createFakeGame({ getProgress: vi.fn().mockRejectedValue(new GameError('unauthenticated', 'Session expired.')) });
       renderArea(auth, '/area', game);
       expect(await screen.findByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
       expect(auth.logout).toHaveBeenCalled();
+    });
+
+    describe('clubs page', () => {
+      it('lists every club in order, marks the collected ones and shows the secret phrase', async () => {
+        const game = createFakeGame();
+        renderArea(await loggedIn(), '/area/suits/clubs', game);
+
+        const list = await screen.findByRole('list', { name: 'Clubs cards' });
+        const cards = within(list).getAllByRole('button');
+        expect(cards.map((card) => card.getAttribute('aria-label'))).toEqual([
+          'Ace of clubs, not collected',
+          ...[2, 3, 4, 5].map((n) => `${n} of clubs, not collected`),
+          '6 of clubs, collected',
+          ...[7, 8, 9, 10].map((n) => `${n} of clubs, not collected`),
+          'Jack of clubs, not collected',
+          'Queen of clubs, not collected',
+          'King of clubs, collected',
+        ]);
+        expect(game.getSuitCards).toHaveBeenCalledWith('clubs');
+        expect(screen.getByText(/-----N---- — 1 of 10 letters found/)).toBeInTheDocument();
+        expect(screen.getByText('2/13 cards collected')).toBeInTheDocument();
+      });
+
+      it('flips a card on click to show its letter, or a star for face cards', async () => {
+        renderArea(await loggedIn(), '/area/suits/clubs');
+        const user = userEvent.setup();
+
+        const six = await screen.findByRole('button', { name: '6 of clubs, collected' });
+        await user.click(six);
+        expect(six).toHaveAttribute('aria-pressed', 'true');
+        expect(six).toHaveAccessibleName('6 of clubs, collected, showing the card back with the letter N');
+
+        const king = screen.getByRole('button', { name: 'King of clubs, collected' });
+        await user.click(king);
+        expect(king).toHaveAccessibleName('King of clubs, collected, showing the card back with a star');
+
+        const ace = screen.getByRole('button', { name: 'Ace of clubs, not collected' });
+        await user.click(ace);
+        expect(ace).toHaveAccessibleName('Ace of clubs, not collected, showing the card back');
+
+        await user.click(six);
+        expect(six).toHaveAttribute('aria-pressed', 'false');
+      });
+
+      it('shows an error with a retry when the cards cannot be loaded', async () => {
+        const getSuitCards = vi
+          .fn<GameRepository['getSuitCards']>()
+          .mockRejectedValueOnce(new GameError('network', 'Unable to reach the server.'))
+          .mockResolvedValueOnce(clubs);
+        renderArea(await loggedIn(), '/area/suits/clubs', createFakeGame({ getSuitCards }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(/unable to reach the server/i);
+        await userEvent.setup().click(screen.getByRole('button', { name: /try again/i }));
+        expect(await screen.findByRole('list', { name: 'Clubs cards' })).toBeInTheDocument();
+      });
     });
   });
 });

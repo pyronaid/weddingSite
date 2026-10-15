@@ -71,4 +71,30 @@ describe('PocketBaseGameRepository', () => {
     expect(error).toBeInstanceOf(GameError);
     expect(error).toMatchObject({ code: 'unauthenticated' });
   });
+
+  it('lists the cards of a suit with the collected state and revealed letters', async () => {
+    pb.authStore.save(fakeToken(), user);
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes('/collections/cards/')
+        ? page([
+            { id: 'a', rank: 1 },
+            { id: 'b', rank: 6, letter: 'A' },
+            { id: 'c', rank: 13, letter: '' },
+          ])
+        : page([{ card: 'b' }, { card: 'c' }]),
+    );
+
+    await expect(new PocketBaseGameRepository(pb).getSuitCards('clubs')).resolves.toEqual([
+      { id: 'a', suit: 'clubs', rank: 1, collected: false, letter: null },
+      { id: 'b', suit: 'clubs', rank: 6, collected: true, letter: 'A' },
+      { id: 'c', suit: 'clubs', rank: 13, collected: true, letter: null },
+    ]);
+
+    const urls = fetchMock.mock.calls.map(([url]) => new URL(String(url)));
+    const cardsUrl = urls.find((u) => u.pathname.includes('/collections/cards/'))!;
+    expect(cardsUrl.searchParams.get('filter')).toBe('suit = "clubs"');
+    expect(cardsUrl.searchParams.get('sort')).toBe('rank');
+    const collectedUrl = urls.find((u) => u.pathname.includes('collected_cards'))!;
+    expect(collectedUrl.searchParams.get('filter')).toBe('user = "u1" && card.suit = "clubs"');
+  });
 });

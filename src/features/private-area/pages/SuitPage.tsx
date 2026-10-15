@@ -1,20 +1,29 @@
+import type { ComponentType } from 'react';
 import { Link, Navigate, useParams } from 'react-router';
 import formStyles from '../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
-import { isSuit } from '../../../services/game';
+import { isSuit, type Suit } from '../../../services/game';
+import { SuitCollection } from '../components/SuitCollection/SuitCollection';
 import { SUIT_META } from '../game/suits';
 import { AREA_HOME } from '../guards';
 import styles from './pages.module.css';
 
-/** Placeholder page of a single suit: collected and missing cards will go here. */
+/** Content of each suit page; suits not listed yet show a placeholder. */
+const SUIT_CONTENT: Partial<Record<Suit, ComponentType<{ suit: Suit }>>> = {
+  clubs: SuitCollection,
+};
+
 export function SuitPage() {
   const { suit } = useParams();
   const meta = isSuit(suit) ? SUIT_META[suit] : undefined;
   useDocumentTitle(meta?.label);
 
   // Unknown suit in the URL (typo, old link): back to the dashboard.
-  if (!meta) return <Navigate to={AREA_HOME} replace />;
+  if (!isSuit(suit) || !meta) return <Navigate to={AREA_HOME} replace />;
+
+  const Content = SUIT_CONTENT[suit];
+  if (Content) return <Content suit={suit} />;
 
   return (
     <div className={styles.stack}>
