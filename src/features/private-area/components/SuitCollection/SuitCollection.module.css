@@ -1,0 +1,33 @@
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.intro {
+  margin: 0;
+  text-align: center;
+  color: var(--card-muted);
+}
+
+.status {
+  margin: 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--card-muted);
+}
+
+/* 3 columns on phones, up to 7 on wide screens. */
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: clamp(0.6rem, 2vw, 1rem);
+}
+
+.back {
+  max-width: 380px;
+  justify-self: center;
+  margin-top: 0.5rem;
+}

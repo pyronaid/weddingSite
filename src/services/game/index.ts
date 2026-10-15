@@ -3,6 +3,7 @@ import { gameError } from './errors';
 import { PocketBaseGameRepository } from './pocketbaseGameRepository';
 import type { GameRepository } from './types';
 
+export * from './cards';
 export * from './types';
 export { toGameError } from './errors';
 
@@ -12,5 +13,6 @@ export function createGameRepository(): GameRepository {
   // No backend configured: fail gracefully, like the auth service does.
   return {
     getProgress: () => Promise.reject(gameError('not_configured')),
+    getSuitCards: () => Promise.reject(gameError('not_configured')),
   };
 }

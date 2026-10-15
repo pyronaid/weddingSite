@@ -14,7 +14,7 @@ export function DashboardPage() {
   const { user, auth } = useAuth();
   const firstName = user?.name.split(' ')[0] || 'friend';
   const game = useGameProgress();
-  const progress = game.status === 'success' ? game.progress : undefined;
+  const progress = game.status === 'success' ? game.data : undefined;
 
   return (
     <div className={styles.stack}>

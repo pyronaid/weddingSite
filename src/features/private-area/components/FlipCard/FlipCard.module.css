@@ -1,0 +1,118 @@
+/* 3D flip: two absolutely positioned faces, the back pre-rotated by 180deg. */
+.card {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7; /* the card images are 240x336 */
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  perspective: 900px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.3, 0.7, 0.35, 1);
+}
+
+.flipped .inner {
+  transform: rotateY(180deg);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 8px 16px -10px rgba(0, 0, 0, 0.6);
+}
+
+.front {
+  background: #fff;
+}
+
+.front img {
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.back {
+  transform: rotateY(180deg);
+  /* Classic card back: diagonal lattice inside a white frame. */
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.16) 0 2px, transparent 2px 9px),
+    var(--pink-600);
+  box-shadow:
+    inset 0 0 0 5px #fff,
+    0 8px 16px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* Collected: thick solid green border on both sides of the card. */
+.collected .face {
+  border: 4px solid var(--collected);
+}
+
+.letter,
+.star {
+  display: grid;
+  place-items: center;
+  width: 58%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--white-warm);
+  box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.5);
+  line-height: 1;
+}
+
+.letter {
+  color: var(--card-bg);
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+  text-transform: uppercase;
+}
+
+.star {
+  color: var(--star);
+  font-size: clamp(1.8rem, 7vw, 2.8rem);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* Lift the button itself: a filter/opacity on .inner would flatten the 3D
+   context and show the mirrored front instead of the back. */
+.card {
+  transition: transform 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+}
+
+.card:focus-visible {
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .inner {
+    transition: none;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+}

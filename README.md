@@ -130,7 +130,8 @@ npm run dev                  # http://localhost:5173
 | Route                        | Page                                    | Access          |
 | ---------------------------- | --------------------------------------- | --------------- |
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
-| `/area/suits/:suit`          | Suit page (placeholder for now)         | logged-in only  |
+| `/area/suits/clubs`          | Clubs: flip cards + secret phrase       | logged-in only  |
+| `/area/suits/:suit`          | Other suits (placeholder for now)       | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
 | `/area/forgot-password`      | Request a reset e-mail                  | guests only     |
@@ -153,6 +154,9 @@ Flows and security choices:
 The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number of cards the guest collected out of the cards in the deck, e.g. `3/13`. Each card links to its suit page.
 
 - Data comes from PocketBase through [`src/services/game`](src/services/game) (a `GameRepository` interface, like the RSVP and auth services). The totals are read from the deck too, so changing the deck needs no frontend release.
+- **Suit page** (clubs for now): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`).
+- **Letters** are set per card in the admin UI (`cards` → `letter`, one character). The field is *hidden*: the server sends it only for cards the guest collected (`pb_hooks/cards.pb.js`), and guests cannot filter or sort on it, so letters cannot be guessed through the API.
+- Card faces are static SVGs in [`public/cards/`](public/cards/CREDITS.md) (CC0 artwork by Adrian Kennard), loaded lazily and cached by nginx.
 - To **give a card to a guest** for now: admin UI → `collected_cards` → New record → pick the user and the card. Guests cannot do this themselves.
 
 ## PocketBase backend
@@ -163,10 +167,12 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `rsvps` collection: **anyone can create**; list/view/update/delete are superuser-only. It has field constraints (lengths, guests 0–10).
   - `users` hardening: only verified users can log in, minimum password length 8, users cannot delete their own account through the API.
   - `cards`: the 52-card deck (`suit` + `rank` 1–13, unique together), seeded by the migration. Logged-in users can read it, only superusers can change it.
+    It also has a hidden `letter` field (see the card game above).
   - `collected_cards`: one row per (user, card), unique. **Users can only read their own rows**; creating/editing them is superuser-only until the collecting mechanics are defined. Rows are deleted with their user or card.
 - **Hooks** (`pocketbase/pb_hooks/`):
   - `settings.pb.js` syncs app name, sender, SMTP and the rate limiter from environment variables **on every start**. It also points the confirmation/reset e-mail links at the React pages (`FRONTEND_URL/area/...`).
   - `rsvps.pb.js` adds cross-field validation (a declining guest cannot bring people).
+  - `cards.pb.js` reveals a card's hidden `letter` only to the guests who collected it.
 
 > Because the hook rewrites the e-mail templates on every start, **edit them in `settings.pb.js`**, not in the admin UI.
 
