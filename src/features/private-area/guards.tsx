@@ -21,6 +21,15 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
+/** Only for organisers (`isAdmin`); other logged-in users go back to the area home. */
+export function RequireAdmin() {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user) return <Navigate to={LOGIN_PATH} replace state={{ from: location } satisfies RedirectState} />;
+  if (!user.isAdmin) return <Navigate to={AREA_HOME} replace />;
+  return <Outlet />;
+}
+
 /**
  * Only for anonymous users (login, sign up, forgot password).
  * This is also what redirects after a successful login: the auth store

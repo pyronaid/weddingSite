@@ -132,6 +132,8 @@ npm run dev                  # http://localhost:5173
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
 | `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase | logged-in only  |
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
+| `/area` (organisers)         | Organisers' home: the four suits to edit + the sign-up secret code | admins only     |
+| `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes | admins only     |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -141,6 +143,7 @@ npm run dev                  # http://localhost:5173
 
 Flows and security choices:
 
+- **Sign up** requires the **secret code** given to the guests (default `#wedding`; capital letters and surrounding spaces do not matter). It is checked by the server (`pb_hooks/signup.pb.js`), never stored with the user, and organisers can change it from their home page.
 - **Sign up** creates the user and sends a confirmation e-mail. **Only verified users can log in**: this is enforced by the server (`authRule = "verified = true"`), not just by the UI.
 - Logging in **before confirming** shows "please confirm your e-mail", with a **resend** button (60 s cooldown).
 - **Forgot password** always shows the same message, whether or not the account exists, so nobody can find out which e-mails are registered.
@@ -229,6 +232,20 @@ FRONTEND_URL=http://192.168.1.20:5173 npm run posters
 
 > ⚠️ Posters made this way only work with your **local** database and URL. Delete them (`rm -rf posters`) when you are done, and for the real print run the script again against production **without** `--allow-localhost`.
 
+### Organisers (admin view)
+
+Organisers are normal users with **`is_admin`** switched on. Only a superuser can do it: admin UI (`/_/`) → `users` → open the user → tick `is_admin` → Save, then the user logs out and in again. Users can never set it themselves (sign-up and profile rules forbid it).
+
+An organiser's `/area` shows their own home instead of the game:
+
+- the **four suits**, each opening an editor with one panel per card:
+  - **secret letter** of Ace to 10 (all suits; Jack, Queen and King have none);
+  - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
+  - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text);
+- the **sign-up secret code** (3–50 characters).
+
+Changes are live for the guests as soon as they are saved. Everything goes through `pb_hooks/admin.pb.js` (`/api/admin/*`): every request checks `is_admin` and each endpoint writes only the fields it is meant to, so guests still never see letters, riddles or solutions they have not earned.
+
 ## PocketBase backend
 
 Everything the backend needs is in code, so a fresh instance is ready on first start:
@@ -238,6 +255,8 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `users` hardening: only verified users can log in, minimum password length 8, users cannot delete their own account through the API.
   - `cards`: the 52-card deck (`suit` + `rank` 1–13, unique together), seeded by the migration. Logged-in users can read it, only superusers can change it.
     It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
+  - `users.is_admin`: organisers (set by a superuser only).
+  - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
   - `photo_scenes`: the scenes of each hearts card (admin only; seeded with examples).
   - `photo_submissions`: one row per (user, card) with the drawn scene and the photo (protected file, thumbnails 480 px and 1200 px). Logged-in users see the rows that have a photo (the gallery); the owner can only replace the photo, never the scene.
   - `collected_cards`: one row per (user, card), unique. **Users can only read their own rows**; creating/editing them is superuser-only until the collecting mechanics are defined. Rows are deleted with their user or card.
@@ -246,6 +265,8 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `rsvps.pb.js` adds cross-field validation (a declining guest cannot bring people).
   - `cards.pb.js` reveals a card's hidden `letter` only to the guests who collected it.
   - `photos.pb.js` draws the photo challenge scenes (`POST /api/game/photos/{cardId}/draw`) and collects the card when a photo is uploaded.
+  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, secret code), admins only.
+  - `signup.pb.js` checks the sign-up secret code.
   - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
 
 > Because the hook rewrites the e-mail templates on every start, **edit them in `settings.pb.js`**, not in the admin UI.

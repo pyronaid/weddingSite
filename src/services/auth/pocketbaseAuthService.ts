@@ -12,6 +12,7 @@ function toAuthUser(record: RecordModel | null): AuthUser | null {
     email: String(record.email ?? ''),
     name: String(record.name ?? ''),
     verified: Boolean(record.verified),
+    isAdmin: Boolean(record.is_admin),
   };
 }
 
@@ -66,9 +67,12 @@ export class PocketBaseAuthService implements AuthService {
     }
   }
 
-  async signUp({ name, email, password, passwordConfirm }: SignUpInput): Promise<void> {
+  async signUp({ name, email, password, passwordConfirm, secretCode }: SignUpInput): Promise<void> {
     try {
-      await this.pb.collection(USERS).create({ name, email, password, passwordConfirm, emailVisibility: false });
+      // `secretCode` is not a field: pb_hooks/signup.pb.js checks it and it is never stored.
+      await this.pb
+        .collection(USERS)
+        .create({ name, email, password, passwordConfirm, secretCode, emailVisibility: false });
     } catch (error) {
       throw toAuthError(error, 'signup');
     }

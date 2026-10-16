@@ -3,6 +3,8 @@ export interface AuthUser {
   email: string;
   name: string;
   verified: boolean;
+  /** Organiser: sees the admin view (granted by a superuser, never self-assigned). */
+  isAdmin: boolean;
 }
 
 export interface SignUpInput {
@@ -10,6 +12,8 @@ export interface SignUpInput {
   email: string;
   password: string;
   passwordConfirm: string;
+  /** Code given to the guests: required to create an account (checked by the server). */
+  secretCode: string;
 }
 
 /**

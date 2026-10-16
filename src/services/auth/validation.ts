@@ -29,13 +29,21 @@ export function validateLogin(email: string, password: string) {
   return errors;
 }
 
-export function validateSignUp(input: { name: string; email: string; password: string; passwordConfirm: string }) {
-  const errors: FieldErrors<'name' | 'email' | 'password' | 'passwordConfirm'> = {
+export function validateSignUp(input: {
+  name: string;
+  email: string;
+  password: string;
+  passwordConfirm: string;
+  secretCode: string;
+}) {
+  const errors: FieldErrors<'name' | 'email' | 'password' | 'passwordConfirm' | 'secretCode'> = {
     ...validateNewPassword(input.password, input.passwordConfirm),
   };
   if (!input.name.trim()) errors.name = 'Please tell us your name.';
   else if (input.name.trim().length > 100) errors.name = 'Name is too long.';
   const emailError = validateEmail(input.email);
   if (emailError) errors.email = emailError;
+  // Only presence here: whether it is the right code is up to the server.
+  if (!input.secretCode.trim()) errors.secretCode = 'Please enter the secret code.';
   return errors;
 }

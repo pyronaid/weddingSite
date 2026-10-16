@@ -5,10 +5,14 @@ import { AuthError, type AuthService, type AuthUser } from '../../services/auth'
 import { GameError, type GameProgress, type GalleryPhoto, type GameRepository, type PlayingCard, type Riddle, type Suit } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
-import { GuestOnly, RequireAuth } from './guards';
+import { GuestOnly, RequireAdmin, RequireAuth } from './guards';
 import { DashboardPage } from './pages/DashboardPage';
 import { GalleryPage } from './pages/GalleryPage';
 import { LoginPage } from './pages/LoginPage';
+import { SignupPage } from './pages/SignupPage';
+import { AdminRepositoryProvider } from './admin/AdminRepositoryContext';
+import { AdminSuitPage } from './admin/AdminSuitPage';
+import { AdminError, type AdminCard, type AdminRepository } from '../../services/admin';
 import { RiddlePage } from './pages/RiddlePage';
 import { SuitPage } from './pages/SuitPage';
 
@@ -24,7 +28,7 @@ function createFakeAuth(overrides: Partial<AuthService> = {}) {
     getCurrentUser: () => user,
     subscribe: (l) => (listeners.add(l), () => listeners.delete(l)),
     login: vi.fn(async (email: string) => {
-      const next = { id: '1', email, name: 'Anna Verdi', verified: true };
+      const next = { id: '1', email, name: 'Anna Verdi', verified: true, isAdmin: email.startsWith('admin') };
       setUser(next);
       return next;
     }),
@@ -83,7 +87,46 @@ function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository
   };
 }
 
-function renderArea(service: AuthService, initialPath: string, game: GameRepository = createFakeGame()) {
+const adminClubs: AdminCard[] = Array.from({ length: 13 }, (_, i) => ({
+  id: `c${i + 1}`,
+  suit: 'clubs',
+  rank: i + 1,
+  letter: i < 10 ? 'WEDDINGFUN'[i] : '',
+  riddle: `Riddle ${i + 1}`,
+  solution: i === 6 ? 'APPLE' : '',
+}));
+const adminHearts: AdminCard[] = Array.from({ length: 13 }, (_, i) => ({
+  id: `h${i + 1}`,
+  suit: 'hearts',
+  rank: i + 1,
+  letter: '',
+  ...(i < 10 ? { scenes: [{ id: `s${i + 1}`, text: `Scene of the ${i + 1}` }] } : {}),
+}));
+
+function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
+  return {
+    getSuit: vi.fn(async (suit: Suit) => (suit === 'clubs' ? adminClubs : suit === 'hearts' ? adminHearts : [])),
+    updateCard: vi.fn(async (cardId: string, changes) => ({
+      ...adminClubs.find((card) => card.id === cardId)!,
+      ...changes,
+      ...(changes.letter !== undefined ? { letter: changes.letter.toUpperCase() } : {}),
+      ...(changes.solution !== undefined ? { solution: changes.solution.replace(/\s+/g, '').toUpperCase() } : {}),
+    })),
+    addScene: vi.fn(async (_cardId: string, text: string) => ({ id: 'new-scene', text })),
+    updateScene: vi.fn(async (sceneId: string, text: string) => ({ id: sceneId, text })),
+    deleteScene: vi.fn(async () => {}),
+    getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
+    updateSettings: vi.fn(async (settings) => settings),
+    ...overrides,
+  };
+}
+
+function renderArea(
+  service: AuthService,
+  initialPath: string,
+  game: GameRepository = createFakeGame(),
+  admin: AdminRepository = createFakeAdmin(),
+) {
   const router = createMemoryRouter(
     [
       {
@@ -92,7 +135,9 @@ function renderArea(service: AuthService, initialPath: string, game: GameReposit
         element: (
           <AuthProvider service={service}>
             <GameRepositoryProvider value={game}>
-              <Outlet />
+              <AdminRepositoryProvider value={admin}>
+                <Outlet />
+              </AdminRepositoryProvider>
             </GameRepositoryProvider>
           </AuthProvider>
         ),
@@ -106,7 +151,14 @@ function renderArea(service: AuthService, initialPath: string, game: GameReposit
               { path: 'gallery', element: <GalleryPage /> },
             ],
           },
-          { element: <GuestOnly />, children: [{ path: 'login', element: <LoginPage /> }] },
+          { element: <RequireAdmin />, children: [{ path: 'admin/suits/:suit', element: <AdminSuitPage /> }] },
+          {
+            element: <GuestOnly />,
+            children: [
+              { path: 'login', element: <LoginPage /> },
+              { path: 'signup', element: <SignupPage /> },
+            ],
+          },
         ],
       },
     ],
@@ -541,6 +593,145 @@ describe('private area', () => {
         renderArea(await loggedIn(), '/area/gallery');
         expect(await screen.findByText(/no photos yet/i)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('sign-up secret code', () => {
+    async function fillSignup(code: string) {
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText(/full name/i), 'Anna Verdi');
+      await user.type(screen.getByLabelText(/^e-mail$/i), 'anna@example.com');
+      await user.type(screen.getByLabelText(/^password$/i, { selector: 'input' }), 'password123');
+      await user.type(screen.getByLabelText(/confirm password/i, { selector: 'input' }), 'password123');
+      if (code) await user.type(screen.getByLabelText(/secret code/i), code);
+      await user.click(screen.getByRole('button', { name: /create account/i }));
+    }
+
+    it('requires the secret code before calling the server', async () => {
+      const auth = createFakeAuth();
+      renderArea(auth, '/area/signup');
+      await fillSignup('');
+      expect(await screen.findByText('Please enter the secret code.')).toBeInTheDocument();
+      expect(auth.signUp).not.toHaveBeenCalled();
+    });
+
+    it('sends the code and shows the server verdict on the field', async () => {
+      const auth = createFakeAuth({
+        signUp: vi.fn().mockRejectedValue(
+          new AuthError('validation', 'Please check the highlighted fields.', { secretCode: 'This secret code is not correct.' }),
+        ),
+      });
+      renderArea(auth, '/area/signup');
+      await fillSignup(' #party ');
+      expect(auth.signUp).toHaveBeenCalledWith(expect.objectContaining({ secretCode: '#party' }));
+      expect(await screen.findByText('This secret code is not correct.')).toBeInTheDocument();
+      expect(screen.getByLabelText(/secret code/i)).toHaveAttribute('aria-invalid', 'true');
+    });
+  });
+
+  describe('organisers', () => {
+    async function loggedInAdmin() {
+      const auth = createFakeAuth();
+      await auth.login('admin@example.com', 'x');
+      return auth;
+    }
+
+    it('shows organisers their own home with the four suits and the secret code', async () => {
+      const admin = createFakeAdmin();
+      renderArea(await loggedInAdmin(), '/area', createFakeGame(), admin);
+
+      expect(await screen.findByText('Organisers')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Clubs: Letters & riddles' })).toHaveAttribute('href', '/area/admin/suits/clubs');
+      expect(screen.getByRole('link', { name: 'Hearts: Letters & scenes' })).toHaveAttribute('href', '/area/admin/suits/hearts');
+
+      const code = await screen.findByLabelText(/code guests need/i);
+      await waitFor(() => expect(code).toHaveValue('#wedding'));
+      const user = userEvent.setup();
+      await user.clear(code);
+      await user.type(code, '#Sposi2027');
+      await user.click(screen.getByRole('button', { name: 'Save code' }));
+      expect(admin.updateSettings).toHaveBeenCalledWith({ signupCode: '#Sposi2027' });
+      expect(await screen.findByText('Saved ✓')).toBeInTheDocument();
+    });
+
+    it('keeps guests out of the admin pages', async () => {
+      const router = renderArea(await (async () => {
+        const auth = createFakeAuth();
+        await auth.login('anna@example.com', 'x');
+        return auth;
+      })(), '/area/admin/suits/clubs');
+      expect(await screen.findByRole('heading', { name: /hello, anna/i })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area');
+    });
+
+    it('edits the letter, riddle and solution of a club, sending only the changes', async () => {
+      const admin = createFakeAdmin();
+      renderArea(await loggedInAdmin(), '/area/admin/suits/clubs', createFakeGame(), admin);
+      const user = userEvent.setup();
+
+      const seven = await screen.findByRole('article', { name: '7 of clubs' });
+      const save = within(seven).getByRole('button', { name: 'Save' });
+      expect(save).toBeDisabled();
+
+      await user.clear(within(seven).getByLabelText('Secret letter'));
+      await user.type(within(seven).getByLabelText('Secret letter'), 'z');
+      await user.clear(within(seven).getByLabelText('Solution'));
+      await user.type(within(seven).getByLabelText('Solution'), 'big apple');
+      await user.click(save);
+
+      expect(admin.updateCard).toHaveBeenCalledWith('c7', { letter: 'Z', solution: 'big apple' });
+      expect(await within(seven).findByText('Saved ✓')).toBeInTheDocument();
+      expect(within(seven).getByLabelText('Solution')).toHaveValue('BIGAPPLE');
+
+      // Face cards: riddle and solution, but no letter.
+      const king = screen.getByRole('article', { name: 'King of clubs' });
+      expect(within(king).queryByLabelText('Secret letter')).not.toBeInTheDocument();
+      expect(within(king).getByLabelText('Riddle')).toHaveValue('Riddle 13');
+    });
+
+    it('shows the server errors next to the field', async () => {
+      const admin = createFakeAdmin({
+        updateCard: vi.fn().mockRejectedValue(
+          new AdminError('validation', 'Please check the highlighted values.', { solution: 'Invalid value format.' }),
+        ),
+      });
+      renderArea(await loggedInAdmin(), '/area/admin/suits/clubs', createFakeGame(), admin);
+      const user = userEvent.setup();
+      const two = await screen.findByRole('article', { name: '2 of clubs' });
+      await user.type(within(two).getByLabelText('Solution'), 'pear');
+      await user.click(within(two).getByRole('button', { name: 'Save' }));
+      expect(await within(two).findByText('Invalid value format.')).toBeInTheDocument();
+      expect(within(two).getByLabelText('Solution')).toHaveAttribute('aria-invalid', 'true');
+
+      // Fixing the value clears the error.
+      await user.type(within(two).getByLabelText('Solution'), 's');
+      expect(within(two).queryByText('Invalid value format.')).not.toBeInTheDocument();
+    });
+
+    it('adds, edits and deletes the scenes of a heart', async () => {
+      const admin = createFakeAdmin();
+      renderArea(await loggedInAdmin(), '/area/admin/suits/hearts', createFakeGame(), admin);
+      const user = userEvent.setup();
+
+      const three = await screen.findByRole('article', { name: '3 of hearts' });
+      const scene = within(three).getByLabelText('Scene 1 of the 3 of hearts');
+      await user.clear(scene);
+      await user.type(scene, 'A juggler');
+      await user.click(within(three).getByRole('button', { name: 'Save scene 1 of the 3 of hearts' }));
+      expect(admin.updateScene).toHaveBeenCalledWith('s3', 'A juggler');
+
+      await user.type(within(three).getByLabelText('New scene for the 3 of hearts'), 'Three hats on one head');
+      await user.click(within(three).getByRole('button', { name: 'Add scene' }));
+      expect(admin.addScene).toHaveBeenCalledWith('h3', 'Three hats on one head');
+      expect(await within(three).findByText('(2)')).toBeInTheDocument();
+
+      await user.click(within(three).getByRole('button', { name: 'Delete scene 1 of the 3 of hearts' }));
+      await user.click(within(three).getByRole('button', { name: 'Confirm delete' }));
+      expect(admin.deleteScene).toHaveBeenCalledWith('s3');
+      expect(await within(three).findByText('(1)')).toBeInTheDocument();
+
+      // Face hearts: the scene is told in person.
+      expect(within(screen.getByRole('article', { name: 'Queen of hearts' })).getByText(/told in person/i)).toBeInTheDocument();
     });
   });
 });

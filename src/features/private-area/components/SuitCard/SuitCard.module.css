@@ -54,6 +54,13 @@
   letter-spacing: 0.05em;
 }
 
+.caption {
+  font-size: 0.78rem;
+  text-align: center;
+  color: var(--pink-600);
+  font-weight: 700;
+}
+
 .bar {
   width: 70%;
   height: 4px;
