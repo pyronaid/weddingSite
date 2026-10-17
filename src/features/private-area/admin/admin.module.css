@@ -274,3 +274,20 @@
   font-size: 0.78rem;
   color: var(--card-muted);
 }
+
+.questionNumber {
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--card-accent);
+}
+
+.answerLetter {
+  flex: none;
+  width: 1.2rem;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  text-align: center;
+}

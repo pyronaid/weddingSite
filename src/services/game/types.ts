@@ -91,6 +91,13 @@ export interface QuizStatus {
 
 export interface QuizQuestion {
   questionId: string;
+  /**
+   * Jack, Queen and King: the question is asked in person. `text` is empty,
+   * the answers are just letters (A, B, C...) and `number` tells the person
+   * which of the card's questions to ask.
+   */
+  inPerson?: boolean;
+  number?: number;
   text: string;
   /** The choices; which one is correct stays on the server. */
   answers: { id: string; text: string }[];

@@ -7,6 +7,7 @@ const { isCollected, collect } = require(`${__hooks}/lib/collection.js`);
 const QUIZ_SUIT = 'diamonds';
 /** Wrong answers allowed before they turn into penalties (all diamonds together). */
 const LIVES = 3;
+const isFaceCard = (rank) => rank >= 11;
 
 function findQuizCard(app, cardId) {
   let card;
@@ -70,13 +71,37 @@ function setCurrent(attempt, question) {
 }
 
 /** The question as guests see it: never which answer is correct. */
-function questionView(app, question) {
+const LETTERS = 'ABCDEFGHIJ';
+
+/**
+ * The question as guests see it: never which answer is correct.
+ *
+ * Jack, Queen and King are asked IN PERSON: the guest gets neither the
+ * question nor the answers, only the question number and the letters A, B,
+ * C... The person asking reads them from the organisers' view, which lists
+ * the questions and answers in the same (creation) order.
+ */
+function questionView(app, question, card) {
+  if (isFaceCard(card.getInt('rank'))) {
+    const answers = app.findRecordsByFilter('quiz_answers', 'question = {:question}', 'created', 0, 0, {
+      question: question.id,
+    });
+    const siblings = app.findRecordsByFilter('quiz_questions', 'card = {:card}', 'created', 0, 0, { card: card.id });
+    return {
+      questionId: question.id,
+      inPerson: true,
+      number: siblings.findIndex((item) => item.id === question.id) + 1,
+      text: '',
+      answers: answers.map((answer, index) => ({ id: answer.id, text: LETTERS[index] || String(index + 1) })),
+    };
+  }
   // Sorted by (random) id: a stable order that does not follow creation order.
   const answers = app.findRecordsByFilter('quiz_answers', 'question = {:question}', 'id', 0, 0, {
     question: question.id,
   });
   return {
     questionId: question.id,
+    inPerson: false,
     text: question.getString('text'),
     answers: answers.map((answer) => ({ id: answer.id, text: answer.getString('text') })),
   };
@@ -104,7 +129,7 @@ function getQuestion(app, userId, card) {
     setCurrent(attempt, question);
     app.save(attempt);
   }
-  return { solved: false, question: questionView(app, question), status: playerStatus(app, userId) };
+  return { solved: false, question: questionView(app, question, card), status: playerStatus(app, userId) };
 }
 
 /**
@@ -144,7 +169,7 @@ function answer(app, userId, card, questionId, answerId) {
   const next = pickQuestion(app, card.id, seenIds(attempt), current.id);
   setCurrent(attempt, next);
   app.save(attempt);
-  return { correct: false, question: questionView(app, next), status: playerStatus(app, userId) };
+  return { correct: false, question: questionView(app, next, card), status: playerStatus(app, userId) };
 }
 
 module.exports = { findQuizCard, playerStatus, getQuestion, answer };

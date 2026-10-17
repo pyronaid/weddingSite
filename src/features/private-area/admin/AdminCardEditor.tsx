@@ -140,7 +140,9 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
       )}
 
       {card.scenes && <ScenesEditor cardId={card.id} cardName={name} scenes={card.scenes} />}
-      {card.questions && <QuestionsEditor cardId={card.id} cardName={name} questions={card.questions} />}
+      {card.questions && (
+        <QuestionsEditor cardId={card.id} cardName={name} questions={card.questions} inPerson={face} />
+      )}
     </article>
   );
 }

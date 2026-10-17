@@ -39,6 +39,24 @@
   gap: 0.5rem;
 }
 
+/* In-person questions: big letter tiles side by side. */
+.letters {
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+}
+
+.letters .option {
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.inPerson {
+  margin: -0.3rem 0 0.8rem;
+  font-size: 0.92rem;
+  color: var(--card-muted);
+}
+
 /* Each answer is a large tap target; the radio stays for keyboards and screen readers. */
 .option {
   display: flex;

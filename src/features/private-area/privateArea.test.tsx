@@ -591,6 +591,7 @@ describe('private area', () => {
         expect(rules).toHaveTextContent(/newlyweds/i);
         expect(rules).toHaveTextContent(/ask the other guests/i);
         expect(rules).toHaveTextContent(/carry them out before claiming the prize/i);
+        expect(rules).toHaveTextContent(/Jack, Queen and King the question and its answers are told to you in person/i);
         expect(await screen.findByText('3 of 3 lives left')).toBeInTheDocument();
       });
 
@@ -638,6 +639,39 @@ describe('private area', () => {
         await user.click(screen.getByRole('button', { name: 'Submit' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('you got a penalty (2 so far)');
         expect(screen.getByText('0 of 3 lives left, 2 penalties')).toBeInTheDocument();
+      });
+
+      it('asks the Jack, Queen and King questions in person: only the number and the letters are shown', async () => {
+        const game = createFakeGame({
+          getQuizQuestion: vi.fn(async () => ({
+            solved: false as const,
+            status: fullLives,
+            question: {
+              questionId: 'kq',
+              inPerson: true,
+              number: 2,
+              text: '',
+              answers: ['A', 'B', 'C', 'D'].map((letter) => ({ id: `kq-${letter}`, text: letter })),
+            },
+          })),
+        });
+        renderArea(await loggedIn(), '/area/suits/diamonds', game);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Quiz for the Jack of diamonds' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Quiz · Jack of diamonds' });
+        expect(within(dialog).getByRole('group', { name: 'Question n° 2' })).toBeInTheDocument();
+        expect(within(dialog).getByText(/will ask you this question/)).toHaveTextContent('in person');
+        expect(within(dialog).getAllByRole('radio').map((radio) => radio.closest('label')?.textContent)).toEqual([
+          'A',
+          'B',
+          'C',
+          'D',
+        ]);
+
+        await user.click(within(dialog).getByRole('radio', { name: 'C' }));
+        await user.click(within(dialog).getByRole('button', { name: 'Submit' }));
+        expect(game.answerQuiz).toHaveBeenCalledWith('diamonds11', 'kq', 'kq-C');
       });
 
       it('shows a won card as won', async () => {
@@ -888,6 +922,19 @@ describe('private area', () => {
         ],
       });
       expect(await within(five).findByText('(2)')).toBeInTheDocument();
+    });
+
+    it('numbers the in-person questions of the face diamonds and letters their answers', async () => {
+      renderArea(await loggedInAdmin(), '/area/admin/suits/diamonds');
+      const queen = await screen.findByRole('article', { name: 'Queen of diamonds' });
+      expect(within(queen).getByRole('group', { name: 'Question n° 1' })).toBeInTheDocument();
+      expect(within(queen).getByText(/asked in person/i)).toBeInTheDocument();
+      const answers = within(within(queen).getByRole('group', { name: 'Question n° 1' })).getAllByRole('listitem');
+      expect(answers.map((item) => item.textContent?.trim()[0])).toEqual(['A', 'B']);
+
+      // Numbered cards are read by the guests themselves: no numbering.
+      const five = screen.getByRole('article', { name: '5 of diamonds' });
+      expect(within(five).queryByText(/Question n°/)).not.toBeInTheDocument();
     });
   });
 });

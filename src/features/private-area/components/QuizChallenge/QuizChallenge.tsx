@@ -146,8 +146,17 @@ export function QuizChallenge({ card, onStatus, onCollected }: QuizChallengeProp
               </p>
             )}
             <fieldset className={styles.fieldset} disabled={submitting} aria-describedby={`${groupId}-hint`}>
-              <legend className={styles.question}>{state.question.text}</legend>
-              <div className={styles.options}>
+              <legend className={styles.question}>
+                {state.question.inPerson ? `Question n° ${state.question.number}` : state.question.text}
+              </legend>
+              {state.question.inPerson && (
+                <p className={styles.inPerson}>
+                  The {name} will ask you this question <strong>in person</strong> and read you the possible answers:
+                  go and find them, tell them it is question n° {state.question.number}, then pick the letter of your
+                  answer.
+                </p>
+              )}
+              <div className={`${styles.options} ${state.question.inPerson ? styles.letters : ''}`}>
                 {state.question.answers.map((answer) => (
                   <label key={answer.id} className={`${styles.option} ${choice === answer.id ? styles.chosen : ''}`}>
                     <input

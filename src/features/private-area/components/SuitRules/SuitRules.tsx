@@ -28,6 +28,7 @@ const SUIT_RULES: Record<Suit, ReactNode[]> = {
       their tastes and the anecdotes of their life together. Pick an answer and submit it.
     </>,
     'Your question is drawn at random and stays the same until you answer it, even if you close it or come back later.',
+    'For the Jack, Queen and King the question and its answers are told to you in person: on the site you only pick the letter (A, B, C…) of your answer.',
     <>
       <strong>Not sure? Ask the other guests</strong>: friends and relatives may know the answer!
     </>,

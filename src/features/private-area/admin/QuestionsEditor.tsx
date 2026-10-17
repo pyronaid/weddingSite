@@ -8,12 +8,16 @@ interface QuestionsEditorProps {
   cardId: string;
   cardName: string;
   questions: AdminQuestion[];
+  /** Jack, Queen, King: asked in person, guests only see the number and A, B, C... */
+  inPerson?: boolean;
 }
+
+const LETTERS = 'ABCDEFGHIJ';
 
 const emptyDraft = () => ({ text: '', answers: ['', '', ''], correct: 0 });
 
 /** The quiz questions of a diamonds card: questions, answers and the correct one. */
-export function QuestionsEditor({ cardId, cardName, questions: initial }: QuestionsEditorProps) {
+export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson = false }: QuestionsEditorProps) {
   const repository = useAdminRepository();
   const [questions, setQuestions] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -44,12 +48,19 @@ export function QuestionsEditor({ cardId, cardName, questions: initial }: Questi
         Quiz questions <span className={styles.count}>({questions.length})</span>
       </p>
       {questions.length === 0 && <p className={styles.warning}>No questions yet: guests cannot play this card.</p>}
+      {inPerson && questions.length > 0 && (
+        <p className={styles.hint}>
+          Asked in person: guests only see “Question n°” and the letters. Read the question and its answers in this
+          order to them.
+        </p>
+      )}
 
       {questions.map((question, index) => (
         <QuestionItem
           key={question.id}
           question={question}
           label={`question ${index + 1} of the ${cardName}`}
+          number={inPerson ? index + 1 : undefined}
           busy={busy}
           onSaveText={(text) => run(async () => replace(await repository.updateQuestion(question.id, text)))}
           onDelete={() =>
@@ -88,6 +99,8 @@ export function QuestionsEditor({ cardId, cardName, questions: initial }: Questi
 interface QuestionItemProps {
   question: AdminQuestion;
   label: string;
+  /** Shown for in-person questions, with the answer letters. */
+  number?: number;
   busy: boolean;
   onSaveText: (text: string) => Promise<boolean>;
   onDelete: () => Promise<boolean>;
@@ -97,7 +110,7 @@ interface QuestionItemProps {
   onAddAnswer: (text: string) => Promise<boolean>;
 }
 
-function QuestionItem({ question, label, busy, ...actions }: QuestionItemProps) {
+function QuestionItem({ question, label, number, busy, ...actions }: QuestionItemProps) {
   const uid = useId();
   const [text, setText] = useState<string | null>(null);
   const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({});
@@ -108,7 +121,11 @@ function QuestionItem({ question, label, busy, ...actions }: QuestionItemProps) 
 
   return (
     <fieldset className={styles.question}>
-      <legend className="visually-hidden">{label}</legend>
+      {number !== undefined ? (
+        <legend className={styles.questionNumber}>Question n° {number}</legend>
+      ) : (
+        <legend className="visually-hidden">{label}</legend>
+      )}
       <div className={styles.sceneRow}>
         <textarea
           aria-label={`Text of ${label}`}
@@ -155,6 +172,11 @@ function QuestionItem({ question, label, busy, ...actions }: QuestionItemProps) 
           const changed = draft !== undefined && draft.trim() !== answer.text;
           return (
             <li key={answer.id} className={`${styles.answer} ${answer.correct ? styles.correct : ''}`}>
+              {number !== undefined && (
+                <span className={styles.answerLetter} aria-hidden="true">
+                  {LETTERS[index]}
+                </span>
+              )}
               <input
                 type="radio"
                 name={`${uid}-correct`}
