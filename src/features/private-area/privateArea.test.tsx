@@ -70,6 +70,16 @@ const riddle: Riddle = {
   letter: null,
 };
 
+const fullLives = { lives: 3, maxLives: 3, penalties: 0 };
+const quizQuestion = (id: string) => ({
+  questionId: id,
+  text: `Question ${id} about the couple?`,
+  answers: [
+    { id: `${id}-wrong`, text: `Wrong answer of ${id}` },
+    { id: `${id}-right`, text: `Right answer of ${id}` },
+  ],
+});
+
 function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository {
   return {
     getProgress: vi.fn(async () => progress),
@@ -83,6 +93,13 @@ function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository
     getGallery: vi.fn(async () => ({ items: [], hasMore: false })),
     getGalleryUpdates: vi.fn(async () => []),
     getFileToken: vi.fn(async () => ({ token: 'file-token', expiresAt: Date.now() + 3_600_000 })),
+    getQuizStatus: vi.fn(async () => ({ lives: 3, maxLives: 3, penalties: 0 })),
+    getQuizQuestion: vi.fn(async () => ({ solved: false as const, question: quizQuestion('q1'), status: fullLives })),
+    answerQuiz: vi.fn(async (_card: string, _question: string, answerId: string) =>
+      answerId.endsWith('-right')
+        ? { correct: true as const, letter: 'D', status: fullLives }
+        : { correct: false as const, stale: false, question: quizQuestion('q2'), status: { ...fullLives, lives: 2 } },
+    ),
     ...overrides,
   };
 }
@@ -95,6 +112,22 @@ const adminClubs: AdminCard[] = Array.from({ length: 13 }, (_, i) => ({
   riddle: `Riddle ${i + 1}`,
   solution: i === 6 ? 'APPLE' : '',
 }));
+const adminDiamonds: AdminCard[] = Array.from({ length: 13 }, (_, i) => ({
+  id: `d${i + 1}`,
+  suit: 'diamonds',
+  rank: i + 1,
+  letter: '',
+  questions: [
+    {
+      id: `dq${i + 1}`,
+      text: `Where did they meet? (${i + 1})`,
+      answers: [
+        { id: `dq${i + 1}-a`, text: 'At a party', correct: true },
+        { id: `dq${i + 1}-b`, text: 'On a train', correct: false },
+      ],
+    },
+  ],
+}));
 const adminHearts: AdminCard[] = Array.from({ length: 13 }, (_, i) => ({
   id: `h${i + 1}`,
   suit: 'hearts',
@@ -105,7 +138,9 @@ const adminHearts: AdminCard[] = Array.from({ length: 13 }, (_, i) => ({
 
 function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
   return {
-    getSuit: vi.fn(async (suit: Suit) => (suit === 'clubs' ? adminClubs : suit === 'hearts' ? adminHearts : [])),
+    getSuit: vi.fn(async (suit: Suit) =>
+      suit === 'clubs' ? adminClubs : suit === 'hearts' ? adminHearts : suit === 'diamonds' ? adminDiamonds : [],
+    ),
     updateCard: vi.fn(async (cardId: string, changes) => ({
       ...adminClubs.find((card) => card.id === cardId)!,
       ...changes,
@@ -115,6 +150,25 @@ function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminReposit
     addScene: vi.fn(async (_cardId: string, text: string) => ({ id: 'new-scene', text })),
     updateScene: vi.fn(async (sceneId: string, text: string) => ({ id: sceneId, text })),
     deleteScene: vi.fn(async () => {}),
+    addQuestion: vi.fn(async (_cardId: string, question) => ({
+      id: 'new-q',
+      text: question.text,
+      answers: question.answers.map((answer: { text: string; correct: boolean }, index: number) => ({ id: `new-a${index}`, ...answer })),
+    })),
+    updateQuestion: vi.fn(async (id: string, text: string) => ({ ...adminDiamonds[4].questions![0], id, text })),
+    deleteQuestion: vi.fn(async () => {}),
+    addAnswer: vi.fn(async (_questionId: string, answer) => ({
+      ...adminDiamonds[4].questions![0],
+      answers: [...adminDiamonds[4].questions![0].answers, { id: 'dq5-c', text: answer.text, correct: false }],
+    })),
+    updateAnswer: vi.fn(async (answerId: string, changes) => ({
+      ...adminDiamonds[4].questions![0],
+      answers: adminDiamonds[4].questions![0].answers.map((answer) => ({
+        ...answer,
+        correct: changes.correct ? answer.id === answerId : answer.correct,
+      })),
+    })),
+    deleteAnswer: vi.fn(async () => adminDiamonds[4].questions![0]),
     getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
     updateSettings: vi.fn(async (settings) => settings),
     ...overrides,
@@ -530,6 +584,106 @@ describe('private area', () => {
       });
     });
 
+    describe('diamonds quiz', () => {
+      it('shows the rules and the three lives', async () => {
+        renderArea(await loggedIn(), '/area/suits/diamonds');
+        const rules = await screen.findByRole('region', { name: 'Rules' });
+        expect(rules).toHaveTextContent(/newlyweds/i);
+        expect(rules).toHaveTextContent(/ask the other guests/i);
+        expect(rules).toHaveTextContent(/carry them out before claiming the prize/i);
+        expect(rules).toHaveTextContent(/Jack, Queen and King the question and its answers are told to you in person/i);
+        expect(await screen.findByText('3 of 3 lives left')).toBeInTheDocument();
+      });
+
+      it('costs a life and brings a new question on a wrong answer, collects the card on the right one', async () => {
+        const game = createFakeGame();
+        renderArea(await loggedIn(), '/area/suits/diamonds', game);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Quiz for the 5 of diamonds' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Quiz · 5 of diamonds' });
+        expect(within(dialog).getByRole('group', { name: 'Question q1 about the couple?' })).toBeInTheDocument();
+        const submit = within(dialog).getByRole('button', { name: 'Submit' });
+        expect(submit).toBeDisabled();
+
+        await user.click(within(dialog).getByRole('radio', { name: 'Wrong answer of q1' }));
+        await user.click(submit);
+        expect(game.answerQuiz).toHaveBeenCalledWith('diamonds5', 'q1', 'q1-wrong');
+        expect(await within(dialog).findByRole('alert')).toHaveTextContent('you lost a life (2 left)');
+        expect(within(dialog).getByRole('group', { name: 'Question q2 about the couple?' })).toBeInTheDocument();
+        expect(screen.getByText('2 of 3 lives left')).toBeInTheDocument();
+
+        await user.click(within(dialog).getByRole('radio', { name: 'Right answer of q2' }));
+        await user.click(within(dialog).getByRole('button', { name: 'Submit' }));
+        expect(await within(dialog).findByText('Right answer! 🎉')).toBeInTheDocument();
+        expect(within(dialog).getByText('D')).toBeInTheDocument();
+        await waitFor(() => expect(game.getSuitCards).toHaveBeenCalledTimes(2));
+      });
+
+      it('turns wrong answers into penalties once the lives are over', async () => {
+        const game = createFakeGame({
+          getQuizStatus: vi.fn(async () => ({ lives: 0, maxLives: 3, penalties: 1 })),
+          answerQuiz: vi.fn(async () => ({
+            correct: false as const,
+            stale: false,
+            question: quizQuestion('q3'),
+            status: { lives: 0, maxLives: 3, penalties: 2 },
+          })),
+        });
+        renderArea(await loggedIn(), '/area/suits/diamonds', game);
+        const user = userEvent.setup();
+        expect(await screen.findByText('0 of 3 lives left, 1 penalty')).toBeInTheDocument();
+
+        await user.click(await screen.findByRole('button', { name: 'Quiz for the 2 of diamonds' }));
+        await user.click(await screen.findByRole('radio', { name: 'Wrong answer of q1' }));
+        await user.click(screen.getByRole('button', { name: 'Submit' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent('you got a penalty (2 so far)');
+        expect(screen.getByText('0 of 3 lives left, 2 penalties')).toBeInTheDocument();
+      });
+
+      it('asks the Jack, Queen and King questions in person: only the number and the letters are shown', async () => {
+        const game = createFakeGame({
+          getQuizQuestion: vi.fn(async () => ({
+            solved: false as const,
+            status: fullLives,
+            question: {
+              questionId: 'kq',
+              inPerson: true,
+              number: 2,
+              text: '',
+              answers: ['A', 'B', 'C', 'D'].map((letter) => ({ id: `kq-${letter}`, text: letter })),
+            },
+          })),
+        });
+        renderArea(await loggedIn(), '/area/suits/diamonds', game);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Quiz for the Jack of diamonds' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Quiz · Jack of diamonds' });
+        expect(within(dialog).getByRole('group', { name: 'Question n° 2' })).toBeInTheDocument();
+        expect(within(dialog).getByText(/will ask you this question/)).toHaveTextContent('in person');
+        expect(within(dialog).getAllByRole('radio').map((radio) => radio.closest('label')?.textContent)).toEqual([
+          'A',
+          'B',
+          'C',
+          'D',
+        ]);
+
+        await user.click(within(dialog).getByRole('radio', { name: 'C' }));
+        await user.click(within(dialog).getByRole('button', { name: 'Submit' }));
+        expect(game.answerQuiz).toHaveBeenCalledWith('diamonds11', 'kq', 'kq-C');
+      });
+
+      it('shows a won card as won', async () => {
+        const game = createFakeGame({
+          getQuizQuestion: vi.fn(async () => ({ solved: true as const, letter: 'N', status: fullLives })),
+        });
+        renderArea(await loggedIn(), '/area/suits/diamonds', game);
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Quiz won for the 6 of diamonds' }));
+        expect(await screen.findByText('Right answer! 🎉')).toBeInTheDocument();
+      });
+    });
+
     describe('gallery', () => {
       const photo = (n: number, updated: string): GalleryPhoto => ({
         id: `p${n}`,
@@ -732,6 +886,55 @@ describe('private area', () => {
 
       // Face hearts: the scene is told in person.
       expect(within(screen.getByRole('article', { name: 'Queen of hearts' })).getByText(/told in person/i)).toBeInTheDocument();
+    });
+
+    it('adds, edits and fixes the correct answer of diamonds quiz questions', async () => {
+      const admin = createFakeAdmin();
+      renderArea(await loggedInAdmin(), '/area/admin/suits/diamonds', createFakeGame(), admin);
+      const user = userEvent.setup();
+
+      const five = await screen.findByRole('article', { name: '5 of diamonds' });
+      expect(within(five).getByLabelText('Text of question 1 of the 5 of diamonds')).toHaveValue('Where did they meet? (5)');
+
+      // The correct answer cannot be deleted; moving the mark is one click.
+      expect(within(five).getByRole('button', { name: 'Delete answer 1 of question 1 of the 5 of diamonds' })).toBeDisabled();
+      await user.click(within(five).getByRole('radio', { name: 'Answer 2 is the correct one' }));
+      expect(admin.updateAnswer).toHaveBeenCalledWith('dq5-b', { correct: true });
+      await waitFor(() => expect(within(five).getByRole('radio', { name: 'Answer 2 is the correct one' })).toBeChecked());
+
+      await user.type(within(five).getByLabelText('New answer for question 1 of the 5 of diamonds'), 'In Rome');
+      await user.click(within(five).getByRole('button', { name: 'Add answer' }));
+      expect(admin.addAnswer).toHaveBeenCalledWith('dq5', { text: 'In Rome' });
+
+      // New question: text, answers, correct one.
+      const addQuestion = within(five).getByRole('button', { name: 'Add question' });
+      expect(addQuestion).toBeDisabled();
+      await user.type(within(five).getByLabelText('New question text for the 5 of diamonds'), 'Favourite colour?');
+      await user.type(within(five).getByLabelText('New answer 1 for the 5 of diamonds'), 'Blue');
+      await user.type(within(five).getByLabelText('New answer 2 for the 5 of diamonds'), 'Green');
+      await user.click(within(five).getByRole('radio', { name: 'New answer 2 is the correct one' }));
+      await user.click(addQuestion);
+      expect(admin.addQuestion).toHaveBeenCalledWith('d5', {
+        text: 'Favourite colour?',
+        answers: [
+          { text: 'Blue', correct: false },
+          { text: 'Green', correct: true },
+        ],
+      });
+      expect(await within(five).findByText('(2)')).toBeInTheDocument();
+    });
+
+    it('numbers the in-person questions of the face diamonds and letters their answers', async () => {
+      renderArea(await loggedInAdmin(), '/area/admin/suits/diamonds');
+      const queen = await screen.findByRole('article', { name: 'Queen of diamonds' });
+      expect(within(queen).getByRole('group', { name: 'Question n° 1' })).toBeInTheDocument();
+      expect(within(queen).getByText(/asked in person/i)).toBeInTheDocument();
+      const answers = within(within(queen).getByRole('group', { name: 'Question n° 1' })).getAllByRole('listitem');
+      expect(answers.map((item) => item.textContent?.trim()[0])).toEqual(['A', 'B']);
+
+      // Numbered cards are read by the guests themselves: no numbering.
+      const five = screen.getByRole('article', { name: '5 of diamonds' });
+      expect(within(five).queryByText(/Question n°/)).not.toBeInTheDocument();
     });
   });
 });

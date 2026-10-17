@@ -172,6 +172,11 @@ The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number
   - **Only real photos are accepted.** In the browser: the file must be an image that decodes as a photo, at least 320 px on each side; it is then shrunk (max 2048 px, ~0.5 MB instead of 3–8 MB) and re-encoded as JPEG, which also **removes the EXIF metadata (GPS location, phone model)** before the photo is shared. On the server: the type is detected from the file **content** (JPEG, PNG or WebP only, so a renamed text, SVG or GIF file is refused), 10 KB–10 MB.
   - The **rules** box explains the draws and warns that the photos of whoever claims victory are checked against their assigned scenes, so fake pictures are useless.
   - Photos are **protected files**: a photo URL only works with a file token, which only logged-in guests get. Tokens last 1 hour (a leaked link stops working) and the gallery renews them automatically.
+- **Diamonds are collected with a quiz** about the newlyweds (tastes, anecdotes). Under each card, ❓ opens the card's question with multiple choices:
+  - The question is drawn **at random on the server** from the card's own bucket (`quiz_questions` / `quiz_answers`) and **stays the same until it is answered**, even if the guest closes it or comes back later.
+  - Every player has **three lives** (three diamonds under the rules), shared by all the diamonds. A wrong answer costs a life and draws a **new question**, avoiding the ones already faced while there are others. With no lives left, every wrong answer adds a **penalty** (diamonds of another colour): penalties must be carried out before claiming the prize, as the bride and groom decide.
+  - **Jack, Queen and King are asked in person**: the guest sees neither the question nor the answers, only "Question n° X" and the letters A, B, C… (one per answer). The person asking reads question n° X and its answers, in the same order, from the organisers' view, where face-card questions are numbered and their answers lettered.
+  - A right answer collects the card. Which answer is correct never reaches the browser; lives and penalties are computed on the server.
 - **Gallery** (`/area/gallery`, linked at the bottom of the hearts page): every player's photos, with the scene, the first name and the card. Built to stay light with many photos:
   - the grid loads **480 px thumbnails** (generated once by PocketBase, then cached); the 1200 px version only when a photo is opened, never the original;
   - **pages of 24**, the next page loading as you scroll; images load lazily and off-screen tiles skip rendering (`content-visibility`);
@@ -241,6 +246,7 @@ An organiser's `/area` shows their own home instead of the game:
 - the **four suits**, each opening an editor with one panel per card:
   - **secret letter** of Ace to 10 (all suits; Jack, Queen and King have none);
   - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
+  - **diamonds**: the **quiz questions** of every card: add, edit and delete questions and answers, and pick the correct answer (a question always keeps at least two answers and exactly one correct);
   - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text);
 - the **sign-up secret code** (3–50 characters).
 
@@ -257,6 +263,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
     It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
   - `users.is_admin`: organisers (set by a superuser only).
   - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
+  - `quiz_questions`, `quiz_answers`: the diamonds quiz (organisers only; seeded with two example questions per card). `quiz_attempts`: per user and card, the current question, the questions already faced and the wrong answers (server only).
   - `photo_scenes`: the scenes of each hearts card (admin only; seeded with examples).
   - `photo_submissions`: one row per (user, card) with the drawn scene and the photo (protected file, thumbnails 480 px and 1200 px). Logged-in users see the rows that have a photo (the gallery); the owner can only replace the photo, never the scene.
   - `collected_cards`: one row per (user, card), unique. **Users can only read their own rows**; creating/editing them is superuser-only until the collecting mechanics are defined. Rows are deleted with their user or card.
@@ -265,7 +272,8 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `rsvps.pb.js` adds cross-field validation (a declining guest cannot bring people).
   - `cards.pb.js` reveals a card's hidden `letter` only to the guests who collected it.
   - `photos.pb.js` draws the photo challenge scenes (`POST /api/game/photos/{cardId}/draw`) and collects the card when a photo is uploaded.
-  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, secret code), admins only.
+  - `quiz.pb.js` serves the diamonds quiz: current question, answers, lives and penalties.
+  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, secret code), admins only.
   - `signup.pb.js` checks the sign-up secret code.
   - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
 

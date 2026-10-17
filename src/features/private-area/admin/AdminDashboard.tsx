@@ -11,7 +11,7 @@ import styles from './admin.module.css';
 
 const CAPTIONS: Record<Suit, string> = {
   hearts: 'Letters & scenes',
-  diamonds: 'Letters',
+  diamonds: 'Letters & quiz',
   spades: 'Letters',
   clubs: 'Letters & riddles',
 };

@@ -82,6 +82,37 @@ export interface GalleryPage {
   hasMore: boolean;
 }
 
+/** Lives and penalties of the quiz, shared by all the diamonds cards. */
+export interface QuizStatus {
+  lives: number;
+  maxLives: number;
+  penalties: number;
+}
+
+export interface QuizQuestion {
+  questionId: string;
+  /**
+   * Jack, Queen and King: the question is asked in person. `text` is empty,
+   * the answers are just letters (A, B, C...) and `number` tells the person
+   * which of the card's questions to ask.
+   */
+  inPerson?: boolean;
+  number?: number;
+  text: string;
+  /** The choices; which one is correct stays on the server. */
+  answers: { id: string; text: string }[];
+}
+
+/** The player's current question for a card, or the card already won. */
+export type QuizDraw =
+  | { solved: true; letter: string | null; status: QuizStatus }
+  | { solved: false; question: QuizQuestion; status: QuizStatus };
+
+export type QuizAnswerResult =
+  | { correct: true; letter: string | null; status: QuizStatus }
+  /** Wrong (or answered an outdated question, `stale`): here is the next question. */
+  | { correct: false; stale: boolean; question: QuizQuestion; status: QuizStatus };
+
 /**
  * Backend-agnostic access to the card game. Pages depend only on this, so the
  * PocketBase implementation can be replaced (or faked in tests) freely.
@@ -105,6 +136,12 @@ export interface GameRepository {
   getGalleryUpdates(since: string): Promise<GalleryPhoto[]>;
   /** A token to load protected photos; cached until close to expiry unless `force`. */
   getFileToken(options?: { force?: boolean }): Promise<FileToken>;
+  /** Lives left and penalties of the quiz. */
+  getQuizStatus(): Promise<QuizStatus>;
+  /** The current question of a diamonds card: drawn once, kept until answered. */
+  getQuizQuestion(cardId: string): Promise<QuizDraw>;
+  /** Answers the current question: right collects the card, wrong costs a life (or a penalty). */
+  answerQuiz(cardId: string, questionId: string, answerId: string): Promise<QuizAnswerResult>;
 }
 
 export type GameErrorCode =

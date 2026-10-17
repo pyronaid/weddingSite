@@ -13,6 +13,8 @@ import styles from './SuitCollection.module.css';
 
 interface SuitCollectionProps {
   suit: Suit;
+  /** Rendered right after the rules (e.g. the quiz lives). */
+  afterRules?: ReactNode;
   /** Rendered under each card (e.g. the photo challenge button). `refresh` reloads the cards. */
   renderCardAction?: (card: PlayingCard, refresh: () => void) => ReactNode;
   /** Rendered after the cards (e.g. a link to the gallery). */
@@ -20,7 +22,7 @@ interface SuitCollectionProps {
 }
 
 /** All the cards of a suit, the collected ones highlighted, and the secret phrase. */
-export function SuitCollection({ suit, renderCardAction, footer }: SuitCollectionProps) {
+export function SuitCollection({ suit, afterRules, renderCardAction, footer }: SuitCollectionProps) {
   const { label, symbol } = SUIT_META[suit];
   const query = useSuitCards(suit);
   const cards = query.status === 'success' ? query.data : undefined;
@@ -35,6 +37,7 @@ export function SuitCollection({ suit, renderCardAction, footer }: SuitCollectio
         the secret phrase.
       </p>
       <SuitRules suit={suit} />
+      {afterRules}
 
       {query.status === 'loading' && (
         <p className={styles.status} role="status">

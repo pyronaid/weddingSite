@@ -16,6 +16,12 @@ export function createAdminRepository(): AdminRepository {
     addScene: fail,
     updateScene: fail,
     deleteScene: fail,
+    addQuestion: fail,
+    updateQuestion: fail,
+    deleteQuestion: fail,
+    addAnswer: fail,
+    updateAnswer: fail,
+    deleteAnswer: fail,
     getSettings: fail,
     updateSettings: fail,
   };

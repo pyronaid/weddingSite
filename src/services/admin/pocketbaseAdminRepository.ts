@@ -1,7 +1,15 @@
 import type PocketBase from 'pocketbase';
 import type { Suit } from '../game';
 import { toAdminError } from './errors';
-import type { AdminCard, AdminCardChanges, AdminRepository, AdminScene, AdminSettings } from './types';
+import type {
+  AdminCard,
+  AdminCardChanges,
+  AdminQuestion,
+  AdminRepository,
+  AdminScene,
+  AdminSettings,
+  NewQuestion,
+} from './types';
 
 /** Client of the endpoints in pb_hooks/admin.pb.js. */
 export class PocketBaseAdminRepository implements AdminRepository {
@@ -38,6 +46,30 @@ export class PocketBaseAdminRepository implements AdminRepository {
 
   async deleteScene(sceneId: string): Promise<void> {
     await this.call(`/scenes/${encodeURIComponent(sceneId)}`, 'DELETE');
+  }
+
+  addQuestion(cardId: string, question: NewQuestion): Promise<AdminQuestion> {
+    return this.call(`/cards/${encodeURIComponent(cardId)}/questions`, 'POST', question);
+  }
+
+  updateQuestion(questionId: string, text: string): Promise<AdminQuestion> {
+    return this.call(`/questions/${encodeURIComponent(questionId)}`, 'PATCH', { text });
+  }
+
+  async deleteQuestion(questionId: string): Promise<void> {
+    await this.call(`/questions/${encodeURIComponent(questionId)}`, 'DELETE');
+  }
+
+  addAnswer(questionId: string, answer: { text: string; correct?: boolean }): Promise<AdminQuestion> {
+    return this.call(`/questions/${encodeURIComponent(questionId)}/answers`, 'POST', answer);
+  }
+
+  updateAnswer(answerId: string, changes: { text?: string; correct?: true }): Promise<AdminQuestion> {
+    return this.call(`/answers/${encodeURIComponent(answerId)}`, 'PATCH', changes);
+  }
+
+  deleteAnswer(answerId: string): Promise<AdminQuestion> {
+    return this.call(`/answers/${encodeURIComponent(answerId)}`, 'DELETE');
   }
 
   getSettings(): Promise<AdminSettings> {

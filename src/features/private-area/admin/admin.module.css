@@ -184,3 +184,110 @@
   max-width: 380px;
   justify-self: center;
 }
+
+/* ---- Quiz questions (diamonds) ---- */
+
+.question {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+}
+
+.answers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.answer {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.correct {
+  border-color: var(--collected);
+  background: rgba(47, 158, 91, 0.15);
+}
+
+.answer input[type='radio'] {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--collected);
+}
+
+.answerText {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--white-warm);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+}
+
+.answerText:focus {
+  outline: none;
+  border-color: var(--card-accent);
+}
+
+.addAnswer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.newQuestion {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem;
+  border: 1px dashed var(--card-accent);
+  border-radius: var(--radius-md);
+}
+
+.newQuestion textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--text);
+  background: var(--white-warm);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  resize: vertical;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--card-muted);
+}
+
+.questionNumber {
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--card-accent);
+}
+
+.answerLetter {
+  flex: none;
+  width: 1.2rem;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  text-align: center;
+}
