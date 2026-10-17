@@ -5,6 +5,8 @@
 const SUITS = ['hearts', 'diamonds', 'spades', 'clubs'];
 const PHOTO_SUIT = 'hearts';
 const RIDDLE_SUIT = 'clubs';
+const QUIZ_SUIT = 'diamonds';
+const MIN_ANSWERS = 2;
 const isFaceCard = (rank) => rank >= 11;
 
 /** Admins are users flagged `is_admin` by a superuser. */
@@ -37,6 +39,20 @@ function sceneView(scene) {
   return { id: scene.id, text: scene.getString('text') };
 }
 
+function answerView(answer) {
+  return { id: answer.id, text: answer.getString('text'), correct: answer.getBool('correct') };
+}
+
+function questionView(app, question) {
+  return {
+    id: question.id,
+    text: question.getString('text'),
+    answers: app
+      .findRecordsByFilter('quiz_answers', 'question = {:question}', 'created', 0, 0, { question: question.id })
+      .map(answerView),
+  };
+}
+
 function cardView(app, card) {
   const suit = card.getString('suit');
   const rank = card.getInt('rank');
@@ -44,6 +60,11 @@ function cardView(app, card) {
   if (suit === RIDDLE_SUIT) {
     view.riddle = card.getString('riddle');
     view.solution = card.getString('solution');
+  }
+  if (suit === QUIZ_SUIT) {
+    view.questions = app
+      .findRecordsByFilter('quiz_questions', 'card = {:card}', 'created', 0, 0, { card: card.id })
+      .map((question) => questionView(app, question));
   }
   if (suit === PHOTO_SUIT && !isFaceCard(rank)) {
     view.scenes = app
@@ -113,4 +134,123 @@ function deleteScene(app, sceneId) {
   app.delete(findRecord(app, 'photo_scenes', sceneId, 'Scene'));
 }
 
-module.exports = { requireAdmin, listSuit, updateCard, addScene, updateScene, deleteScene };
+// ---- Quiz (diamonds) ----
+
+const cleanText = (value) => String(value ?? '').trim();
+
+function quizCard(app, cardId) {
+  const card = findRecord(app, 'cards', cardId, 'Card');
+  if (card.getString('suit') !== QUIZ_SUIT) throw new BadRequestError('Only diamonds have quiz questions.');
+  return card;
+}
+
+function siblings(app, questionId) {
+  return app.findRecordsByFilter('quiz_answers', 'question = {:question}', 'created', 0, 0, { question: questionId });
+}
+
+/** New question with its answers: at least two, exactly one correct, all in one transaction. */
+function addQuestion(app, cardId, body) {
+  const card = quizCard(app, cardId);
+  const options = Array.isArray(body.answers) ? body.answers : [];
+  const answers = options.map((option) => ({ text: cleanText(option && option.text), correct: Boolean(option && option.correct) }));
+  if (answers.length < MIN_ANSWERS || answers.some((answer) => !answer.text)) {
+    throw new BadRequestError(`A question needs at least ${MIN_ANSWERS} answers, none of them empty.`);
+  }
+  if (answers.filter((answer) => answer.correct).length !== 1) {
+    throw new BadRequestError('Mark exactly one answer as the correct one.');
+  }
+
+  let created;
+  app.runInTransaction((txApp) => {
+    const question = new Record(txApp.findCollectionByNameOrId('quiz_questions'));
+    question.set('card', card.id);
+    question.set('text', cleanText(body.text));
+    saveOrBadRequest(txApp, question);
+    for (const option of answers) {
+      const answer = new Record(txApp.findCollectionByNameOrId('quiz_answers'));
+      answer.set('question', question.id);
+      answer.set('text', option.text);
+      answer.set('correct', option.correct);
+      saveOrBadRequest(txApp, answer);
+    }
+    created = question.id;
+  });
+  return questionView(app, app.findRecordById('quiz_questions', created));
+}
+
+function updateQuestion(app, questionId, text) {
+  const question = findRecord(app, 'quiz_questions', questionId, 'Question');
+  question.set('text', cleanText(text));
+  saveOrBadRequest(app, question);
+  return questionView(app, question);
+}
+
+/** Deletes a question and its answers; players currently facing it get a new one. */
+function deleteQuestion(app, questionId) {
+  app.delete(findRecord(app, 'quiz_questions', questionId, 'Question'));
+}
+
+function addAnswer(app, questionId, body) {
+  const question = findRecord(app, 'quiz_questions', questionId, 'Question');
+  const answer = new Record(app.findCollectionByNameOrId('quiz_answers'));
+  answer.set('question', question.id);
+  answer.set('text', cleanText(body.text));
+  answer.set('correct', false);
+  saveOrBadRequest(app, answer);
+  if (body.correct) return updateAnswer(app, answer.id, { correct: true });
+  return questionView(app, question);
+}
+
+/**
+ * Edits an answer. Making it correct un-marks the previous correct one (in
+ * one transaction); un-marking the only correct answer is refused: pick the
+ * new correct answer instead.
+ */
+function updateAnswer(app, answerId, body) {
+  const answer = findRecord(app, 'quiz_answers', answerId, 'Answer');
+  const questionId = answer.getString('question');
+  if (body.correct === false && answer.getBool('correct')) {
+    throw new BadRequestError('Choose the new correct answer instead: a question always has one.');
+  }
+  app.runInTransaction((txApp) => {
+    const target = txApp.findRecordById('quiz_answers', answerId);
+    if (body.text !== undefined) target.set('text', cleanText(body.text));
+    if (body.correct === true) {
+      for (const other of siblings(txApp, questionId)) {
+        if (other.id !== target.id && other.getBool('correct')) {
+          other.set('correct', false);
+          saveOrBadRequest(txApp, other);
+        }
+      }
+      target.set('correct', true);
+    }
+    saveOrBadRequest(txApp, target);
+  });
+  return questionView(app, app.findRecordById('quiz_questions', questionId));
+}
+
+function deleteAnswer(app, answerId) {
+  const answer = findRecord(app, 'quiz_answers', answerId, 'Answer');
+  const questionId = answer.getString('question');
+  if (answer.getBool('correct')) throw new BadRequestError('Choose another correct answer before deleting this one.');
+  if (siblings(app, questionId).length <= MIN_ANSWERS) {
+    throw new BadRequestError(`A question needs at least ${MIN_ANSWERS} answers.`);
+  }
+  app.delete(answer);
+  return questionView(app, app.findRecordById('quiz_questions', questionId));
+}
+
+module.exports = {
+  requireAdmin,
+  listSuit,
+  updateCard,
+  addScene,
+  updateScene,
+  deleteScene,
+  addQuestion,
+  updateQuestion,
+  deleteQuestion,
+  addAnswer,
+  updateAnswer,
+  deleteAnswer,
+};

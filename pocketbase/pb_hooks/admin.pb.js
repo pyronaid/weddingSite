@@ -9,6 +9,12 @@
  *   POST   /api/admin/cards/{cardId}/scenes     {text}       (numbered hearts)
  *   PATCH  /api/admin/scenes/{sceneId}          {text}
  *   DELETE /api/admin/scenes/{sceneId}
+ *   POST   /api/admin/cards/{cardId}/questions  {text, answers: [{text, correct}]}   (diamonds)
+ *   PATCH  /api/admin/questions/{questionId}    {text}
+ *   DELETE /api/admin/questions/{questionId}
+ *   POST   /api/admin/questions/{questionId}/answers  {text, correct?}
+ *   PATCH  /api/admin/answers/{answerId}        {text?, correct?}   (correct: true moves the mark here)
+ *   DELETE /api/admin/answers/{answerId}
  *   GET    /api/admin/settings                  {signupCode}
  *   PATCH  /api/admin/settings                  {signupCode}
  */
@@ -98,6 +104,75 @@ routerAdd(
     }
     setSetting(e.app, 'signup_code', code);
     return e.json(200, { signupCode: code });
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Quiz (diamonds) ----
+
+routerAdd(
+  'POST',
+  '/api/admin/cards/{cardId}/questions',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, admin.addQuestion(e.app, e.request.pathValue('cardId'), e.requestInfo().body));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'PATCH',
+  '/api/admin/questions/{questionId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, admin.updateQuestion(e.app, e.request.pathValue('questionId'), e.requestInfo().body.text));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'DELETE',
+  '/api/admin/questions/{questionId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    admin.deleteQuestion(e.app, e.request.pathValue('questionId'));
+    return e.noContent(204);
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'POST',
+  '/api/admin/questions/{questionId}/answers',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, admin.addAnswer(e.app, e.request.pathValue('questionId'), e.requestInfo().body));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'PATCH',
+  '/api/admin/answers/{answerId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, admin.updateAnswer(e.app, e.request.pathValue('answerId'), e.requestInfo().body));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'DELETE',
+  '/api/admin/answers/{answerId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, admin.deleteAnswer(e.app, e.request.pathValue('answerId')));
   },
   $apis.requireAuth('users'),
 );

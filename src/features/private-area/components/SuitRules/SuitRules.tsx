@@ -22,7 +22,25 @@ const SUIT_RULES: Record<Suit, ReactNode[]> = {
     </>,
     'Scan a QR code with your phone, solve its riddle and type the answer to collect that card.',
   ],
-  diamonds: ['Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.'],
+  diamonds: [
+    <>
+      Press <span aria-hidden="true">❓</span> under a card to get its question: they are all about the newlyweds,
+      their tastes and the anecdotes of their life together. Pick an answer and submit it.
+    </>,
+    'Your question is drawn at random and stays the same until you answer it, even if you close it or come back later.',
+    <>
+      <strong>Not sure? Ask the other guests</strong>: friends and relatives may know the answer!
+    </>,
+    <>
+      You have <strong>three lives</strong> (the three diamonds below), shared by all the diamonds. Every wrong answer
+      costs a life and gives you a new question.
+    </>,
+    <>
+      With no lives left, every wrong answer adds a <strong>penalty</strong> (the diamonds of another colour). If you
+      end the game with penalties, you will have to <strong>carry them out before claiming the prize</strong>: the
+      bride and groom will choose them!
+    </>,
+  ],
   spades: ['Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.'],
 };
 

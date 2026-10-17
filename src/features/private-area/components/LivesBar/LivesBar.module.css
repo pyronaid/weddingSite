@@ -1,0 +1,47 @@
+.bar {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3rem;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.label {
+  margin-right: 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--card-muted);
+}
+
+.life {
+  color: var(--pink-400);
+  text-shadow: 0 0 10px rgba(232, 138, 168, 0.6);
+}
+
+/* A lost life: the same diamond, emptied. */
+.lost {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--card-muted);
+  opacity: 0.6;
+}
+
+/* Penalties: the same symbol in a warning colour. */
+.penalty {
+  color: var(--penalty);
+  text-shadow: 0 0 10px rgba(246, 154, 60, 0.5);
+}
+
+.more {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--penalty);
+}

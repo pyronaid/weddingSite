@@ -9,6 +9,9 @@ import {
   type GameProgress,
   type GameRepository,
   type PhotoDraw,
+  type QuizAnswerResult,
+  type QuizDraw,
+  type QuizStatus,
   type PlayingCard,
   type Riddle,
   type RiddleAttempt,
@@ -272,6 +275,40 @@ export class PocketBaseGameRepository implements GameRepository {
       const token = await this.pb.files.getToken();
       this.fileToken = { token, expiresAt: tokenExpiry(token), userId };
       return { token, expiresAt: this.fileToken.expiresAt };
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async getQuizStatus(): Promise<QuizStatus> {
+    this.requireUserId();
+    try {
+      return await this.pb.send<QuizStatus>('/api/game/quiz/status', { method: 'GET' });
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async getQuizQuestion(cardId: string): Promise<QuizDraw> {
+    this.requireUserId();
+    try {
+      const data = await this.pb.send<QuizDraw>(`/api/game/quiz/${encodeURIComponent(cardId)}/question`, {
+        method: 'POST',
+      });
+      return data.solved ? { ...data, letter: data.letter || null } : data;
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  async answerQuiz(cardId: string, questionId: string, answerId: string): Promise<QuizAnswerResult> {
+    this.requireUserId();
+    try {
+      const data = await this.pb.send<QuizAnswerResult>(`/api/game/quiz/${encodeURIComponent(cardId)}/answer`, {
+        method: 'POST',
+        body: { questionId, answerId },
+      });
+      return data.correct ? { ...data, letter: data.letter || null } : { ...data, stale: Boolean(data.stale) };
     } catch (error) {
       throw toGameError(error);
     }
