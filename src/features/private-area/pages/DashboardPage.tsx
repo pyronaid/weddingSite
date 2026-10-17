@@ -5,11 +5,18 @@ import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { SUITS } from '../../../services/game';
 import { SuitCard } from '../components/SuitCard/SuitCard';
 import { useGameProgress } from '../game/useGameProgress';
+import { AdminDashboard } from '../admin/AdminDashboard';
 import { useAuth } from '../useAuth';
 import styles from './pages.module.css';
 
 /** Landing page of the private area: game intro and progress per suit. */
 export function DashboardPage() {
+  const { user } = useAuth();
+  // Organisers get their own home: what to edit in each suit.
+  return user?.isAdmin ? <AdminDashboard /> : <PlayerDashboard />;
+}
+
+function PlayerDashboard() {
   useDocumentTitle('Private area');
   const { user, auth } = useAuth();
   const firstName = user?.name.split(' ')[0] || 'friend';

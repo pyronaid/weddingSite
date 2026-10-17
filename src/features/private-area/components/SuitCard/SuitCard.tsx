@@ -7,18 +7,22 @@ interface SuitCardProps {
   suit: Suit;
   /** Undefined while loading or when the progress could not be loaded. */
   progress?: SuitProgress;
+  /** Admin variant: link target and caption instead of the progress. */
+  to?: string;
+  caption?: string;
 }
 
 /** A playing-card shaped link to a suit page, showing the collected count. */
-export function SuitCard({ suit, progress }: SuitCardProps) {
+export function SuitCard({ suit, progress, to, caption }: SuitCardProps) {
   const { label, symbol, colour } = SUIT_META[suit];
   const complete = progress !== undefined && progress.total > 0 && progress.collected >= progress.total;
   const percent = progress && progress.total > 0 ? Math.min(100, (progress.collected / progress.total) * 100) : 0;
-  const description = progress ? `${progress.collected} of ${progress.total} cards collected` : 'progress not available';
+  const description =
+    caption ?? (progress ? `${progress.collected} of ${progress.total} cards collected` : 'progress not available');
 
   return (
     <Link
-      to={suitPath(suit)}
+      to={to ?? suitPath(suit)}
       className={`${styles.card} ${styles[colour]} ${complete ? styles.complete : ''}`}
       aria-label={`${label}: ${description}`}
     >
@@ -29,12 +33,16 @@ export function SuitCard({ suit, progress }: SuitCardProps) {
         {symbol}
       </span>
       <span className={styles.label}>{label}</span>
-      <span className={styles.counter}>
-        {progress ? `${progress.collected}/${progress.total}` : '–/–'}
-      </span>
-      <span className={styles.bar} aria-hidden="true">
-        <span style={{ width: `${percent}%` }} />
-      </span>
+      {caption ? (
+        <span className={styles.caption}>{caption}</span>
+      ) : (
+        <>
+          <span className={styles.counter}>{progress ? `${progress.collected}/${progress.total}` : '–/–'}</span>
+          <span className={styles.bar} aria-hidden="true">
+            <span style={{ width: `${percent}%` }} />
+          </span>
+        </>
+      )}
       <span className={`${styles.corner} ${styles.cornerBottom}`} aria-hidden="true">
         {symbol}
       </span>

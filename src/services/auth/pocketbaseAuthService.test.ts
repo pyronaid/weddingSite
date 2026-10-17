@@ -21,7 +21,13 @@ describe('PocketBaseAuthService', () => {
   it('returns a stable snapshot between changes (required by useSyncExternalStore)', () => {
     pb.authStore.save(fakeToken(), record);
     const service = new PocketBaseAuthService(pb);
-    expect(service.getCurrentUser()).toEqual({ id: 'u1', email: 'anna@example.com', name: 'Anna', verified: true });
+    expect(service.getCurrentUser()).toEqual({
+      id: 'u1',
+      email: 'anna@example.com',
+      name: 'Anna',
+      verified: true,
+      isAdmin: false,
+    });
     expect(service.getCurrentUser()).toBe(service.getCurrentUser());
   });
 

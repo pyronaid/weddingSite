@@ -1,4 +1,5 @@
 // Single entry point: the router lazy-loads this module as one chunk.
+export { AdminSuitPage } from '../admin/AdminSuitPage';
 export { DashboardPage } from './DashboardPage';
 export { ForgotPasswordPage } from './ForgotPasswordPage';
 export { GalleryPage } from './GalleryPage';

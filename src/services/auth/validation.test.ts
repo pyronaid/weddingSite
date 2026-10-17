@@ -19,8 +19,13 @@ describe('auth validation', () => {
   });
 
   it('validates the whole sign-up form', () => {
-    expect(validateSignUp({ name: ' ', email: 'a@b.co', password: 'longenough', passwordConfirm: 'longenough' })).toEqual({
-      name: expect.any(String),
-    });
+    const valid = { name: 'Anna', email: 'a@b.co', password: 'longenough', passwordConfirm: 'longenough', secretCode: '#wedding' };
+    expect(validateSignUp(valid)).toEqual({});
+    expect(validateSignUp({ ...valid, name: ' ' })).toEqual({ name: expect.any(String) });
+  });
+
+  it('requires the secret code (its value is checked by the server)', () => {
+    const input = { name: 'Anna', email: 'a@b.co', password: 'longenough', passwordConfirm: 'longenough', secretCode: '  ' };
+    expect(validateSignUp(input)).toEqual({ secretCode: 'Please enter the secret code.' });
   });
 });

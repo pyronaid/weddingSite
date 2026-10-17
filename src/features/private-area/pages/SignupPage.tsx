@@ -11,7 +11,7 @@ import styles from './pages.module.css';
 import { useFormSubmit } from './useFormSubmit';
 
 type Field = keyof SignUpInput;
-const EMPTY: SignUpInput = { name: '', email: '', password: '', passwordConfirm: '' };
+const EMPTY: SignUpInput = { name: '', email: '', password: '', passwordConfirm: '', secretCode: '' };
 
 export function SignupPage() {
   useDocumentTitle('Create an account');
@@ -26,7 +26,12 @@ export function SignupPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const input = { ...values, name: values.name.trim(), email: values.email.trim().toLowerCase() };
+    const input = {
+      ...values,
+      name: values.name.trim(),
+      email: values.email.trim().toLowerCase(),
+      secretCode: values.secretCode.trim(),
+    };
     const errors = validateSignUp(input);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
@@ -105,6 +110,19 @@ export function SignupPage() {
           value={values.passwordConfirm}
           onChange={update('passwordConfirm')}
           error={errorFor('passwordConfirm')}
+          required
+        />
+        <TextField
+          label="Secret code"
+          name="secretCode"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          maxLength={50}
+          value={values.secretCode}
+          onChange={update('secretCode')}
+          error={errorFor('secretCode')}
+          hint="You find it in your wedding invitation."
           required
         />
 

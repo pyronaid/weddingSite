@@ -1,0 +1,186 @@
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.help {
+  margin: 0;
+  text-align: center;
+  color: var(--card-muted);
+}
+
+.suits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.9rem;
+}
+
+.panel {
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+}
+
+.panelTitle {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--card-accent);
+}
+
+.inline {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.saved {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  color: var(--success);
+}
+
+/* One editor per card: 1 column on phones, 2 on wide screens. */
+.editors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.editor {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+}
+
+.editorHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.editorHeader img {
+  border-radius: 4px;
+  box-shadow: 0 4px 8px -4px rgba(0, 0, 0, 0.5);
+}
+
+.editorHeader h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+}
+
+.badge {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: var(--card-bg);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.letterField input {
+  width: 3.2rem !important;
+  text-align: center;
+  font: 700 1.3rem var(--font-serif) !important;
+  text-transform: uppercase;
+}
+
+.saveRow {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--card-muted);
+}
+
+.scenes {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--card-border);
+}
+
+.subTitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--card-muted);
+}
+
+.count {
+  opacity: 0.8;
+}
+
+.warning {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.sceneList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sceneRow {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.sceneRow textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--text);
+  background: var(--white-warm);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  resize: vertical;
+}
+
+.sceneRow textarea:focus {
+  outline: none;
+  border-color: var(--card-accent);
+}
+
+.sceneActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.back {
+  max-width: 380px;
+  justify-self: center;
+}
