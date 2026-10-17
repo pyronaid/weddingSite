@@ -5,6 +5,24 @@ export interface AdminScene {
   text: string;
 }
 
+export interface AdminAnswer {
+  id: string;
+  text: string;
+  correct: boolean;
+}
+
+export interface AdminQuestion {
+  id: string;
+  text: string;
+  answers: AdminAnswer[];
+}
+
+export interface NewQuestion {
+  text: string;
+  /** At least two, exactly one correct. */
+  answers: { text: string; correct: boolean }[];
+}
+
 /** A card as the organisers edit it (hidden fields included). */
 export interface AdminCard {
   id: string;
@@ -18,6 +36,8 @@ export interface AdminCard {
   solution?: string;
   /** Numbered hearts only: the bucket of scenes drawn by the photo challenge. */
   scenes?: AdminScene[];
+  /** Diamonds only: the quiz questions with their answers. */
+  questions?: AdminQuestion[];
 }
 
 export interface AdminCardChanges {
@@ -38,6 +58,13 @@ export interface AdminRepository {
   addScene(cardId: string, text: string): Promise<AdminScene>;
   updateScene(sceneId: string, text: string): Promise<AdminScene>;
   deleteScene(sceneId: string): Promise<void>;
+  addQuestion(cardId: string, question: NewQuestion): Promise<AdminQuestion>;
+  updateQuestion(questionId: string, text: string): Promise<AdminQuestion>;
+  deleteQuestion(questionId: string): Promise<void>;
+  /** Answer operations return the whole question, as the correct mark may move. */
+  addAnswer(questionId: string, answer: { text: string; correct?: boolean }): Promise<AdminQuestion>;
+  updateAnswer(answerId: string, changes: { text?: string; correct?: true }): Promise<AdminQuestion>;
+  deleteAnswer(answerId: string): Promise<AdminQuestion>;
   getSettings(): Promise<AdminSettings>;
   updateSettings(settings: AdminSettings): Promise<AdminSettings>;
 }

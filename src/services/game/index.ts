@@ -21,5 +21,8 @@ export function createGameRepository(): GameRepository {
     getGallery: () => Promise.reject(gameError('not_configured')),
     getGalleryUpdates: () => Promise.reject(gameError('not_configured')),
     getFileToken: () => Promise.reject(gameError('not_configured')),
+    getQuizStatus: () => Promise.reject(gameError('not_configured')),
+    getQuizQuestion: () => Promise.reject(gameError('not_configured')),
+    answerQuiz: () => Promise.reject(gameError('not_configured')),
   };
 }

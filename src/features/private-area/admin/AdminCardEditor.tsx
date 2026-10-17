@@ -3,6 +3,7 @@ import formStyles from '../../../components/Form/Form.module.css';
 import { toAdminError, type AdminCard, type AdminCardChanges, type AdminError } from '../../../services/admin';
 import { cardImageUrl, isFaceCard, rankName } from '../../../services/game';
 import { useAdminRepository } from './AdminRepositoryContext';
+import { QuestionsEditor } from './QuestionsEditor';
 import { ScenesEditor } from './ScenesEditor';
 import styles from './admin.module.css';
 
@@ -139,6 +140,7 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
       )}
 
       {card.scenes && <ScenesEditor cardId={card.id} cardName={name} scenes={card.scenes} />}
+      {card.questions && <QuestionsEditor cardId={card.id} cardName={name} questions={card.questions} />}
     </article>
   );
 }

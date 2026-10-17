@@ -13,7 +13,8 @@ import styles from './admin.module.css';
 
 const HELP: Record<Suit, string> = {
   hearts: 'Set the secret letter of each card (Ace to 10) and the scenes guests may draw for the photo challenge.',
-  diamonds: 'Set the secret letter of each card (Ace to 10).',
+  diamonds:
+    'Set the secret letter of each card (Ace to 10) and its quiz questions: the answers, and which one is correct.',
   spades: 'Set the secret letter of each card (Ace to 10).',
   clubs: 'Set the secret letter of each card (Ace to 10) and the riddle printed behind each QR code.',
 };
