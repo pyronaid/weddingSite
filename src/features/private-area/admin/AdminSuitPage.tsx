@@ -8,6 +8,7 @@ import { isSuit, type Suit } from '../../../services/game';
 import { SUIT_META } from '../game/suits';
 import { AREA_HOME } from '../guards';
 import { AdminCardEditor } from './AdminCardEditor';
+import { PeopleEditor } from './PeopleEditor';
 import { useAdminQuery } from './useAdminQuery';
 import styles from './admin.module.css';
 
@@ -15,7 +16,7 @@ const HELP: Record<Suit, string> = {
   hearts: 'Set the secret letter of each card (Ace to 10) and the scenes guests may draw for the photo challenge.',
   diamonds:
     'Set the secret letter of each card (Ace to 10) and its quiz questions: the answers, and which one is correct.',
-  spades: 'Set the secret letter of each card (Ace to 10).',
+  spades: 'Set the secret letter of each card (Ace to 10) and the people to find in the “guess who” game, with their hints.',
   clubs: 'Set the secret letter of each card (Ace to 10) and the riddle printed behind each QR code.',
 };
 
@@ -57,6 +58,8 @@ function AdminSuit({ suit }: { suit: Suit }) {
           ))}
         </div>
       )}
+
+      {suit === 'spades' && <PeopleEditor />}
 
       <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
         ← Back to the organisers' home

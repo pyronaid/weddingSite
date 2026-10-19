@@ -240,8 +240,90 @@ function deleteAnswer(app, answerId) {
   return questionView(app, app.findRecordById('quiz_questions', questionId));
 }
 
+// ---- Guess who (spades) ----
+
+const GUESS_RANKS = 13;
+
+function personView(app, person) {
+  const hints = Array(GUESS_RANKS).fill('');
+  for (const hint of app.findRecordsByFilter('guess_hints', 'person = {:person}', 'rank', 0, 0, { person: person.id })) {
+    const rank = hint.getInt('rank');
+    if (rank >= 1 && rank <= GUESS_RANKS) hints[rank - 1] = hint.getString('text');
+  }
+  const assignments = app.findRecordsByFilter('guess_assignments', 'person = {:person}', '', 0, 0, { person: person.id });
+  return {
+    id: person.id,
+    firstName: person.getString('first_name'),
+    lastName: person.getString('last_name'),
+    hints,
+    assigned: assignments.length,
+    found: assignments.filter((assignment) => assignment.getBool('found')).length,
+  };
+}
+
+function listPeople(app) {
+  return app.findRecordsByFilter('guess_people', '', 'created', 0, 0).map((person) => personView(app, person));
+}
+
+/** Name, surname and all 13 hints are required: a player may be given anyone. */
+function personFields(body) {
+  const hints = Array.isArray(body.hints) ? body.hints.map(cleanText) : [];
+  const fields = { firstName: cleanText(body.firstName), lastName: cleanText(body.lastName), hints };
+  if (!fields.firstName || !fields.lastName) throw new BadRequestError('Please write the name and the surname.');
+  if (hints.length !== GUESS_RANKS || hints.some((hint) => !hint)) {
+    throw new BadRequestError(`Please write all the ${GUESS_RANKS} hints, one per card.`);
+  }
+  return fields;
+}
+
+/** Writes a person and their hints in one transaction (hints are kept per rank). */
+function savePerson(app, person, fields) {
+  let id;
+  app.runInTransaction((txApp) => {
+    const record = person ? txApp.findRecordById('guess_people', person.id) : new Record(txApp.findCollectionByNameOrId('guess_people'));
+    record.set('first_name', fields.firstName);
+    record.set('last_name', fields.lastName);
+    saveOrBadRequest(txApp, record);
+    const existing = {};
+    for (const hint of txApp.findRecordsByFilter('guess_hints', 'person = {:person}', '', 0, 0, { person: record.id })) {
+      existing[hint.getInt('rank')] = hint;
+    }
+    fields.hints.forEach((text, index) => {
+      const rank = index + 1;
+      const hint = existing[rank] || new Record(txApp.findCollectionByNameOrId('guess_hints'));
+      hint.set('person', record.id);
+      hint.set('rank', rank);
+      hint.set('text', text);
+      saveOrBadRequest(txApp, hint);
+    });
+    id = record.id;
+  });
+  return personView(app, app.findRecordById('guess_people', id));
+}
+
+function addPerson(app, body) {
+  return savePerson(app, null, personFields(body));
+}
+
+/** Edits apply at once, also for the players already looking for this person. */
+function updatePerson(app, personId, body) {
+  return savePerson(app, findRecord(app, 'guess_people', personId, 'Person'), personFields(body));
+}
+
+/** A person already given to a player cannot be deleted: their game depends on it. */
+function deletePerson(app, personId) {
+  const person = findRecord(app, 'guess_people', personId, 'Person');
+  const assigned = app.findRecordsByFilter('guess_assignments', 'person = {:person}', '', 1, 0, { person: person.id });
+  if (assigned.length > 0) throw new BadRequestError('This person is already being looked for by some guests: edit it instead.');
+  app.delete(person);
+}
+
 module.exports = {
   requireAdmin,
+  listPeople,
+  addPerson,
+  updatePerson,
+  deletePerson,
   listSuit,
   updateCard,
   addScene,

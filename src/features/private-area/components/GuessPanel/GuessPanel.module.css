@@ -1,0 +1,61 @@
+.panel {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+  text-align: center;
+}
+
+.found {
+  border: 2px solid var(--collected);
+}
+
+.title {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--card-accent);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--card-muted);
+}
+
+.result {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.legend {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--card-muted);
+}
+
+.feedback {
+  min-height: 1.3em;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--danger);
+}

@@ -15,8 +15,11 @@ interface SuitCollectionProps {
   suit: Suit;
   /** Rendered right after the rules (e.g. the quiz lives). */
   afterRules?: ReactNode;
-  /** Rendered under each card (e.g. the photo challenge button). `refresh` reloads the cards. */
-  renderCardAction?: (card: PlayingCard, refresh: () => void) => ReactNode;
+  /**
+   * Rendered under each card (e.g. the photo challenge button). `refresh`
+   * reloads the cards; `cards` is the whole suit, sorted by rank.
+   */
+  renderCardAction?: (card: PlayingCard, refresh: () => void, cards: readonly PlayingCard[]) => ReactNode;
   /** Rendered after the cards (e.g. a link to the gallery). */
   footer?: ReactNode;
 }
@@ -66,7 +69,7 @@ export function SuitCollection({ suit, afterRules, renderCardAction, footer }: S
             {cards.map((card) => (
               <li key={card.id}>
                 <FlipCard card={card} />
-                {renderCardAction?.(card, query.refresh)}
+                {renderCardAction?.(card, query.refresh, cards)}
               </li>
             ))}
           </ul>

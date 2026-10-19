@@ -2,7 +2,17 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
-import { GameError, type GameProgress, type GalleryPhoto, type GameRepository, type PlayingCard, type Riddle, type Suit } from '../../services/game';
+import {
+  GameError,
+  type GameProgress,
+  type GalleryPhoto,
+  type GameRepository,
+  type GuessCard,
+  type GuessStatus,
+  type PlayingCard,
+  type Riddle,
+  type Suit,
+} from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
 import { GuestOnly, RequireAdmin, RequireAuth } from './guards';
@@ -12,7 +22,7 @@ import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { AdminRepositoryProvider } from './admin/AdminRepositoryContext';
 import { AdminSuitPage } from './admin/AdminSuitPage';
-import { AdminError, type AdminCard, type AdminRepository } from '../../services/admin';
+import { AdminError, type AdminCard, type AdminPerson, type AdminRepository } from '../../services/admin';
 import { RiddlePage } from './pages/RiddlePage';
 import { SuitPage } from './pages/SuitPage';
 
@@ -47,7 +57,7 @@ function createFakeAuth(overrides: Partial<AuthService> = {}) {
 const progress: GameProgress = {
   hearts: { collected: 3, total: 13 },
   diamonds: { collected: 0, total: 13 },
-  spades: { collected: 13, total: 13 },
+  spades: { collected: 13, total: 13, found: false },
   clubs: { collected: 1, total: 13 },
 };
 
@@ -80,6 +90,25 @@ const quizQuestion = (id: string) => ({
   ],
 });
 
+const guessStatus: GuessStatus = { assigned: true, complete: false, found: false, name: null, lengths: null };
+const spadesHints = (rank: number) =>
+  Array.from({ length: rank }, (_, i) => ({ rank: i + 1, text: `Hint ${i + 1} about your person` }));
+/** A spades card without a selfie yet; from the 2 on, the previous card's selfie can be confirmed. */
+const openGuessCard = (rank: number): GuessCard => ({
+  locked: false,
+  rank,
+  hints: spadesHints(rank),
+  selfie: null,
+  previous: rank > 1 ? { url: 'http://pb/previous.jpg', takenFor: rank - 1 } : null,
+});
+const collectedGuessCard = (rank: number, reused: boolean): GuessCard => ({
+  locked: false,
+  rank,
+  hints: spadesHints(rank),
+  selfie: { url: 'http://pb/selfie.jpg', takenFor: reused ? rank - 1 : rank, reused },
+  previous: null,
+});
+
 function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository {
   return {
     getProgress: vi.fn(async () => progress),
@@ -99,6 +128,15 @@ function createFakeGame(overrides: Partial<GameRepository> = {}): GameRepository
       answerId.endsWith('-right')
         ? { correct: true as const, letter: 'D', status: fullLives }
         : { correct: false as const, stale: false, question: quizQuestion('q2'), status: { ...fullLives, lives: 2 } },
+    ),
+    getGuessStatus: vi.fn(async () => guessStatus),
+    getGuessCard: vi.fn(async (cardId: string) => openGuessCard(Number(cardId.replace('spades', '')))),
+    uploadSelfie: vi.fn(async (cardId: string) => collectedGuessCard(Number(cardId.replace('spades', '')), false)),
+    confirmPreviousSelfie: vi.fn(async (cardId: string) => collectedGuessCard(Number(cardId.replace('spades', '')), true)),
+    solveGuess: vi.fn(async (firstName: string, lastName: string) =>
+      firstName === 'GIULIA' && lastName === 'BIANCHI'
+        ? { correct: true, name: 'Giulia Bianchi' }
+        : { correct: false, name: null },
     ),
     ...overrides,
   };
@@ -136,6 +174,25 @@ const adminHearts: AdminCard[] = Array.from({ length: 13 }, (_, i) => ({
   ...(i < 10 ? { scenes: [{ id: `s${i + 1}`, text: `Scene of the ${i + 1}` }] } : {}),
 }));
 
+const adminPeople: AdminPerson[] = [
+  {
+    id: 'p1',
+    firstName: 'Giulia',
+    lastName: 'Bianchi',
+    hints: Array.from({ length: 13 }, (_, i) => `Giulia hint ${i + 1}`),
+    assigned: 2,
+    found: 1,
+  },
+  {
+    id: 'p2',
+    firstName: 'Mario',
+    lastName: 'Rossi',
+    hints: Array.from({ length: 13 }, (_, i) => `Mario hint ${i + 1}`),
+    assigned: 0,
+    found: 0,
+  },
+];
+
 function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
   return {
     getSuit: vi.fn(async (suit: Suit) =>
@@ -169,6 +226,13 @@ function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminReposit
       })),
     })),
     deleteAnswer: vi.fn(async () => adminDiamonds[4].questions![0]),
+    getPeople: vi.fn(async () => adminPeople),
+    addPerson: vi.fn(async (person) => ({ ...person, id: 'p3', assigned: 0, found: 0 })),
+    updatePerson: vi.fn(async (personId: string, person) => ({
+      ...adminPeople.find((item) => item.id === personId)!,
+      ...person,
+    })),
+    deletePerson: vi.fn(async () => {}),
     getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
     updateSettings: vi.fn(async (settings) => settings),
     ...overrides,
@@ -286,7 +350,8 @@ describe('private area', () => {
       const hearts = await screen.findByRole('link', { name: 'Hearts: 3 of 13 cards collected' });
       expect(hearts).toHaveTextContent('3/13');
       expect(screen.getByRole('link', { name: 'Diamonds: 0 of 13 cards collected' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Spades: 13 of 13 cards collected' })).toBeInTheDocument();
+      const spades = screen.getByRole('link', { name: 'Spades: 13 of 13 cards collected, person not found yet' });
+      expect(spades).toHaveTextContent('Person not found');
       expect(screen.getByRole('link', { name: 'Clubs: 1 of 13 cards collected' })).toBeInTheDocument();
 
       await userEvent.setup().click(hearts);
@@ -684,6 +749,136 @@ describe('private area', () => {
       });
     });
 
+    describe('spades guess who', () => {
+      /** Ace to 3 have their selfie: the 4 is the next card to play. */
+      const progressSpades = () =>
+        createFakeGame({
+          getSuitCards: vi.fn(async (suit: Suit) =>
+            suitCards(suit).map((card) => ({ ...card, collected: card.rank <= 3, letter: null })),
+          ),
+        });
+
+      beforeEach(() => {
+        URL.createObjectURL = vi.fn(() => 'blob:preview');
+        URL.revokeObjectURL = vi.fn();
+      });
+
+      it('explains the game in the rules, without the road to the King', async () => {
+        renderArea(await loggedIn(), '/area/suits/spades');
+        const rules = await screen.findByRole('region', { name: 'Rules' });
+        expect(rules).toHaveTextContent(/guess who/i);
+        expect(rules).toHaveTextContent(/take a selfie with them/i);
+        expect(rules).toHaveTextContent(/Same person as before/);
+        expect(rules).toHaveTextContent(/name and surname/i);
+        expect(rules).not.toHaveTextContent(/name of the Jack|name of the Queen/i);
+        expect(await screen.findByRole('region', { name: 'Guess who' })).toHaveTextContent(/collect all 13 spades/i);
+      });
+
+      it('unlocks the cards in order: the next one needs the selfie of the previous card', async () => {
+        renderArea(await loggedIn(), '/area/suits/spades', progressSpades());
+        expect(await screen.findByRole('button', { name: 'Hint of the 4 of spades' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Hints and selfie of the 3 of spades' })).toBeEnabled();
+        expect(
+          screen.getByRole('button', { name: 'Hint of the 5 of spades: locked until you collect the 4 of spades' }),
+        ).toBeDisabled();
+      });
+
+      it('shows every hint so far and confirms the previous selfie for the same person', async () => {
+        const game = progressSpades();
+        renderArea(await loggedIn(), '/area/suits/spades', game);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Hint of the 4 of spades' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Guess who · 4 of spades' });
+        const hints = within(await within(dialog).findByRole('region', { name: 'The 4 hints so far' })).getAllByRole(
+          'listitem',
+        );
+        expect(hints.map((hint) => hint.textContent)).toEqual([
+          'AceHint 1 about your person',
+          '2Hint 2 about your person',
+          '3Hint 3 about your person',
+          '4Hint 4 about your person' + 'new',
+        ]);
+        expect(within(dialog).getByRole('img', { name: 'Your selfie for the 3 of spades' })).toHaveAttribute(
+          'src',
+          'http://pb/previous.jpg',
+        );
+
+        await user.click(within(dialog).getByRole('button', { name: 'Same person as before' }));
+        expect(await within(dialog).findByText('Card collected! 🎉')).toBeInTheDocument();
+        expect(within(dialog).getByText(/same person as before: the selfie of the 3 of spades/i)).toBeInTheDocument();
+        expect(within(dialog).getByText(/the 5 of spades is unlocked/i)).toBeInTheDocument();
+        expect(game.confirmPreviousSelfie).toHaveBeenCalledWith('spades4');
+        // The cards and the guess status are reloaded.
+        await waitFor(() => expect(game.getSuitCards).toHaveBeenCalledTimes(2));
+        expect(game.getGuessStatus).toHaveBeenCalledTimes(2);
+      });
+
+      it('uploads a new selfie when the person changes', async () => {
+        const game = progressSpades();
+        renderArea(await loggedIn(), '/area/suits/spades', game);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Hint of the 4 of spades' }));
+        const dialog = await screen.findByRole('dialog', { name: 'Guess who · 4 of spades' });
+        const upload = await within(dialog).findByRole('button', { name: 'Upload selfie' });
+        expect(upload).toBeDisabled();
+        await user.upload(within(dialog).getByLabelText('Take a new selfie'), new File(['jpeg'], 'me.jpg', { type: 'image/jpeg' }));
+        await user.click(upload);
+
+        expect(await within(dialog).findByText('Card collected! 🎉')).toBeInTheDocument();
+        expect(within(dialog).getByRole('img', { name: 'Your selfie for the 4 of spades' })).toBeInTheDocument();
+        expect(game.uploadSelfie).toHaveBeenCalledWith('spades4', expect.any(File));
+      });
+
+      it('shows the selfie of a collected card, which cannot change', async () => {
+        const game = progressSpades();
+        game.getGuessCard = vi.fn(async () => collectedGuessCard(3, true));
+        renderArea(await loggedIn(), '/area/suits/spades', game);
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Hints and selfie of the 3 of spades' }));
+
+        const dialog = await screen.findByRole('dialog', { name: 'Guess who · 3 of spades' });
+        expect(await within(dialog).findByRole('img', { name: 'Your selfie for the 3 of spades' })).toBeInTheDocument();
+        expect(within(dialog).getByText(/cannot be changed once sent/i)).toBeInTheDocument();
+        expect(within(dialog).queryByRole('button', { name: /upload selfie|same person/i })).not.toBeInTheDocument();
+      });
+
+      it('asks the name and surname after the King, and completes the spades only when right', async () => {
+        const game = createFakeGame({
+          getGuessStatus: vi.fn(async () => ({ ...guessStatus, complete: true, lengths: { firstName: 6, lastName: 7 } })),
+        });
+        renderArea(await loggedIn(), '/area/suits/spades', game);
+        const user = userEvent.setup();
+
+        const panel = await screen.findByRole('region', { name: 'Guess who' });
+        const submit = await within(panel).findByRole('button', { name: 'Submit' });
+        expect(within(panel).getAllByRole('textbox', { name: /^Name letter/ })).toHaveLength(6);
+        expect(within(panel).getAllByRole('textbox', { name: /^Surname letter/ })).toHaveLength(7);
+        expect(submit).toBeDisabled();
+
+        await user.type(within(panel).getByRole('textbox', { name: 'Name letter 1 of 6' }), 'Mariaa');
+        await user.type(within(panel).getByRole('textbox', { name: 'Surname letter 1 of 7' }), 'Bianchi');
+        await user.click(submit);
+        expect(await within(panel).findByText(/that is not your person/i)).toBeInTheDocument();
+        expect(game.solveGuess).toHaveBeenCalledWith('MARIAA', 'BIANCHI');
+
+        await user.type(within(panel).getByRole('textbox', { name: 'Name letter 1 of 6' }), 'giulia');
+        expect(within(panel).queryByText(/that is not your person/i)).not.toBeInTheDocument();
+        await user.click(submit);
+        expect(await within(panel).findByText('Giulia Bianchi')).toBeInTheDocument();
+        expect(within(panel).getByRole('status')).toHaveTextContent('You found Giulia Bianchi! The spades are complete.');
+      });
+
+      it('marks the spades as found on the dashboard', async () => {
+        const game = createFakeGame({
+          getProgress: vi.fn(async () => ({ ...progress, spades: { collected: 13, total: 13, found: true } })),
+        });
+        renderArea(await loggedIn(), '/area', game);
+        const spades = await screen.findByRole('link', { name: 'Spades: 13 of 13 cards collected, person found' });
+        expect(spades).toHaveTextContent('Person found ✓');
+      });
+    });
+
     describe('gallery', () => {
       const photo = (n: number, updated: string): GalleryPhoto => ({
         id: `p${n}`,
@@ -935,6 +1130,57 @@ describe('private area', () => {
       // Numbered cards are read by the guests themselves: no numbering.
       const five = screen.getByRole('article', { name: '5 of diamonds' });
       expect(within(five).queryByText(/Question n°/)).not.toBeInTheDocument();
+    });
+
+    it('edits the people of the spades guess who, with their 13 hints', async () => {
+      const admin = createFakeAdmin();
+      renderArea(await loggedInAdmin(), '/area/admin/suits/spades', createFakeGame(), admin);
+      const user = userEvent.setup();
+
+      const section = await screen.findByRole('region', { name: 'Guess who: the people to find' });
+      expect(await within(section).findByText('Giulia Bianchi')).toBeInTheDocument();
+      expect(within(section).getByText(/given to 2 guests, found by 1/)).toBeInTheDocument();
+
+      // Giulia was given to guests: she can be edited, not deleted.
+      const giulia = within(section).getByText('Giulia Bianchi').closest('details')!;
+      await user.click(within(giulia).getByText('Giulia Bianchi'));
+      expect(within(giulia).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+      const king = within(giulia).getByLabelText('King');
+      await user.clear(king);
+      await user.type(king, 'Was born in winter');
+      await user.click(within(giulia).getByRole('button', { name: 'Save' }));
+      expect(admin.updatePerson).toHaveBeenCalledWith('p1', {
+        firstName: 'Giulia',
+        lastName: 'Bianchi',
+        hints: [...adminPeople[0].hints.slice(0, 12), 'Was born in winter'],
+      });
+      expect(await within(giulia).findByText('Saved ✓')).toBeInTheDocument();
+
+      // Mario was never given: two-step delete.
+      const mario = within(section).getByText('Mario Rossi').closest('details')!;
+      await user.click(within(mario).getByText('Mario Rossi'));
+      await user.click(within(mario).getByRole('button', { name: 'Delete' }));
+      await user.click(within(mario).getByRole('button', { name: 'Confirm delete' }));
+      expect(admin.deletePerson).toHaveBeenCalledWith('p2');
+      await waitFor(() => expect(within(section).queryByText('Mario Rossi')).not.toBeInTheDocument());
+
+      // A new person needs the name, the surname and all 13 hints.
+      const added = within(section).getByText('+ Add a person').closest('details')!;
+      await user.click(within(added).getByText('+ Add a person'));
+      const add = within(added).getByRole('button', { name: 'Add person' });
+      await user.type(within(added).getByLabelText('Name'), 'Luca');
+      await user.type(within(added).getByLabelText('Surname'), 'Neri');
+      expect(add).toBeDisabled();
+      for (const [index, label] of ['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'].entries()) {
+        await user.type(within(added).getByLabelText(label), `Luca hint ${index + 1}`);
+      }
+      await user.click(add);
+      expect(admin.addPerson).toHaveBeenCalledWith({
+        firstName: 'Luca',
+        lastName: 'Neri',
+        hints: Array.from({ length: 13 }, (_, i) => `Luca hint ${i + 1}`),
+      });
+      expect(await within(section).findByText('Luca Neri')).toBeInTheDocument();
     });
   });
 });

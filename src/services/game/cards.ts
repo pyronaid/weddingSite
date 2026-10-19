@@ -24,9 +24,16 @@ export function buildPhrase(cards: readonly PlayingCard[]): string {
     .join('');
 }
 
-/** Letters and digits only, uppercase: the format of riddle answers. */
+/**
+ * Letters and digits only, uppercase, accents folded ("Nicolò" -> "NICOLO"):
+ * the format of riddle answers and of the "guess who" names.
+ */
 export function normalizeAnswer(value: string): string {
-  return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 /** Adds the file token to a protected file URL. */

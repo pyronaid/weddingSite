@@ -9,9 +9,14 @@ const { isCollected, collect } = require(`${__hooks}/lib/collection.js`);
 
 const CODE_PATTERN = /^[a-z0-9]{8,32}$/;
 
-/** Uppercase, letters and digits only: "  apple " and "A P P L E" both become "APPLE". */
+/**
+ * Uppercase, letters and digits only, accents folded: "  apple " and
+ * "A P P L E" both become "APPLE", "Café" becomes "CAFE" (as typed in the boxes).
+ */
 function normalize(value) {
   return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
 }

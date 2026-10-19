@@ -57,6 +57,18 @@ describe('LetterInputs', () => {
     expect(box(3)).toHaveFocus();
   });
 
+  it('moves on when retyping the letter a box already holds', async () => {
+    render(<Harness />);
+    const user = userEvent.setup();
+    await user.click(box(1));
+    await user.keyboard('maria');
+    // Back to the start to correct the word: the first letter stays the same.
+    await user.click(box(1));
+    await user.keyboard('mario');
+    expect(answer()).toBe('MARIO');
+    expect(box(5)).toHaveFocus();
+  });
+
   it('moves with the arrow keys', async () => {
     render(<Harness />);
     const user = userEvent.setup();

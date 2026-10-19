@@ -291,3 +291,79 @@
   font-weight: 700;
   text-align: center;
 }
+
+/* ---- Guess who people (spades) ---- */
+
+.people {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+}
+
+.person {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+}
+
+.person summary {
+  cursor: pointer;
+}
+
+.person[open] summary {
+  margin-bottom: 0.7rem;
+}
+
+.newPerson {
+  border-style: dashed;
+  border-color: var(--card-accent);
+}
+
+.nameRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 0.6rem;
+}
+
+.hintList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hintRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hintRank {
+  flex: none;
+  width: 3rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--card-muted);
+}
+
+.hintRow textarea {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--white-warm);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+  resize: vertical;
+}
+
+.hintRow textarea:focus {
+  outline: none;
+  border-color: var(--card-accent);
+}

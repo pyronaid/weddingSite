@@ -46,6 +46,21 @@ export interface AdminCardChanges {
   solution?: string;
 }
 
+/** A person of the "guess who" game (spades). */
+export interface PersonFields {
+  firstName: string;
+  lastName: string;
+  /** 13 hints, one per card: index 0 is the Ace's, 12 the King's. */
+  hints: string[];
+}
+
+export interface AdminPerson extends PersonFields {
+  id: string;
+  /** Players given this person, and how many of them found it. */
+  assigned: number;
+  found: number;
+}
+
 export interface AdminSettings {
   /** Code required to create an account. */
   signupCode: string;
@@ -65,6 +80,11 @@ export interface AdminRepository {
   addAnswer(questionId: string, answer: { text: string; correct?: boolean }): Promise<AdminQuestion>;
   updateAnswer(answerId: string, changes: { text?: string; correct?: true }): Promise<AdminQuestion>;
   deleteAnswer(answerId: string): Promise<AdminQuestion>;
+  getPeople(): Promise<AdminPerson[]>;
+  addPerson(person: PersonFields): Promise<AdminPerson>;
+  updatePerson(personId: string, person: PersonFields): Promise<AdminPerson>;
+  /** Refused once the person was given to a player. */
+  deletePerson(personId: string): Promise<void>;
   getSettings(): Promise<AdminSettings>;
   updateSettings(settings: AdminSettings): Promise<AdminSettings>;
 }
