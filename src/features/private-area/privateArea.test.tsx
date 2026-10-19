@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
@@ -1144,6 +1144,48 @@ describe('private area', () => {
       // Numbered cards are read by the guests themselves: no numbering.
       const five = screen.getByRole('article', { name: '5 of diamonds' });
       expect(within(five).queryByText(/Question n°/)).not.toBeInTheDocument();
+    });
+
+    it('reorders the hints of a person with the arrow keys or by dragging', async () => {
+      const admin = createFakeAdmin();
+      renderArea(await loggedInAdmin(), '/area/admin/suits/spades', createFakeGame(), admin);
+      const user = userEvent.setup();
+      const section = await screen.findByRole('region', { name: 'Guess who: the people to find' });
+      const giulia = (await within(section).findByText('Giulia Bianchi')).closest('details')!;
+      await user.click(within(giulia).getByText('Giulia Bianchi'));
+      const hintOf = (rank: string) => within(giulia).getByLabelText(rank);
+
+      // Keyboard: the Ace's hint goes down two cards; the handle keeps the focus.
+      const handle = within(giulia).getByRole('button', { name: 'Move the hint of the Ace' });
+      handle.focus();
+      await user.keyboard('{ArrowDown}{ArrowDown}');
+      expect(hintOf('Ace')).toHaveValue('Giulia hint 2');
+      expect(hintOf('2')).toHaveValue('Giulia hint 3');
+      expect(hintOf('3')).toHaveValue('Giulia hint 1');
+      expect(within(giulia).getByRole('button', { name: 'Move the hint of the 3' })).toHaveFocus();
+      expect(within(giulia).getByText('Hint moved to the 3.')).toBeInTheDocument();
+
+      // Pointer: drag the King's hint up to the Jack (rows are 40 px high).
+      const rows = within(giulia).getAllByRole('listitem');
+      rows.forEach((row, index) => {
+        row.getBoundingClientRect = () => ({ top: index * 40, height: 40, bottom: index * 40 + 40 }) as DOMRect;
+      });
+      const king = within(giulia).getByRole('button', { name: 'Move the hint of the King' });
+      fireEvent.pointerDown(king, { button: 0, pointerId: 1, clientY: 500 });
+      fireEvent.pointerMove(king, { pointerId: 1, clientY: 455 }); // past the Queen's middle (460)
+      fireEvent.pointerMove(king, { pointerId: 1, clientY: 415 }); // past the Jack's middle (420)
+      fireEvent.pointerUp(king, { pointerId: 1 });
+      expect(hintOf('Jack')).toHaveValue('Giulia hint 13');
+      expect(hintOf('Queen')).toHaveValue('Giulia hint 11');
+      expect(hintOf('King')).toHaveValue('Giulia hint 12');
+
+      await user.click(within(giulia).getByRole('button', { name: 'Save' }));
+      const hints = adminPeople[0].hints;
+      expect(admin.updatePerson).toHaveBeenCalledWith('p1', {
+        firstName: 'Giulia',
+        lastName: 'Bianchi',
+        hints: [hints[1], hints[2], hints[0], ...hints.slice(3, 10), hints[12], hints[10], hints[11]],
+      });
     });
 
     it('edits the people of the spades guess who, with their 13 hints', async () => {

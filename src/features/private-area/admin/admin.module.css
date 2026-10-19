@@ -350,6 +350,39 @@
   color: var(--card-muted);
 }
 
+.dragHandle {
+  flex: none;
+  width: 1.8rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--card-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: grab;
+  /* The page must not scroll while dragging with a finger. */
+  touch-action: none;
+}
+
+.dragHandle:hover,
+.dragHandle:focus-visible {
+  background: var(--card-surface);
+  color: var(--card-accent);
+}
+
+/* The row being dragged. */
+.dragging {
+  border-radius: 8px;
+  background: var(--card-surface);
+  box-shadow: 0 8px 18px -8px rgba(0, 0, 0, 0.6);
+}
+
+.dragging .dragHandle {
+  cursor: grabbing;
+}
+
 .hintRow textarea {
   flex: 1;
   min-width: 0;

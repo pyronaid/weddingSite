@@ -4,6 +4,7 @@ import { toAdminError, type AdminPerson, type AdminRepository, type PersonFields
 import { rankName } from '../../../services/game';
 import { useAdminRepository } from './AdminRepositoryContext';
 import { useAdminQuery } from './useAdminQuery';
+import { moveItem, useReorder } from './useReorder';
 import styles from './admin.module.css';
 
 const RANKS = 13;
@@ -109,9 +110,17 @@ interface PersonFormProps {
   onDelete?: () => Promise<void>;
 }
 
+/** A hint being edited: the id keeps its row (and focus) while it is moved. */
+interface HintItem {
+  id: number;
+  text: string;
+}
+
 function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProps) {
   const uid = useId();
-  const [fields, setFields] = useState<PersonFields>(initial);
+  const [names, setNames] = useState({ firstName: initial.firstName, lastName: initial.lastName });
+  const [hints, setHints] = useState<HintItem[]>(() => initial.hints.map((text, id) => ({ id, text })));
+  const [announcement, setAnnouncement] = useState('');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -122,15 +131,21 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
     lastName: person.lastName.trim(),
     hints: person.hints.map((hint) => hint.trim()),
   });
-  const current = clean(fields);
+  const current = clean({ ...names, hints: hints.map((hint) => hint.text) });
   const dirty = JSON.stringify(current) !== JSON.stringify(clean(initial));
   const filled = Boolean(current.firstName && current.lastName) && current.hints.every(Boolean);
 
-  const change = useCallback((update: (previous: PersonFields) => PersonFields) => {
-    setFields(update);
+  const touched = useCallback(() => {
     setSaved(false);
     setError(null);
   }, []);
+
+  // The texts move, the cards stay: the Ace's hint is always the first one.
+  const { listRef, dragging, handleProps } = useReorder<HTMLOListElement>(hints.length, (from, to) => {
+    setHints((list) => moveItem(list, from, to));
+    setAnnouncement(`Hint moved to the ${rankName(to + 1)}.`);
+    touched();
+  });
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -159,20 +174,26 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
           <label htmlFor={`${uid}-first`}>Name</label>
           <input
             id={`${uid}-first`}
-            value={fields.firstName}
+            value={names.firstName}
             maxLength={60}
             autoComplete="off"
-            onChange={(event) => change((previous) => ({ ...previous, firstName: event.target.value }))}
+            onChange={(event) => {
+              setNames((previous) => ({ ...previous, firstName: event.target.value }));
+              touched();
+            }}
           />
         </div>
         <div className={formStyles.field}>
           <label htmlFor={`${uid}-last`}>Surname</label>
           <input
             id={`${uid}-last`}
-            value={fields.lastName}
+            value={names.lastName}
             maxLength={60}
             autoComplete="off"
-            onChange={(event) => change((previous) => ({ ...previous, lastName: event.target.value }))}
+            onChange={(event) => {
+              setNames((previous) => ({ ...previous, lastName: event.target.value }));
+              touched();
+            }}
           />
         </div>
       </div>
@@ -180,28 +201,43 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
         Guests type them in letter boxes: spaces, apostrophes and accents are ignored (“D'Amico” is DAMICO).
       </p>
 
-      <ol className={styles.hintList}>
-        {fields.hints.map((hint, index) => (
-          <li key={index} className={styles.hintRow}>
+      <p id={`${uid}-reorder`} className={styles.hint}>
+        Drag a hint by its <span aria-hidden="true">⠿</span> handle (or focus it and use the arrow keys) to give it to
+        another card.
+      </p>
+      <ol ref={listRef} className={styles.hintList}>
+        {hints.map((hint, index) => (
+          <li key={hint.id} className={`${styles.hintRow} ${dragging === index ? styles.dragging : ''}`}>
             <label htmlFor={`${uid}-hint-${index}`} className={styles.hintRank}>
               {rankName(index + 1)}
             </label>
+            <button
+              type="button"
+              className={styles.dragHandle}
+              aria-label={`Move the hint of the ${rankName(index + 1)}`}
+              aria-describedby={`${uid}-reorder`}
+              {...handleProps(index)}
+            >
+              <span aria-hidden="true">⠿</span>
+            </button>
             <textarea
               id={`${uid}-hint-${index}`}
               rows={1}
               maxLength={300}
-              value={hint}
+              value={hint.text}
               placeholder={index === 0 ? 'e.g. “Wears glasses or contact lenses”' : undefined}
-              onChange={(event) =>
-                change((previous) => ({
-                  ...previous,
-                  hints: previous.hints.map((item, position) => (position === index ? event.target.value : item)),
-                }))
-              }
+              onChange={(event) => {
+                const text = event.target.value;
+                setHints((list) => list.map((item) => (item.id === hint.id ? { ...item, text } : item)));
+                touched();
+              }}
             />
           </li>
         ))}
       </ol>
+      <p className="visually-hidden" aria-live="polite">
+        {announcement}
+      </p>
 
       <div className={styles.saveRow}>
         <button type="submit" className={formStyles.textButton} disabled={!dirty || !filled || busy}>
