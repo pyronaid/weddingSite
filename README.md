@@ -130,7 +130,7 @@ npm run dev                  # http://localhost:5173
 | Route                        | Page                                    | Access          |
 | ---------------------------- | --------------------------------------- | --------------- |
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
-| `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase | logged-in only  |
+| `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase (not spades) | logged-in only  |
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
 | `/area` (organisers)         | Organisers' home: the four suits to edit + the sign-up secret code | admins only     |
 | `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes | admins only     |
@@ -158,7 +158,7 @@ Flows and security choices:
 The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number of cards the guest collected out of the cards in the deck, e.g. `3/13`; the spades card also says whether the "guess who" person was found. Each card links to its suit page.
 
 - Data comes from PocketBase through [`src/services/game`](src/services/game) (a `GameRepository` interface, like the RSVP and auth services). The totals are read from the deck too, so changing the deck needs no frontend release.
-- **Suit pages** (one per suit, same behaviour; each suit has its own letters and phrase): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`).
+- **Suit pages** (one per suit, same behaviour): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`). Hearts, diamonds and clubs each have their own letters and phrase; **the spades have none** (they are the "guess who" game): every collected spade shows a star and there is no phrase (`hasLetters` in `src/services/game/cards.ts`; the server refuses spades letters).
 - **Letters** are set per card in the admin UI (`cards` → `letter`, one character). The field is *hidden*: the server sends it only for cards the guest collected (`pb_hooks/cards.pb.js`), and guests cannot filter or sort on it, so letters cannot be guessed through the API.
 - Card faces are static SVGs in [`public/cards/`](public/cards/CREDITS.md) (CC0 artwork by Adrian Kennard), loaded lazily and cached by nginx.
 - **Riddles (collecting cards)**: each card has a secret `code`, a `riddle` and a `solution` (hidden fields, admin UI). A poster with the card and a QR code to `/area/riddles/<code>` is put up at the venue. The guest scans it (logging in first if needed, then coming straight back), reads the riddle and types the answer in one box per letter: the focus moves to the next box automatically, Backspace goes back, pasting fills all boxes. The answer is checked **on the server** (`pb_hooks/riddles.pb.js`, case-insensitive, letters and digits only) and a correct one collects the card. The solution never reaches the browser.
@@ -249,11 +249,11 @@ Organisers are normal users with **`is_admin`** switched on. Only a superuser ca
 
 An organiser's `/area` shows their own home instead of the game:
 
-- the **four suits**, each opening an editor with one panel per card:
-  - **secret letter** of Ace to 10 (all suits; Jack, Queen and King have none);
+- the **four suits**, each opening an editor (one panel per card, except the spades):
+  - **secret letter** of Ace to 10 (hearts, diamonds and clubs; Jack, Queen and King have none, the spades have none at all);
   - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
   - **diamonds**: the **quiz questions** of every card: add, edit and delete questions and answers, and pick the correct answer (a question always keeps at least two answers and exactly one correct);
-  - **spades**: the **people to find** of the "guess who" game: name, surname and the 13 hints (Ace to King), all required. Each person shows how many guests were given it and how many found it; a person already given to a guest can be edited (live for those guests too) but not deleted;
+  - **spades**: only the **people to find** of the "guess who" game: name, surname and the 13 hints (Ace to King), all required. Each person shows how many guests were given it and how many found it; a person already given to a guest can be edited (live for those guests too) but not deleted;
   - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text);
 - the **sign-up secret code** (3–50 characters).
 

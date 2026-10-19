@@ -400,7 +400,6 @@ describe('private area', () => {
     it.each([
       ['hearts', 'Hearts'],
       ['diamonds', 'Diamonds'],
-      ['spades', 'Spades'],
       ['clubs', 'Clubs'],
     ] as const)('shows the cards and the secret phrase on the %s page', async (suit, label) => {
       const game = createFakeGame();
@@ -761,6 +760,21 @@ describe('private area', () => {
       beforeEach(() => {
         URL.createObjectURL = vi.fn(() => 'blob:preview');
         URL.revokeObjectURL = vi.fn();
+      });
+
+      it('has no letters nor secret phrase: a collected spade shows a star', async () => {
+        renderArea(await loggedIn(), '/area/suits/spades');
+        const list = await screen.findByRole('list', { name: 'Spades cards' });
+        expect(within(list).getAllByRole('listitem')).toHaveLength(13);
+        expect(screen.queryByText(/secret phrase/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/letters found/)).not.toBeInTheDocument();
+
+        // The 6 is collected in the fake data (with letter "N" for the other suits).
+        const six = screen.getByRole('button', { name: '6 of spades, collected' });
+        await userEvent.setup().click(six);
+        expect(six).toHaveAccessibleName('6 of spades, collected, showing the card back with a star');
+        expect(six).toHaveTextContent('★');
+        expect(six).not.toHaveTextContent('N');
       });
 
       it('explains the game in the rules, without the road to the King', async () => {
@@ -1138,6 +1152,9 @@ describe('private area', () => {
       const user = userEvent.setup();
 
       const section = await screen.findByRole('region', { name: 'Guess who: the people to find' });
+      // Spades have no letters: no card panels, only the people.
+      expect(screen.queryByRole('article')).not.toBeInTheDocument();
+      expect(admin.getSuit).not.toHaveBeenCalled();
       expect(await within(section).findByText('Giulia Bianchi')).toBeInTheDocument();
       expect(within(section).getByText(/given to 2 guests, found by 1/)).toBeInTheDocument();
 

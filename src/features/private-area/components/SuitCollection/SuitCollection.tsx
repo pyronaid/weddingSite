@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import formStyles from '../../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../../components/InfoCard/CardHeader';
-import { buildPhrase, type PlayingCard, type Suit } from '../../../../services/game';
+import { buildPhrase, hasLetters, type PlayingCard, type Suit } from '../../../../services/game';
 import { useSuitCards } from '../../game/useGameProgress';
 import { SUIT_META } from '../../game/suits';
 import { AREA_HOME } from '../../guards';
@@ -24,20 +24,22 @@ interface SuitCollectionProps {
   footer?: ReactNode;
 }
 
-/** All the cards of a suit, the collected ones highlighted, and the secret phrase. */
+/** All the cards of a suit, the collected ones highlighted, and the secret phrase (suits with letters). */
 export function SuitCollection({ suit, afterRules, renderCardAction, footer }: SuitCollectionProps) {
   const { label, symbol } = SUIT_META[suit];
   const query = useSuitCards(suit);
   const cards = query.status === 'success' ? query.data : undefined;
-  const phrase = useMemo(() => (cards ? buildPhrase(cards) : ''), [cards]);
+  const letters = hasLetters(suit);
+  const phrase = useMemo(() => (cards && letters ? buildPhrase(cards) : ''), [cards, letters]);
   const collected = cards?.filter((card) => card.collected).length ?? 0;
 
   return (
     <div className={styles.page} data-layout="wide">
       <CardHeader id="suit-title" eyebrow={`${symbol} Your collection`} title={label} />
       <p className={styles.intro}>
-        Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to discover
-        the secret phrase.
+        {letters
+          ? 'Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to discover the secret phrase.'
+          : 'Tap a card to flip it: every card you collect shows a star on its back.'}
       </p>
       <SuitRules suit={suit} />
       {afterRules}
@@ -61,7 +63,7 @@ export function SuitCollection({ suit, afterRules, renderCardAction, footer }: S
 
       {cards && (
         <>
-          <SecretPhrase phrase={phrase} />
+          {letters && <SecretPhrase phrase={phrase} />}
           <p className={styles.status}>
             {collected}/{cards.length} cards collected
           </p>

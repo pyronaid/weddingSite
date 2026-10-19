@@ -5,6 +5,13 @@ const RANK_NAMES: Record<number, string> = { 1: 'Ace', 11: 'Jack', 12: 'Queen', 
 /** Jack, Queen and King: they show a star instead of a letter. */
 export const isFaceCard = (rank: Rank) => rank >= 11;
 
+/**
+ * Suits whose numbered cards hide a secret letter (and so a secret phrase).
+ * The spades are a "guess who" game instead: no letters, a star on every
+ * collected card.
+ */
+export const hasLetters = (suit: Suit) => suit !== 'spades';
+
 export const rankName = (rank: Rank) => RANK_NAMES[rank] ?? String(rank);
 
 /** Path of the front image in /public/cards. */

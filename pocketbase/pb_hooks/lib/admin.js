@@ -6,6 +6,7 @@ const SUITS = ['hearts', 'diamonds', 'spades', 'clubs'];
 const PHOTO_SUIT = 'hearts';
 const RIDDLE_SUIT = 'clubs';
 const QUIZ_SUIT = 'diamonds';
+const GUESS_SUIT = 'spades';
 const MIN_ANSWERS = 2;
 const isFaceCard = (rank) => rank >= 11;
 
@@ -81,7 +82,7 @@ function listSuit(app, suit) {
 
 /**
  * Updates the editable fields of a card. Only the fields that make sense for
- * the card are accepted: the letter (Ace..10), riddle and solution (clubs).
+ * the card are accepted: the letter (Ace..10, not spades), riddle and solution (clubs).
  */
 function updateCard(app, cardId, body) {
   const card = findRecord(app, 'cards', cardId, 'Card');
@@ -90,6 +91,7 @@ function updateCard(app, cardId, body) {
 
   if (body.letter !== undefined) {
     if (isFaceCard(rank)) throw new BadRequestError('Jack, Queen and King have no letter.');
+    if (suit === GUESS_SUIT) throw new BadRequestError('Spades have no letters: they are a "guess who" game.');
     card.set('letter', String(body.letter).trim().toUpperCase());
   }
   if (body.riddle !== undefined || body.solution !== undefined) {

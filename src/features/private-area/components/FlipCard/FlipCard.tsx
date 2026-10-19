@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { cardImageUrl, isFaceCard, rankName, type PlayingCard } from '../../../../services/game';
+import { cardImageUrl, hasLetters, isFaceCard, rankName, type PlayingCard } from '../../../../services/game';
 import { SUIT_META } from '../../game/suits';
 import styles from './FlipCard.module.css';
 
@@ -10,11 +10,12 @@ interface FlipCardProps {
 /**
  * A playing card that flips on click/tap (or Enter/Space: it is a button).
  * Front: the standard card image. Back: the card back, plus the secret letter
- * (numbered cards) or a star (Jack, Queen, King) once the card is collected.
+ * (numbered cards) or a star (Jack, Queen, King, and every spade: they have
+ * no letters) once the card is collected.
  */
 export function FlipCard({ card }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false);
-  const face = isFaceCard(card.rank);
+  const face = isFaceCard(card.rank) || !hasLetters(card.suit);
   const name = `${rankName(card.rank)} of ${SUIT_META[card.suit].label.toLowerCase()}`;
 
   let backContent: string | null = null;
