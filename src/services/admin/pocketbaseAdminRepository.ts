@@ -4,11 +4,13 @@ import { toAdminError } from './errors';
 import type {
   AdminCard,
   AdminCardChanges,
+  AdminPerson,
   AdminQuestion,
   AdminRepository,
   AdminScene,
   AdminSettings,
   NewQuestion,
+  PersonFields,
 } from './types';
 
 /** Client of the endpoints in pb_hooks/admin.pb.js. */
@@ -70,6 +72,23 @@ export class PocketBaseAdminRepository implements AdminRepository {
 
   deleteAnswer(answerId: string): Promise<AdminQuestion> {
     return this.call(`/answers/${encodeURIComponent(answerId)}`, 'DELETE');
+  }
+
+  async getPeople(): Promise<AdminPerson[]> {
+    const { people } = await this.call<{ people: AdminPerson[] }>('/guess/people', 'GET');
+    return people;
+  }
+
+  addPerson(person: PersonFields): Promise<AdminPerson> {
+    return this.call('/guess/people', 'POST', person);
+  }
+
+  updatePerson(personId: string, person: PersonFields): Promise<AdminPerson> {
+    return this.call(`/guess/people/${encodeURIComponent(personId)}`, 'PATCH', person);
+  }
+
+  async deletePerson(personId: string): Promise<void> {
+    await this.call(`/guess/people/${encodeURIComponent(personId)}`, 'DELETE');
   }
 
   getSettings(): Promise<AdminSettings> {

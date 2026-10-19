@@ -8,6 +8,7 @@ import { isSuit, type Suit } from '../../../services/game';
 import { SUIT_META } from '../game/suits';
 import { AREA_HOME } from '../guards';
 import { AdminCardEditor } from './AdminCardEditor';
+import { PeopleEditor } from './PeopleEditor';
 import { useAdminQuery } from './useAdminQuery';
 import styles from './admin.module.css';
 
@@ -15,7 +16,7 @@ const HELP: Record<Suit, string> = {
   hearts: 'Set the secret letter of each card (Ace to 10) and the scenes guests may draw for the photo challenge.',
   diamonds:
     'Set the secret letter of each card (Ace to 10) and its quiz questions: the answers, and which one is correct.',
-  spades: 'Set the secret letter of each card (Ace to 10).',
+  spades: 'Set the people to find in the “guess who” game: name, surname and one hint per card. Spades have no secret letters.',
   clubs: 'Set the secret letter of each card (Ace to 10) and the riddle printed behind each QR code.',
 };
 
@@ -29,14 +30,29 @@ export function AdminSuitPage() {
 
 function AdminSuit({ suit }: { suit: Suit }) {
   const { label, symbol } = SUIT_META[suit];
-  const load = useCallback((repository: AdminRepository) => repository.getSuit(suit), [suit]);
-  const query = useAdminQuery(load);
 
   return (
     <div className={styles.page} data-layout="wide">
       <CardHeader id="admin-suit-title" eyebrow={`${symbol} Organisers`} title={label} />
       <p className={styles.help}>{HELP[suit]} Changes are live for the guests as soon as you save.</p>
 
+      {/* Spades ("guess who") have nothing to set per card: only the people to find. */}
+      {suit === 'spades' ? <PeopleEditor /> : <CardEditors suit={suit} />}
+
+      <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
+        ← Back to the organisers' home
+      </Link>
+    </div>
+  );
+}
+
+/** One editor per card of the suit. */
+function CardEditors({ suit }: { suit: Suit }) {
+  const load = useCallback((repository: AdminRepository) => repository.getSuit(suit), [suit]);
+  const query = useAdminQuery(load);
+
+  return (
+    <>
       {query.status === 'loading' && (
         <p className={styles.help} role="status">
           Loading the cards…
@@ -57,10 +73,6 @@ function AdminSuit({ suit }: { suit: Suit }) {
           ))}
         </div>
       )}
-
-      <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
-        ← Back to the organisers' home
-      </Link>
-    </div>
+    </>
   );
 }

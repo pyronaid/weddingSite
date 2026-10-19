@@ -15,6 +15,10 @@
  *   POST   /api/admin/questions/{questionId}/answers  {text, correct?}
  *   PATCH  /api/admin/answers/{answerId}        {text?, correct?}   (correct: true moves the mark here)
  *   DELETE /api/admin/answers/{answerId}
+ *   GET    /api/admin/guess/people              the people to find (spades), with their 13 hints
+ *   POST   /api/admin/guess/people              {firstName, lastName, hints: [13 texts]}
+ *   PATCH  /api/admin/guess/people/{personId}   {firstName, lastName, hints: [13 texts]}
+ *   DELETE /api/admin/guess/people/{personId}   (refused once given to a player)
  *   GET    /api/admin/settings                  {signupCode}
  *   PATCH  /api/admin/settings                  {signupCode}
  */
@@ -173,6 +177,53 @@ routerAdd(
     const admin = require(`${__hooks}/lib/admin.js`);
     admin.requireAdmin(e);
     return e.json(200, admin.deleteAnswer(e.app, e.request.pathValue('answerId')));
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Guess who (spades) ----
+
+routerAdd(
+  'GET',
+  '/api/admin/guess/people',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, { people: admin.listPeople(e.app) });
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'POST',
+  '/api/admin/guess/people',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, admin.addPerson(e.app, e.requestInfo().body));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'PATCH',
+  '/api/admin/guess/people/{personId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    return e.json(200, admin.updatePerson(e.app, e.request.pathValue('personId'), e.requestInfo().body));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'DELETE',
+  '/api/admin/guess/people/{personId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireAdmin(e);
+    admin.deletePerson(e.app, e.request.pathValue('personId'));
+    return e.noContent(204);
   },
   $apis.requireAuth('users'),
 );

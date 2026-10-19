@@ -39,13 +39,17 @@ describe('PocketBaseGameRepository', () => {
     fetchMock.mockImplementation(async (url: string) =>
       url.includes('/collections/cards/')
         ? page(deck)
-        : page([owned('hearts'), owned('hearts'), owned('clubs'), owned('unknown-suit'), {}]),
+        : url.includes('/api/game/guess/status')
+          ? new Response(JSON.stringify({ assigned: true, complete: false, found: false }), {
+              headers: { 'Content-Type': 'application/json' },
+            })
+          : page([owned('hearts'), owned('hearts'), owned('clubs'), owned('unknown-suit'), {}]),
     );
 
     await expect(new PocketBaseGameRepository(pb).getProgress()).resolves.toEqual({
       hearts: { collected: 2, total: 13 },
       diamonds: { collected: 0, total: 13 },
-      spades: { collected: 0, total: 13 },
+      spades: { collected: 0, total: 13, found: false },
       clubs: { collected: 1, total: 13 },
     });
 
@@ -170,5 +174,43 @@ describe('PocketBaseGameRepository', () => {
     const draw = await new PocketBaseGameRepository(pb).drawPhotoScene('card1');
     expect(draw).toMatchObject({ submissionId: 's1', scene: 'Dance', locked: true });
     expect(draw.photoUrl).toBe('http://pocketbase.test/api/files/col1/s1/p.jpg?thumb=480x0&token=tkn');
+  });
+
+  it('signs the selfies of a spades card, including the confirmed one of an earlier card', async () => {
+    pb.authStore.save(fakeToken(), user);
+    const json = (body: object) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes('/api/files/token')
+        ? json({ token: 'tkn' })
+        : json({
+            locked: false,
+            rank: 3,
+            hints: [{ rank: 1, text: 'Glasses' }],
+            selfie: { recordId: 'r1', collectionId: 'col2', photo: 'me.jpg', takenFor: 1, reused: true },
+            previous: null,
+          }),
+    );
+
+    const card = await new PocketBaseGameRepository(pb).confirmPreviousSelfie('spades3');
+    expect(String(fetchMock.mock.calls[0][0])).toBe('http://pocketbase.test/api/game/guess/spades3/confirm');
+    expect(card).toEqual({
+      locked: false,
+      rank: 3,
+      hints: [{ rank: 1, text: 'Glasses' }],
+      selfie: { url: 'http://pocketbase.test/api/files/col2/r1/me.jpg?thumb=480x0&token=tkn', takenFor: 1, reused: true },
+      previous: null,
+    });
+  });
+
+  it('shows the message of a refused game action', async () => {
+    pb.authStore.save(fakeToken(), user);
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ status: 400, message: 'This card is still locked.', data: {} }), { status: 400 }),
+    );
+    await expect(new PocketBaseGameRepository(pb).getGuessCard('spades5')).rejects.toMatchObject({
+      code: 'rejected',
+      message: 'This card is still locked.',
+    });
   });
 });

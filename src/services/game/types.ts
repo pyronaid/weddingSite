@@ -11,6 +11,8 @@ export interface SuitProgress {
   collected: number;
   /** Cards of this suit in the deck. */
   total: number;
+  /** Spades only: the "guess who" person was found. */
+  found?: boolean;
 }
 
 export type GameProgress = Record<Suit, SuitProgress>;
@@ -113,6 +115,50 @@ export type QuizAnswerResult =
   /** Wrong (or answered an outdated question, `stale`): here is the next question. */
   | { correct: false; stale: boolean; question: QuizQuestion; status: QuizStatus };
 
+/** A hint of the "guess who" game (spades), revealed by the card of that rank. */
+export interface GuessHint {
+  rank: Rank;
+  text: string;
+}
+
+export interface SelfiePhoto {
+  /** Protected: already signed with a file token. */
+  url: string;
+  /** The card the photo was taken for (an earlier one, when confirmed as the same person). */
+  takenFor: Rank;
+}
+
+/** A spades card as the player sees it: locked until the previous card has its selfie. */
+export type GuessCard =
+  | { locked: true; rank: Rank }
+  | {
+      locked: false;
+      rank: Rank;
+      /** From the Ace up to this card, in order. */
+      hints: GuessHint[];
+      /** Sent for this card (it is then collected); `reused`: the previous selfie was confirmed. */
+      selfie: (SelfiePhoto & { reused: boolean }) | null;
+      /** Without a selfie yet: the previous card's, to confirm "same person as before". */
+      previous: SelfiePhoto | null;
+    };
+
+export interface GuessStatus {
+  /** The person was drawn (the Ace was opened). */
+  assigned: boolean;
+  /** Every spades card has its selfie: the final guess is open. */
+  complete: boolean;
+  found: boolean;
+  /** Who it was, once found. */
+  name: string | null;
+  /** Letters of the name and surname (one box each), while guessing. */
+  lengths: { firstName: number; lastName: number } | null;
+}
+
+export interface GuessResult {
+  correct: boolean;
+  name: string | null;
+}
+
 /**
  * Backend-agnostic access to the card game. Pages depend only on this, so the
  * PocketBase implementation can be replaced (or faked in tests) freely.
@@ -142,12 +188,24 @@ export interface GameRepository {
   getQuizQuestion(cardId: string): Promise<QuizDraw>;
   /** Answers the current question: right collects the card, wrong costs a life (or a penalty). */
   answerQuiz(cardId: string, questionId: string, answerId: string): Promise<QuizAnswerResult>;
+  /** Where the player stands in the "guess who" game. */
+  getGuessStatus(): Promise<GuessStatus>;
+  /** The hints of a spades card (opening the Ace draws the person to find). */
+  getGuessCard(cardId: string): Promise<GuessCard>;
+  /** Sends the selfie of a spades card, which collects it. */
+  uploadSelfie(cardId: string, photo: Blob): Promise<GuessCard>;
+  /** "Same person as before": the previous card's selfie counts for this one too. */
+  confirmPreviousSelfie(cardId: string): Promise<GuessCard>;
+  /** The final guess, once all the spades are collected. */
+  solveGuess(firstName: string, lastName: string): Promise<GuessResult>;
 }
 
 export type GameErrorCode =
   | 'unauthenticated'
   | 'not_found'
   | 'invalid_photo'
+  /** The server refused the action (e.g. a locked card): its message is shown. */
+  | 'rejected'
   | 'network'
   | 'not_configured'
   | 'unknown';

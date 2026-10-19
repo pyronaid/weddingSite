@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { toAdminError, type AdminCard, type AdminCardChanges, type AdminError } from '../../../services/admin';
-import { cardImageUrl, isFaceCard, rankName } from '../../../services/game';
+import { cardImageUrl, hasLetters, isFaceCard, rankName } from '../../../services/game';
 import { useAdminRepository } from './AdminRepositoryContext';
 import { QuestionsEditor } from './QuestionsEditor';
 import { ScenesEditor } from './ScenesEditor';
@@ -20,16 +20,18 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
   const [error, setError] = useState<AdminError | null>(null);
 
   const face = isFaceCard(card.rank);
+  // Spades have no letters ("guess who"): nothing to set per card.
+  const withLetter = !face && hasLetters(card.suit);
   const hasRiddle = card.riddle !== undefined;
   const name = `${rankName(card.rank)} of ${card.suit}`;
 
   // Only what changed is sent.
   const changes: AdminCardChanges = {};
-  if (!face && letter.trim().toUpperCase() !== card.letter) changes.letter = letter;
+  if (withLetter && letter.trim().toUpperCase() !== card.letter) changes.letter = letter;
   if (hasRiddle && riddle.trim() !== card.riddle) changes.riddle = riddle;
   if (hasRiddle && solution.replace(/\s+/g, '').toUpperCase() !== card.solution) changes.solution = solution;
   const dirty = Object.keys(changes).length > 0;
-  const editable = !face || hasRiddle;
+  const editable = withLetter || hasRiddle;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -68,7 +70,7 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
 
       {editable ? (
         <form className={styles.fields} onSubmit={submit} noValidate>
-          {!face && (
+          {withLetter && (
             <div className={`${formStyles.field} ${styles.letterField}`}>
               <label htmlFor={`${uid}-letter`}>Secret letter</label>
               <input
@@ -135,7 +137,7 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
         </form>
       ) : (
         <p className={styles.note}>
-          {card.suit === 'hearts' ? 'Its scene is told in person: nothing to set here.' : 'Face cards have no letter.'}
+          {card.suit === 'hearts' ? 'Its scene is told in person: nothing to set here.' : 'This card has no letter.'}
         </p>
       )}
 

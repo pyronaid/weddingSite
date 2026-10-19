@@ -5,6 +5,13 @@ const RANK_NAMES: Record<number, string> = { 1: 'Ace', 11: 'Jack', 12: 'Queen', 
 /** Jack, Queen and King: they show a star instead of a letter. */
 export const isFaceCard = (rank: Rank) => rank >= 11;
 
+/**
+ * Suits whose numbered cards hide a secret letter (and so a secret phrase).
+ * The spades are a "guess who" game instead: no letters, a star on every
+ * collected card.
+ */
+export const hasLetters = (suit: Suit) => suit !== 'spades';
+
 export const rankName = (rank: Rank) => RANK_NAMES[rank] ?? String(rank);
 
 /** Path of the front image in /public/cards. */
@@ -24,9 +31,16 @@ export function buildPhrase(cards: readonly PlayingCard[]): string {
     .join('');
 }
 
-/** Letters and digits only, uppercase: the format of riddle answers. */
+/**
+ * Letters and digits only, uppercase, accents folded ("Nicolò" -> "NICOLO"):
+ * the format of riddle answers and of the "guess who" names.
+ */
 export function normalizeAnswer(value: string): string {
-  return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 /** Adds the file token to a protected file URL. */

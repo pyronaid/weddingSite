@@ -8,6 +8,9 @@ import {
   type GalleryPhoto,
   type GameProgress,
   type GameRepository,
+  type GuessCard,
+  type GuessResult,
+  type GuessStatus,
   type PhotoDraw,
   type QuizAnswerResult,
   type QuizDraw,
@@ -75,6 +78,27 @@ interface SubmissionRecord {
   expand?: { card?: { suit: Suit; rank: number } };
 }
 
+/** Payloads of pb_hooks/guess.pb.js: photos come as record references, signed here. */
+interface PhotoRef {
+  recordId: string;
+  collectionId: string;
+  photo: string;
+  takenFor: number;
+}
+
+type GuessCardResponse =
+  | { locked: true; rank: number }
+  | {
+      locked: false;
+      rank: number;
+      hints: { rank: number; text: string }[];
+      selfie: (PhotoRef & { reused: boolean }) | null;
+      previous: PhotoRef | null;
+    };
+
+const SELFIES = 'guess_selfies';
+const guessPath = (cardId: string) => `/api/game/guess/${encodeURIComponent(cardId)}`;
+
 const riddlePath = (code: string) => `/api/game/riddles/${encodeURIComponent(code)}`;
 
 interface CollectedRow {
@@ -115,7 +139,7 @@ export class PocketBaseGameRepository implements GameRepository {
     try {
       // Totals come from the deck too, so changing it never needs a frontend
       // release. `fields` keeps both payloads to the bare minimum.
-      const [deck, collected] = await Promise.all([
+      const [deck, collected, guess] = await Promise.all([
         this.pb.collection(CARDS).getFullList<CardRow>({ fields: 'suit' }),
         this.pb.collection(COLLECTED).getFullList<CollectedRow>({
           // The list rule already limits rows to the current user; the explicit
@@ -124,14 +148,17 @@ export class PocketBaseGameRepository implements GameRepository {
           expand: 'card',
           fields: 'expand.card.suit',
         }),
+        this.pb.send<GuessStatus>('/api/game/guess/status', { method: 'GET' }),
       ]);
 
       const totals = countBySuit(deck.map((card) => card.suit));
       const owned = countBySuit(collected.flatMap((row) => row.expand?.card?.suit ?? []));
 
-      return Object.fromEntries(
+      const progress = Object.fromEntries(
         SUITS.map((suit) => [suit, { collected: owned[suit], total: totals[suit] }]),
       ) as GameProgress;
+      progress.spades.found = guess.found;
+      return progress;
     } catch (error) {
       throw toGameError(error);
     }
@@ -312,6 +339,74 @@ export class PocketBaseGameRepository implements GameRepository {
     } catch (error) {
       throw toGameError(error);
     }
+  }
+
+  async getGuessStatus(): Promise<GuessStatus> {
+    this.requireUserId();
+    try {
+      return await this.pb.send<GuessStatus>('/api/game/guess/status', { method: 'GET' });
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  getGuessCard(cardId: string): Promise<GuessCard> {
+    return this.guessCall(guessPath(cardId));
+  }
+
+  uploadSelfie(cardId: string, photo: Blob): Promise<GuessCard> {
+    const body = new FormData();
+    body.append('photo', photo, 'selfie.jpg');
+    return this.guessCall(`${guessPath(cardId)}/selfie`, body);
+  }
+
+  confirmPreviousSelfie(cardId: string): Promise<GuessCard> {
+    return this.guessCall(`${guessPath(cardId)}/confirm`);
+  }
+
+  async solveGuess(firstName: string, lastName: string): Promise<GuessResult> {
+    this.requireUserId();
+    try {
+      const data = await this.pb.send<GuessResult>('/api/game/guess/solve', {
+        method: 'POST',
+        body: { firstName, lastName },
+      });
+      return { correct: data.correct, name: data.name || null };
+    } catch (error) {
+      throw toGameError(error);
+    }
+  }
+
+  private async guessCall(path: string, body?: FormData): Promise<GuessCard> {
+    this.requireUserId();
+    let data: GuessCardResponse;
+    try {
+      data = await this.pb.send<GuessCardResponse>(path, { method: 'POST', body });
+    } catch (error) {
+      // 413: the photo is larger than the server accepts.
+      throw (error as { status?: number }).status === 413 ? gameError('invalid_photo', error) : toGameError(error);
+    }
+    if (data.locked) return { locked: true, rank: data.rank };
+
+    const photos = [data.selfie, data.previous].filter((ref) => ref?.photo);
+    const token = photos.length > 0 ? (await this.getFileToken()).token : '';
+    const sign = (ref: PhotoRef) => ({
+      url: ref.photo
+        ? this.pb.files.getURL(
+            { id: ref.recordId, collectionId: ref.collectionId, collectionName: SELFIES },
+            ref.photo,
+            { thumb: THUMB_GRID, token },
+          )
+        : '',
+      takenFor: ref.takenFor,
+    });
+    return {
+      locked: false,
+      rank: data.rank,
+      hints: data.hints,
+      selfie: data.selfie ? { ...sign(data.selfie), reused: Boolean(data.selfie.reused) } : null,
+      previous: data.previous ? sign(data.previous) : null,
+    };
   }
 
   private toGalleryPhoto = (record: SubmissionRecord): GalleryPhoto => ({

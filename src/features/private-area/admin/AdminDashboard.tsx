@@ -12,7 +12,7 @@ import styles from './admin.module.css';
 const CAPTIONS: Record<Suit, string> = {
   hearts: 'Letters & scenes',
   diamonds: 'Letters & quiz',
-  spades: 'Letters',
+  spades: 'Guess who',
   clubs: 'Letters & riddles',
 };
 
@@ -25,8 +25,8 @@ export function AdminDashboard() {
     <div className={styles.page} data-layout="wide">
       <CardHeader id="dashboard-title" eyebrow="Organisers" title={`Hello, ${firstName}!`} />
       <p className={pageStyles.center}>
-        Prepare the game: choose a suit to edit the secret letters of its cards, the riddles of the clubs and the photo
-        scenes of the hearts.
+        Prepare the game: choose a suit to edit the secret letters of its cards, the photo scenes of the hearts, the quiz
+        of the diamonds, the people to find of the spades and the riddles of the clubs.
       </p>
 
       <section aria-labelledby="admin-suits-title">

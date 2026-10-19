@@ -42,10 +42,34 @@ const SUIT_RULES: Record<Suit, ReactNode[]> = {
       bride and groom will choose them!
     </>,
   ],
-  spades: ['Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.'],
+  spades: [
+    <>
+      <strong>Guess who!</strong> A guest has been secretly chosen for you: it is drawn when you open the Ace for
+      the first time and stays the same for the whole game.
+    </>,
+    <>
+      Press <span aria-hidden="true">🔍</span> under a card to read its hint, then find a guest who matches it and{' '}
+      <strong>take a selfie with them</strong>: uploading it collects the card and unlocks the next one. The cards
+      unlock in order, from the Ace to the King.
+    </>,
+    'Every card adds a new hint and keeps showing the previous ones: look for someone who matches all of them together.',
+    <>
+      If the person of your last selfie still matches the new hint, press <strong>Same person as before</strong>{' '}
+      instead of taking a new selfie; otherwise take a selfie with someone who does. Once sent, a card's selfie
+      cannot be changed.
+    </>,
+    <>
+      With all 13 cards collected, write the <strong>name and surname</strong> of the person you think it is: the
+      spades are complete only when you guess right (you can try again as many times as you need).
+    </>,
+    <>
+      <strong>The selfies of whoever claims victory</strong> will be checked against the hints of their cards:
+      selfies with people who do not match them do not count.
+    </>,
+  ],
 };
 
-/** The road to the King, the same for every suit. */
+/** The road to the King, for every suit but the spades (which have their own). */
 const PROGRESSION_RULES: ReactNode[] = [
   <>
     Collect the first ten cards (Ace to 10): their letters spell <strong>the name of the Jack</strong>.
@@ -65,7 +89,7 @@ export function SuitRules({ suit }: { suit: Suit }) {
         Rules
       </h3>
       <ul>
-        {[...SUIT_RULES[suit], ...PROGRESSION_RULES].map((rule, index) => (
+        {[...SUIT_RULES[suit], ...(suit === 'spades' ? [] : PROGRESSION_RULES)].map((rule, index) => (
           <li key={index}>{rule}</li>
         ))}
       </ul>

@@ -15,10 +15,16 @@ interface SuitCardProps {
 /** A playing-card shaped link to a suit page, showing the collected count. */
 export function SuitCard({ suit, progress, to, caption }: SuitCardProps) {
   const { label, symbol, colour } = SUIT_META[suit];
-  const complete = progress !== undefined && progress.total > 0 && progress.collected >= progress.total;
+  // Spades are complete only once the "guess who" person is found too.
+  const complete =
+    progress !== undefined && progress.total > 0 && progress.collected >= progress.total && progress.found !== false;
   const percent = progress && progress.total > 0 ? Math.min(100, (progress.collected / progress.total) * 100) : 0;
+  const found = progress?.found === undefined ? '' : progress.found ? 'person found' : 'person not found yet';
   const description =
-    caption ?? (progress ? `${progress.collected} of ${progress.total} cards collected` : 'progress not available');
+    caption ??
+    (progress
+      ? `${progress.collected} of ${progress.total} cards collected${found ? `, ${found}` : ''}`
+      : 'progress not available');
 
   return (
     <Link
@@ -41,6 +47,11 @@ export function SuitCard({ suit, progress, to, caption }: SuitCardProps) {
           <span className={styles.bar} aria-hidden="true">
             <span style={{ width: `${percent}%` }} />
           </span>
+          {progress?.found !== undefined && (
+            <span className={`${styles.found} ${progress.found ? styles.foundYes : ''}`} aria-hidden="true">
+              {progress.found ? 'Person found ✓' : 'Person not found'}
+            </span>
+          )}
         </>
       )}
       <span className={`${styles.corner} ${styles.cornerBottom}`} aria-hidden="true">

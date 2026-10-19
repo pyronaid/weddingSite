@@ -22,6 +22,10 @@ export function createAdminRepository(): AdminRepository {
     addAnswer: fail,
     updateAnswer: fail,
     deleteAnswer: fail,
+    getPeople: fail,
+    addPerson: fail,
+    updatePerson: fail,
+    deletePerson: fail,
     getSettings: fail,
     updateSettings: fail,
   };

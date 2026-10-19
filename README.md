@@ -130,7 +130,7 @@ npm run dev                  # http://localhost:5173
 | Route                        | Page                                    | Access          |
 | ---------------------------- | --------------------------------------- | --------------- |
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
-| `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase | logged-in only  |
+| `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase (not spades) | logged-in only  |
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
 | `/area` (organisers)         | Organisers' home: the four suits to edit + the sign-up secret code | admins only     |
 | `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes | admins only     |
@@ -155,16 +155,16 @@ Flows and security choices:
 
 ### The card game ("find the joker")
 
-The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number of cards the guest collected out of the cards in the deck, e.g. `3/13`. Each card links to its suit page.
+The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number of cards the guest collected out of the cards in the deck, e.g. `3/13`; the spades card also says whether the "guess who" person was found. Each card links to its suit page.
 
 - Data comes from PocketBase through [`src/services/game`](src/services/game) (a `GameRepository` interface, like the RSVP and auth services). The totals are read from the deck too, so changing the deck needs no frontend release.
-- **Suit pages** (one per suit, same behaviour; each suit has its own letters and phrase): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`).
+- **Suit pages** (one per suit, same behaviour): all 13 cards in rank order. Tap a card to flip it. Collected cards have a green border; their back shows the card's **secret letter** (Ace..10) or a **yellow star** (Jack, Queen, King). Above the cards, the **secret phrase** joins the collected letters in rank order, with a dash for each missing one (e.g. `-----A----`). Hearts, diamonds and clubs each have their own letters and phrase; **the spades have none** (they are the "guess who" game): every collected spade shows a star and there is no phrase (`hasLetters` in `src/services/game/cards.ts`; the server refuses spades letters).
 - **Letters** are set per card in the admin UI (`cards` → `letter`, one character). The field is *hidden*: the server sends it only for cards the guest collected (`pb_hooks/cards.pb.js`), and guests cannot filter or sort on it, so letters cannot be guessed through the API.
 - Card faces are static SVGs in [`public/cards/`](public/cards/CREDITS.md) (CC0 artwork by Adrian Kennard), loaded lazily and cached by nginx.
 - **Riddles (collecting cards)**: each card has a secret `code`, a `riddle` and a `solution` (hidden fields, admin UI). A poster with the card and a QR code to `/area/riddles/<code>` is put up at the venue. The guest scans it (logging in first if needed, then coming straight back), reads the riddle and types the answer in one box per letter: the focus moves to the next box automatically, Backspace goes back, pasting fills all boxes. The answer is checked **on the server** (`pb_hooks/riddles.pb.js`, case-insensitive, letters and digits only) and a correct one collects the card. The solution never reaches the browser.
   - The clubs come with placeholder riddles. **Solutions are not seeded** (this repository is the source): set them in the admin UI. A riddle without a solution shows "not available yet".
   - Changing a card's `code` in the admin UI invalidates its printed poster.
-- **Rules box** on every suit page ([`SuitRules`](src/features/private-area/components/SuitRules/SuitRules.tsx), edit the texts there): how that suit's cards are collected (QR codes around the venue for clubs, photos for hearts, placeholders for diamonds and spades), plus the road to the King, the same for all suits: Ace–10 spell the Jack's name, the Jack's challenge reveals the Queen's name, the Queen's the King's.
+- **Rules box** on every suit page ([`SuitRules`](src/features/private-area/components/SuitRules/SuitRules.tsx), edit the texts there): how that suit's cards are collected (QR codes around the venue for clubs, photos for hearts, the quiz for diamonds, "guess who" for spades), plus the road to the King for every suit but the spades: Ace–10 spell the Jack's name, the Jack's challenge reveals the Queen's name, the Queen's the King's.
 - **Hearts are collected with photos** instead of riddles. Under each card, 📷 opens a window with a **scene to photograph**:
   - Numbered cards: the scene is drawn **at random on the server** from the card's own bucket (`photo_scenes`, edit them in the admin UI; higher cards get harder scenes). **Every press draws a new scene**, so photos cannot be prepared in advance.
   - Jack, Queen and King: the scene is told in person ("The King of hearts will tell you the scene…").
@@ -177,6 +177,12 @@ The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number
   - Every player has **three lives** (three diamonds under the rules), shared by all the diamonds. A wrong answer costs a life and draws a **new question**, avoiding the ones already faced while there are others. With no lives left, every wrong answer adds a **penalty** (diamonds of another colour): penalties must be carried out before claiming the prize, as the bride and groom decide.
   - **Jack, Queen and King are asked in person**: the guest sees neither the question nor the answers, only "Question n° X" and the letters A, B, C… (one per answer). The person asking reads question n° X and its answers, in the same order, from the organisers' view, where face-card questions are numbered and their answers lettered.
   - A right answer collects the card. Which answer is correct never reaches the browser; lives and penalties are computed on the server.
+- **Spades are a "guess who" game.** Each player is secretly given a person to find (`guess_people`, with 13 hints in `guess_hints`, one per card). The person is drawn **at random on the server** the first time the player opens the Ace (never the player themselves, when their name matches) and **kept for the whole game** (`guess_assignments`).
+  - Under each card, 🔍 opens its hints: **every hint from the Ace up to that card**, the newest one highlighted. The guest finds someone matching all of them and uploads a **selfie** with them, which collects the card.
+  - The cards **unlock in order**: a card needs the previous card's selfie (🔒 until then, checked on the server too).
+  - From the 2 on, **Same person as before** reuses the previous selfie (with its thumbnail as a reminder) instead of taking a new one, when that person still matches the new hint.
+  - Reopening a collected card shows its selfie (or "same person as before: the selfie of the 3 of spades"). **A sent selfie cannot be changed.** Selfies go through the same checks as the hearts photos (real photo, shrunk, EXIF removed, 10 KB–10 MB) and are **protected files** visible only to their owner and the organisers (`guess_selfies`).
+  - With all 13 cards collected, a **Guess who** box above the cards asks the **name and surname** in letter boxes (one per letter; spaces, apostrophes and accents are ignored, so "D'Amico" is `DAMICO`). The answer is checked on the server, with unlimited attempts; only a right guess completes the spades. The person's name never reaches the browser before it is guessed.
 - **Gallery** (`/area/gallery`, linked at the bottom of the hearts page): every player's photos, with the scene, the first name and the card. Built to stay light with many photos:
   - the grid loads **480 px thumbnails** (generated once by PocketBase, then cached); the 1200 px version only when a photo is opened, never the original;
   - **pages of 24**, the next page loading as you scroll; images load lazily and off-screen tiles skip rendering (`content-visibility`);
@@ -243,10 +249,11 @@ Organisers are normal users with **`is_admin`** switched on. Only a superuser ca
 
 An organiser's `/area` shows their own home instead of the game:
 
-- the **four suits**, each opening an editor with one panel per card:
-  - **secret letter** of Ace to 10 (all suits; Jack, Queen and King have none);
+- the **four suits**, each opening an editor (one panel per card, except the spades):
+  - **secret letter** of Ace to 10 (hearts, diamonds and clubs; Jack, Queen and King have none, the spades have none at all);
   - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
   - **diamonds**: the **quiz questions** of every card: add, edit and delete questions and answers, and pick the correct answer (a question always keeps at least two answers and exactly one correct);
+  - **spades**: only the **people to find** of the "guess who" game: name, surname and the 13 hints (Ace to King), all required. Drag a hint by its ⠿ handle (mouse or finger; or focus the handle and use the arrow keys) to give it to another card without retyping: the cards stay, the texts move, and nothing changes until Save. Each person shows how many guests were given it and how many found it; a person already given to a guest can be edited (live for those guests too) but not deleted;
   - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text);
 - the **sign-up secret code** (3–50 characters).
 
@@ -264,6 +271,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `users.is_admin`: organisers (set by a superuser only).
   - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
   - `quiz_questions`, `quiz_answers`: the diamonds quiz (organisers only; seeded with two example questions per card). `quiz_attempts`: per user and card, the current question, the questions already faced and the wrong answers (server only).
+  - `guess_people`, `guess_hints`: the people of the spades "guess who" and their 13 hints (organisers only; seeded with two example people). `guess_assignments`: the person drawn for each user, its attempts and `found` (server only). `guess_selfies`: one per (user, card), a protected photo or `same_as` the earlier selfie confirmed; created only by the hook, visible to the owner and the organisers.
   - `photo_scenes`: the scenes of each hearts card (admin only; seeded with examples).
   - `photo_submissions`: one row per (user, card) with the drawn scene and the photo (protected file, thumbnails 480 px and 1200 px). Logged-in users see the rows that have a photo (the gallery); the owner can only replace the photo, never the scene.
   - `collected_cards`: one row per (user, card), unique. **Users can only read their own rows**; creating/editing them is superuser-only until the collecting mechanics are defined. Rows are deleted with their user or card.
@@ -273,7 +281,8 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `cards.pb.js` reveals a card's hidden `letter` only to the guests who collected it.
   - `photos.pb.js` draws the photo challenge scenes (`POST /api/game/photos/{cardId}/draw`) and collects the card when a photo is uploaded.
   - `quiz.pb.js` serves the diamonds quiz: current question, answers, lives and penalties.
-  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, secret code), admins only.
+  - `guess.pb.js` serves the spades "guess who": the hints of a card (`POST /api/game/guess/{cardId}`), the selfie upload and the "same person as before" confirmation, the status and the final guess.
+  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code), admins only.
   - `signup.pb.js` checks the sign-up secret code.
   - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
 

@@ -1,4 +1,4 @@
-import { buildPhrase, isFaceCard, rankName } from './cards';
+import { buildPhrase, isFaceCard, normalizeAnswer, rankName } from './cards';
 import type { PlayingCard } from './types';
 
 const clubs = (collected: Record<number, string | null> = {}): PlayingCard[] =>
@@ -32,5 +32,17 @@ describe('card helpers', () => {
   it('names ranks and detects face cards', () => {
     expect([1, 7, 11, 12, 13].map(rankName)).toEqual(['Ace', '7', 'Jack', 'Queen', 'King']);
     expect([10, 11, 13].map(isFaceCard)).toEqual([false, true, true]);
+  });
+});
+
+describe('normalizeAnswer', () => {
+  it('keeps letters and digits only, uppercase', () => {
+    expect(normalizeAnswer(' a p-p.le 2 ')).toBe('APPLE2');
+  });
+
+  it('folds accents and drops apostrophes, as names are typed in the boxes', () => {
+    expect(normalizeAnswer('Nicolò')).toBe('NICOLO');
+    expect(normalizeAnswer("D'Amico")).toBe('DAMICO');
+    expect(normalizeAnswer('Èlia Società')).toBe('ELIASOCIETA');
   });
 });

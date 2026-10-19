@@ -24,5 +24,10 @@ export function createGameRepository(): GameRepository {
     getQuizStatus: () => Promise.reject(gameError('not_configured')),
     getQuizQuestion: () => Promise.reject(gameError('not_configured')),
     answerQuiz: () => Promise.reject(gameError('not_configured')),
+    getGuessStatus: () => Promise.reject(gameError('not_configured')),
+    getGuessCard: () => Promise.reject(gameError('not_configured')),
+    uploadSelfie: () => Promise.reject(gameError('not_configured')),
+    confirmPreviousSelfie: () => Promise.reject(gameError('not_configured')),
+    solveGuess: () => Promise.reject(gameError('not_configured')),
   };
 }
