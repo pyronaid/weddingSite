@@ -30,6 +30,15 @@ export function RequireAdmin() {
   return <Outlet />;
 }
 
+/** Super admins only (site content and language); others go back to the private area home. */
+export function RequireSuperAdmin() {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user) return <Navigate to={LOGIN_PATH} replace state={{ from: location } satisfies RedirectState} />;
+  if (!user.isSuperAdmin) return <Navigate to={AREA_HOME} replace />;
+  return <Outlet />;
+}
+
 /**
  * Only for anonymous users (login, sign up, forgot password).
  * This is also what redirects after a successful login: the auth store

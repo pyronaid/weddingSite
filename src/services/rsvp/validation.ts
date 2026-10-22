@@ -1,3 +1,5 @@
+import { messagesOf } from '../../i18n';
+import { rsvpMessages } from './messages';
 import type { RsvpSubmission } from './types';
 
 export type RsvpErrors = Partial<Record<keyof RsvpSubmission, string>>;
@@ -28,24 +30,25 @@ export function normalizeRsvp(input: RsvpSubmission): RsvpSubmission {
 
 export function validateRsvp(input: RsvpSubmission, maxGuests: number): RsvpErrors {
   const errors: RsvpErrors = {};
+  const t = messagesOf(rsvpMessages);
 
-  if (!input.fullName) errors.fullName = 'Please tell us your name.';
-  else if (input.fullName.length > LIMITS.fullName) errors.fullName = 'Name is too long.';
+  if (!input.fullName) errors.fullName = t.nameMissing;
+  else if (input.fullName.length > LIMITS.fullName) errors.fullName = t.nameTooLong;
 
-  if (!input.email) errors.email = 'Please enter your e-mail.';
+  if (!input.email) errors.email = t.emailMissing;
   else if (input.email.length > LIMITS.email || !EMAIL_RE.test(input.email))
-    errors.email = 'Please enter a valid e-mail.';
+    errors.email = t.emailInvalid;
 
   if (input.attending !== 'yes' && input.attending !== 'no')
-    errors.attending = 'Please let us know if you can come.';
+    errors.attending = t.attendingMissing;
 
   if (input.attending === 'yes') {
     if (!Number.isInteger(input.guests) || input.guests < 1 || input.guests > maxGuests)
-      errors.guests = `Number of guests must be between 1 and ${maxGuests}.`;
+      errors.guests = t.guestsRange(maxGuests);
   }
 
-  if (input.dietaryNotes.length > LIMITS.dietaryNotes) errors.dietaryNotes = 'Text is too long.';
-  if (input.message.length > LIMITS.message) errors.message = 'Message is too long.';
+  if (input.dietaryNotes.length > LIMITS.dietaryNotes) errors.dietaryNotes = t.textTooLong;
+  if (input.message.length > LIMITS.message) errors.message = t.messageTooLong;
 
   return errors;
 }

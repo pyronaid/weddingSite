@@ -11,3 +11,7 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
     this.dispatchEvent(new Event('close'));
   };
 }
+
+// Each test starts in English, whatever language the previous one switched to.
+import { setLanguage } from '../i18n';
+afterEach(() => setLanguage('en'));

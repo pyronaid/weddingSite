@@ -1,4 +1,6 @@
 import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useMessages } from '../../i18n';
+import { componentMessages } from '../componentMessages';
 import styles from './Form.module.css';
 
 interface BaseFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'id' | 'type'> {
@@ -65,6 +67,7 @@ export function TextField({ label, name, error, hint, type = 'text', ...inputPro
 /** Password input with a show/hide toggle (reduces typos on mobile). */
 export function PasswordField({ label, name, error, hint, ...inputProps }: BaseFieldProps) {
   const [visible, setVisible] = useState(false);
+  const t = useMessages(componentMessages);
   const { id, errorId, hintId, inputAria } = useFieldA11y(name, error, hint);
   return (
     <FieldShell id={id} label={label} error={error} errorId={errorId} hint={hint} hintId={hintId}>
@@ -75,9 +78,9 @@ export function PasswordField({ label, name, error, hint, ...inputProps }: BaseF
           className={styles.toggle}
           onClick={() => setVisible((v) => !v)}
           aria-pressed={visible}
-          aria-label={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+          aria-label={t.toggle(visible, label)}
         >
-          {visible ? 'Hide' : 'Show'}
+          {visible ? t.hide : t.show}
         </button>
       </div>
     </FieldShell>

@@ -400,3 +400,28 @@
   outline: none;
   border-color: var(--card-accent);
 }
+
+/* Super admin: link to the site settings. */
+.siteLink {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--card-accent);
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+  color: var(--card-muted);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.siteLink:hover,
+.siteLink:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.siteLinkTitle {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--card-text);
+}

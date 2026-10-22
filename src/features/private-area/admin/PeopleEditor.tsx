@@ -1,7 +1,9 @@
 import { useCallback, useId, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { toAdminError, type AdminPerson, type AdminRepository, type PersonFields } from '../../../services/admin';
+import { useMessages } from '../../../i18n';
 import { rankName } from '../../../services/game';
+import { adminMessages } from '../messages/admin';
 import { useAdminRepository } from './AdminRepositoryContext';
 import { useAdminQuery } from './useAdminQuery';
 import { moveItem, useReorder } from './useReorder';
@@ -24,49 +26,46 @@ export function PeopleEditor() {
   const [people, setPeople] = useState<AdminPerson[] | null>(null);
   const list = people ?? (query.status === 'success' ? query.data : []);
   const [adding, setAdding] = useState(0);
+  const messages = useMessages(adminMessages);
+  const t = messages.people;
 
   const replace = (updated: AdminPerson) => setPeople(list.map((item) => (item.id === updated.id ? updated : item)));
 
   return (
     <section className={styles.people} aria-labelledby="people-title">
       <h3 id="people-title" className={styles.panelTitle}>
-        Guess who: the people to find
+        {t.title}
       </h3>
       <p className={styles.hint}>
-        Every guest is given one of these people at random when they open the Ace, and keeps it for the whole game.
-        Each card reveals one more hint, from the Ace to the King: start from the vaguest one. Changes are live, also
-        for the guests already looking for that person.
+        {t.intro}
       </p>
 
       {query.status === 'loading' && (
         <p className={styles.help} role="status">
-          Loading the people…
+          {t.loading}
         </p>
       )}
       {query.status === 'error' && (
         <div role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
           {query.error.message}{' '}
           <button type="button" className={formStyles.textButton} onClick={query.retry}>
-            Try again
+            {messages.common.tryAgain}
           </button>
         </div>
       )}
 
       {query.status === 'success' && (
         <>
-          {list.length === 0 && <p className={styles.warning}>Nobody to find yet: guests cannot play the spades.</p>}
+          {list.length === 0 && <p className={styles.warning}>{t.none}</p>}
           {list.map((person) => (
             <details key={person.id} className={styles.person}>
               <summary>
                 <strong>{fullName(person)}</strong>
-                <span className={styles.count}>
-                  {' '}
-                  · given to {person.assigned} {person.assigned === 1 ? 'guest' : 'guests'}, found by {person.found}
-                </span>
+                <span className={styles.count}>{t.stats(person.assigned, person.found)}</span>
               </summary>
               <PersonForm
                 initial={person}
-                submitLabel="Save"
+                submitLabel={messages.common.save}
                 onSubmit={async (fields) => replace(await repository.updatePerson(person.id, fields))}
                 onDelete={
                   person.assigned === 0
@@ -82,13 +81,13 @@ export function PeopleEditor() {
 
           <details className={`${styles.person} ${styles.newPerson}`}>
             <summary>
-              <strong>+ Add a person</strong>
+              <strong>{t.add}</strong>
             </summary>
             {/* Keyed: after an add the form starts empty again. */}
             <PersonForm
               key={adding}
               initial={EMPTY}
-              submitLabel="Add person"
+              submitLabel={t.addPerson}
               onSubmit={async (fields) => {
                 const created = await repository.addPerson(fields);
                 setPeople([...list, created]);
@@ -125,6 +124,8 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
   const [saved, setSaved] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messages = useMessages(adminMessages);
+  const t = messages.people;
 
   const clean = (person: PersonFields) => ({
     firstName: person.firstName.trim(),
@@ -143,7 +144,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
   // The texts move, the cards stay: the Ace's hint is always the first one.
   const { listRef, dragging, handleProps } = useReorder<HTMLOListElement>(hints.length, (from, to) => {
     setHints((list) => moveItem(list, from, to));
-    setAnnouncement(`Hint moved to the ${rankName(to + 1)}.`);
+    setAnnouncement(t.moved(rankName(to + 1)));
     touched();
   });
 
@@ -171,7 +172,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
     <form className={styles.fields} onSubmit={submit} noValidate>
       <div className={styles.nameRow}>
         <div className={formStyles.field}>
-          <label htmlFor={`${uid}-first`}>Name</label>
+          <label htmlFor={`${uid}-first`}>{t.name}</label>
           <input
             id={`${uid}-first`}
             value={names.firstName}
@@ -184,7 +185,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
           />
         </div>
         <div className={formStyles.field}>
-          <label htmlFor={`${uid}-last`}>Surname</label>
+          <label htmlFor={`${uid}-last`}>{t.surname}</label>
           <input
             id={`${uid}-last`}
             value={names.lastName}
@@ -198,12 +199,11 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
         </div>
       </div>
       <p className={styles.hint}>
-        Guests type them in letter boxes: spaces, apostrophes and accents are ignored (“D'Amico” is DAMICO).
+        {t.nameHint}
       </p>
 
       <p id={`${uid}-reorder`} className={styles.hint}>
-        Drag a hint by its <span aria-hidden="true">⠿</span> handle (or focus it and use the arrow keys) to give it to
-        another card.
+        {t.reorderBefore} <span aria-hidden="true">⠿</span> {t.reorderAfter}
       </p>
       <ol ref={listRef} className={styles.hintList}>
         {hints.map((hint, index) => (
@@ -214,7 +214,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
             <button
               type="button"
               className={styles.dragHandle}
-              aria-label={`Move the hint of the ${rankName(index + 1)}`}
+              aria-label={t.move(rankName(index + 1))}
               aria-describedby={`${uid}-reorder`}
               {...handleProps(index)}
             >
@@ -225,7 +225,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
               rows={1}
               maxLength={300}
               value={hint.text}
-              placeholder={index === 0 ? 'e.g. “Wears glasses or contact lenses”' : undefined}
+              placeholder={index === 0 ? t.hintPlaceholder : undefined}
               onChange={(event) => {
                 const text = event.target.value;
                 setHints((list) => list.map((item) => (item.id === hint.id ? { ...item, text } : item)));
@@ -241,7 +241,7 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
 
       <div className={styles.saveRow}>
         <button type="submit" className={formStyles.textButton} disabled={!dirty || !filled || busy}>
-          {busy ? 'Saving…' : submitLabel}
+          {busy ? messages.common.saving : submitLabel}
         </button>
         {onDelete &&
           (confirming ? (
@@ -251,18 +251,18 @@ function PersonForm({ initial, submitLabel, onSubmit, onDelete }: PersonFormProp
               disabled={busy}
               onClick={() => void run(onDelete)}
             >
-              Confirm delete
+              {messages.common.confirmDelete}
             </button>
           ) : (
             <button type="button" className={formStyles.textButton} disabled={busy} onClick={() => setConfirming(true)}>
-              Delete
+              {messages.common.delete}
             </button>
           ))}
         <span role="status" className={styles.saved}>
-          {saved && !dirty && 'Saved ✓'}
+          {saved && !dirty && messages.common.saved}
         </span>
       </div>
-      {!filled && dirty && <p className={styles.hint}>Write the name, the surname and all the 13 hints to save.</p>}
+      {!filled && dirty && <p className={styles.hint}>{t.incomplete}</p>}
       {error && (
         <p role="alert" className={styles.error}>
           {error}

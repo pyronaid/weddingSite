@@ -5,6 +5,8 @@ import { PasswordField } from '../../../components/Form/TextField';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { PASSWORD_MIN_LENGTH, validateNewPassword, type FieldErrors } from '../../../services/auth';
+import { useMessages } from '../../../i18n';
+import { authMessages } from '../messages/auth';
 import { useAuth } from '../useAuth';
 import { LOGIN_PATH, type RedirectState } from '../guards';
 import styles from './pages.module.css';
@@ -14,7 +16,8 @@ type Field = 'password' | 'passwordConfirm';
 
 /** Target of the link in the "reset password" e-mail: /area/reset-password?token=... */
 export function ResetPasswordPage() {
-  useDocumentTitle('Choose a new password');
+  const t = useMessages(authMessages);
+  useDocumentTitle(t.reset.documentTitle);
   const { auth } = useAuth();
   const navigate = useNavigate();
   const token = useSearchParams()[0].get('token') ?? '';
@@ -34,7 +37,7 @@ export function ResetPasswordPage() {
     if (ok) {
       navigate(LOGIN_PATH, {
         replace: true,
-        state: { notice: 'Your password has been updated. You can now log in.' } satisfies RedirectState,
+        state: { notice: t.reset.updated } satisfies RedirectState,
       });
     }
   };
@@ -42,12 +45,12 @@ export function ResetPasswordPage() {
   if (!token || error?.code === 'invalid_token') {
     return (
       <div className={styles.stack}>
-        <CardHeader id="reset-invalid-title" eyebrow="Password reset" title="Link expired" />
+        <CardHeader id="reset-invalid-title" eyebrow={t.reset.eyebrow} title={t.reset.expiredTitle} />
         <p className={`${formStyles.notice} ${formStyles.noticeError}`} role="alert">
-          This reset link is invalid or has expired. Reset links can be used only once.
+          {t.reset.expired}
         </p>
         <Link to="/area/forgot-password" className={formStyles.secondary}>
-          Request a new link
+          {t.reset.requestNew}
         </Link>
       </div>
     );
@@ -57,22 +60,22 @@ export function ResetPasswordPage() {
 
   return (
     <>
-      <CardHeader id="reset-title" eyebrow="Private area" title="Reset password" />
-      <p className={styles.intro}>Choose a new password for your account.</p>
+      <CardHeader id="reset-title" eyebrow={t.privateArea} title={t.reset.title} />
+      <p className={styles.intro}>{t.reset.intro}</p>
 
       <form className={formStyles.form} onSubmit={handleSubmit} noValidate aria-labelledby="reset-title">
         <PasswordField
-          label="New password"
+          label={t.reset.newPassword}
           name="password"
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fieldErrors.password ?? serverErrors.password}
-          hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
+          hint={t.passwordHint(PASSWORD_MIN_LENGTH)}
           required
         />
         <PasswordField
-          label="Confirm new password"
+          label={t.reset.confirmNewPassword}
           name="passwordConfirm"
           autoComplete="new-password"
           value={passwordConfirm}
@@ -88,7 +91,7 @@ export function ResetPasswordPage() {
         )}
 
         <button className={formStyles.submit} type="submit" disabled={submitting}>
-          {submitting ? 'Saving…' : 'Save new password'}
+          {submitting ? t.reset.submitting : t.reset.submit}
         </button>
       </form>
     </>

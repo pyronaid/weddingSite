@@ -4,6 +4,8 @@ import formStyles from '../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import type { AuthError } from '../../../services/auth';
+import { useMessages } from '../../../i18n';
+import { authMessages } from '../messages/auth';
 import { useAuth } from '../useAuth';
 import styles from './pages.module.css';
 
@@ -11,11 +13,12 @@ type Status = 'verifying' | 'success' | 'error';
 
 /** Target of the link in the confirmation e-mail: /area/verify-email?token=... */
 export function VerifyEmailPage() {
-  useDocumentTitle('Confirm e-mail');
+  const t = useMessages(authMessages);
+  useDocumentTitle(t.verify.documentTitle);
   const { auth } = useAuth();
   const token = useSearchParams()[0].get('token') ?? '';
   const [status, setStatus] = useState<Status>(token ? 'verifying' : 'error');
-  const [message, setMessage] = useState('This confirmation link is invalid.');
+  const [message, setMessage] = useState(t.verify.invalidLink);
   // StrictMode runs effects twice in development: confirm each token only once.
   const confirmedToken = useRef<string | null>(null);
 
@@ -35,8 +38,8 @@ export function VerifyEmailPage() {
   if (status === 'verifying') {
     return (
       <div className={styles.stack} role="status">
-        <CardHeader id="verify-title" eyebrow="Private area" title="Just a moment" />
-        <p className={styles.center}>Confirming your e-mail address…</p>
+        <CardHeader id="verify-title" eyebrow={t.privateArea} title={t.verify.waitTitle} />
+        <p className={styles.center}>{t.verify.confirming}</p>
       </div>
     );
   }
@@ -47,12 +50,12 @@ export function VerifyEmailPage() {
         <span className={styles.icon} aria-hidden="true">
           💌
         </span>
-        <CardHeader id="verify-title" eyebrow="All set" title="E-mail confirmed" />
+        <CardHeader id="verify-title" eyebrow={t.verify.allSet} title={t.verify.confirmedTitle} />
         <p className={styles.center} role="status">
-          Thank you! Your account is now active.
+          {t.verify.active}
         </p>
         <Link to="/area/login" className={formStyles.submit}>
-          Log in
+          {t.logIn}
         </Link>
       </div>
     );
@@ -60,13 +63,12 @@ export function VerifyEmailPage() {
 
   return (
     <div className={styles.stack}>
-      <CardHeader id="verify-title" eyebrow="Private area" title="Link not valid" />
+      <CardHeader id="verify-title" eyebrow={t.privateArea} title={t.verify.invalidTitle} />
       <p className={`${formStyles.notice} ${formStyles.noticeError}`} role="alert">
-        {message} If you already confirmed your e-mail, simply log in. Otherwise, try to log in to receive a new
-        confirmation e-mail.
+        {message} {t.verify.invalidHelp}
       </p>
       <Link to="/area/login" className={formStyles.secondary}>
-        Go to login
+        {t.goToLogin}
       </Link>
     </div>
   );

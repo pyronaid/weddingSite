@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import type { CSSProperties } from 'react';
-import type { Photo } from '../../../config/wedding';
+import type { Photo } from '../../../services/site/types';
 import styles from './FloatingPhotos.module.css';
 
 /**

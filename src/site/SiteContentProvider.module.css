@@ -1,0 +1,24 @@
+.loading {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  background: var(--pink-100);
+  color: var(--pink-400);
+  font-size: 2.5rem;
+}
+
+.loading span {
+  animation: beat 1.2s ease-in-out infinite;
+}
+
+@keyframes beat {
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading span {
+    animation: none;
+  }
+}

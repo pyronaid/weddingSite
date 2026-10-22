@@ -4,19 +4,22 @@ import formStyles from '../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { Modal } from '../../../components/Modal/Modal';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
-import { rankName, signFileUrl, type GalleryPhoto } from '../../../services/game';
+import { useMessages } from '../../../i18n';
+import { cardName, rankName, signFileUrl, type GalleryPhoto } from '../../../services/game';
 import { SUIT_META, suitPath } from '../game/suits';
 import { useFileToken } from '../game/useFileToken';
 import { useGalleryFeed } from '../game/useGalleryFeed';
+import { gameMessages } from '../messages/game';
 import styles from './GalleryPage.module.css';
 
-const cardLabel = (photo: GalleryPhoto) => `${rankName(photo.rank)} of ${SUIT_META[photo.suit].label.toLowerCase()}`;
+const cardLabel = (photo: GalleryPhoto) => cardName(photo.rank, photo.suit);
 const shortCard = (photo: GalleryPhoto) =>
   `${photo.rank === 1 ? 'A' : photo.rank > 10 ? rankName(photo.rank)[0] : photo.rank}${SUIT_META[photo.suit].symbol}`;
 
 /** Photos of every player, newest first, refreshed automatically. */
 export function GalleryPage() {
-  useDocumentTitle('Gallery');
+  const t = useMessages(gameMessages);
+  useDocumentTitle(t.gallery.documentTitle);
   const feed = useGalleryFeed();
   // Photos are protected files: every URL needs a (renewed) token.
   const { token, renew } = useFileToken();
@@ -37,16 +40,16 @@ export function GalleryPage() {
 
   return (
     <div className={styles.page} data-layout="wide">
-      <CardHeader id="gallery-title" eyebrow="Photo challenge" title="Gallery" />
-      <p className={styles.intro}>The scenes caught by everyone. New photos show up here by themselves.</p>
+      <CardHeader id="gallery-title" eyebrow={t.gallery.eyebrow} title={t.gallery.title} />
+      <p className={styles.intro}>{t.gallery.intro}</p>
 
       <p className="visually-hidden" aria-live="polite">
-        {feed.newCount > 0 && `${feed.newCount} new photo${feed.newCount === 1 ? '' : 's'}`}
+        {feed.newCount > 0 && t.gallery.newPhotos(feed.newCount)}
       </p>
 
       {feed.status === 'loading' && (
         <p className={styles.status} role="status">
-          Developing the photos…
+          {t.gallery.loading}
         </p>
       )}
 
@@ -54,24 +57,24 @@ export function GalleryPage() {
         <div role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
           {feed.error.message}{' '}
           <button type="button" className={formStyles.textButton} onClick={feed.retry}>
-            Try again
+            {t.tryAgain}
           </button>
         </div>
       )}
 
       {feed.status === 'ready' && feed.photos.length === 0 && (
-        <p className={`${formStyles.notice} ${styles.status}`}>No photos yet: be the first to catch a scene! 📷</p>
+        <p className={`${formStyles.notice} ${styles.status}`}>{t.gallery.empty}</p>
       )}
 
       {feed.photos.length > 0 && (
-        <ul className={styles.grid} aria-label="Photos">
+        <ul className={styles.grid} aria-label={t.gallery.list}>
           {feed.photos.map((photo) => (
             <li key={photo.id} className={styles.item}>
               <button
                 type="button"
                 className={styles.tile}
                 onClick={() => setSelected(photo)}
-                aria-label={`${photo.scene}, by ${photo.player} (${cardLabel(photo)})`}
+                aria-label={t.gallery.tile(photo.scene, photo.player, cardLabel(photo))}
               >
                 {token && (
                   <img
@@ -96,13 +99,13 @@ export function GalleryPage() {
       {feed.hasMore && (
         <div ref={sentinel} className={styles.more}>
           <button type="button" className={formStyles.secondary} onClick={feed.loadMore} disabled={feed.loadingMore}>
-            {feed.loadingMore ? 'Loading…' : 'Load more photos'}
+            {feed.loadingMore ? t.gallery.loadingMore : t.gallery.loadMore}
           </button>
         </div>
       )}
 
       <Link to={suitPath('hearts')} className={formStyles.secondary}>
-        ← Back to the hearts
+        {t.gallery.back}
       </Link>
 
       <Modal open={selected !== null} onClose={() => setSelected(null)} title={selected?.scene ?? ''} size="wide">
@@ -110,7 +113,7 @@ export function GalleryPage() {
           <figure className={styles.large}>
             {token && <img src={signFileUrl(selected.largeUrl, token)} alt={selected.scene} onError={renew} />}
             <figcaption>
-              Caught by <strong>{selected.player}</strong> · {cardLabel(selected)}
+              {t.gallery.caughtBy} <strong>{selected.player}</strong> · {cardLabel(selected)}
             </figcaption>
           </figure>
         )}

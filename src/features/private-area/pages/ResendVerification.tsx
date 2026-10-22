@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { useCooldown } from '../../../hooks/useCooldown';
+import { useMessages } from '../../../i18n';
+import { authMessages } from '../messages/auth';
 import { useAuth } from '../useAuth';
 
 const COOLDOWN_SECONDS = 60;
@@ -13,6 +15,7 @@ interface ResendVerificationProps {
 
 export function ResendVerification({ email, startCoolingDown = false }: ResendVerificationProps) {
   const { auth } = useAuth();
+  const t = useMessages(authMessages).resend;
   const { remaining, isCoolingDown, start } = useCooldown(COOLDOWN_SECONDS, startCoolingDown);
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
@@ -29,15 +32,15 @@ export function ResendVerification({ email, startCoolingDown = false }: ResendVe
 
   return (
     <p role="status">
-      {status === 'sent' && 'A new confirmation e-mail is on its way. '}
-      {status === 'error' && 'We could not send the e-mail, please try again later. '}
+      {status === 'sent' && t.sent}
+      {status === 'error' && t.failed}
       <button
         type="button"
         className={formStyles.textButton}
         onClick={resend}
         disabled={isCoolingDown || status === 'sending'}
       >
-        {isCoolingDown ? `Resend e-mail (${remaining}s)` : 'Resend confirmation e-mail'}
+        {isCoolingDown ? t.resendIn(remaining) : t.resend}
       </button>
     </p>
   );

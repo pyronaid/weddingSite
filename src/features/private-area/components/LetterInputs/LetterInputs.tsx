@@ -1,5 +1,7 @@
 import { useRef, type ClipboardEvent, type KeyboardEvent } from 'react';
 import { normalizeAnswer } from '../../../../services/game';
+import { useMessages } from '../../../../i18n';
+import { gameMessages } from '../../messages/game';
 import styles from './LetterInputs.module.css';
 
 interface LetterInputsProps {
@@ -23,6 +25,7 @@ interface LetterInputsProps {
  * Only letters and digits are accepted, always shown uppercase.
  */
 export function LetterInputs({ values, onChange, disabled, invalid, describedBy, label }: LetterInputsProps) {
+  const t = useMessages(gameMessages).letters;
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const count = values.length;
 
@@ -99,7 +102,7 @@ export function LetterInputs({ values, onChange, disabled, invalid, describedBy,
           enterKeyHint={index === count - 1 ? 'done' : 'next'}
           value={value}
           disabled={disabled}
-          aria-label={`${label ? `${label} letter` : 'Letter'} ${index + 1} of ${count}`}
+          aria-label={t.box(label, index + 1, count)}
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy}
           onChange={(event) => handleInput(index, event.target.value)}

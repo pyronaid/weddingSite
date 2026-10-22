@@ -1,0 +1,195 @@
+.page {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.intro {
+  margin: 0;
+  text-align: center;
+  color: var(--card-muted);
+}
+
+.form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+/* One block per topic (language, couple, date...). */
+.section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+}
+
+.section legend,
+.sectionTitle {
+  margin: 0;
+  padding: 0 0.3rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--card-accent);
+}
+
+/* Two columns on wide screens; long fields take the whole row. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 0.75rem;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+}
+
+.choice input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--card-accent);
+}
+
+/* Save stays reachable at the bottom of the screen on long forms. */
+.saveBar {
+  position: sticky;
+  bottom: 0.6rem;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+}
+
+.saveBar button {
+  flex: 1 1 220px;
+}
+
+.saved {
+  font-size: 0.9rem;
+  color: var(--success);
+}
+
+.photoGroup {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.groupTitle {
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+  font-family: var(--font-serif);
+}
+
+.photoGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+  gap: 0.7rem;
+}
+
+.heroGrid {
+  grid-template-columns: minmax(0, 360px);
+}
+
+.photoCard {
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+  padding: 0.5rem;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.photoPreview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.photoName {
+  margin: 0;
+  font-weight: 700;
+}
+
+.custom {
+  font-weight: 400;
+  color: var(--success);
+}
+
+.muted {
+  margin: 0;
+  font-weight: 400;
+  color: var(--card-muted);
+}
+
+.smallButton {
+  padding: 0.45rem 0.6rem !important;
+  font-size: 0.85rem !important;
+  cursor: pointer;
+}
+
+/* The file input is visually hidden; its label is the visible button. */
+.photoCard input[type='file']:focus-visible + label {
+  outline: 3px solid var(--pink-400);
+  outline-offset: 3px;
+}
+
+.altRow {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.altRow input {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--white-warm);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+}
+
+.altRow input:focus {
+  outline: none;
+  border-color: var(--card-accent);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.back {
+  max-width: 380px;
+  justify-self: center;
+}

@@ -2,9 +2,10 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } 
 import { Modal } from '../../../../components/Modal/Modal';
 import formStyles from '../../../../components/Form/Form.module.css';
 import { PhotoCheckError, preparePhoto } from '../../../../lib/preparePhoto';
-import { rankName, toGameError, type GuessCard, type PlayingCard } from '../../../../services/game';
+import { useMessages } from '../../../../i18n';
+import { cardName, rankName, toGameError, type GuessCard, type PlayingCard } from '../../../../services/game';
 import { useGameRepository } from '../../game/GameRepositoryContext';
-import { SUIT_META } from '../../game/suits';
+import { gameMessages } from '../../messages/game';
 import { useAuth } from '../../useAuth';
 import styles from './GuessChallenge.module.css';
 
@@ -31,8 +32,6 @@ type SendState =
 /** The last card: after it comes the final guess. */
 const KING = 13;
 
-const cardName = (rank: number) => `${rankName(rank)} of ${SUIT_META.spades.label.toLowerCase()}`;
-
 /**
  * The button under a spades card and its modal: every hint from the Ace up
  * to this card, then a selfie with a guest matching all of them, or the
@@ -50,8 +49,8 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
   // Ignores the answer of a request started before the latest open/close.
   const request = useRef(0);
 
-  const name = cardName(card.rank);
-  const previousName = card.rank > 1 ? cardName(card.rank - 1) : '';
+  const t = useMessages(gameMessages);
+  const name = cardName(card.rank, card.suit);
 
   useEffect(() => {
     if (!preview) return;
@@ -117,9 +116,7 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
 
   const confirm = () => void run('confirm', () => repository.confirmPreviousSelfie(card.id));
 
-  const label = locked
-    ? `Hint of the ${name}: locked until you collect the ${previousName}`
-    : `${card.collected ? 'Hints and selfie' : 'Hint'} of the ${name}`;
+  const label = t.guess.trigger(locked, card.collected, card.rank);
   const view = state.status === 'ready' ? state.view : null;
   const sending = send.status === 'sending';
 
@@ -137,10 +134,10 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
         <span aria-hidden="true">{locked ? '🔒' : '🔍'}</span>
       </button>
 
-      <Modal open={state.status !== 'closed'} onClose={close} title={`Guess who · ${name}`}>
+      <Modal open={state.status !== 'closed'} onClose={close} title={t.guess.title(name)}>
         {state.status === 'loading' && (
           <p className={styles.muted} role="status">
-            Reading the hints…
+            {t.guess.loading}
           </p>
         )}
 
@@ -152,7 +149,7 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
 
         {view?.locked && (
           <p role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
-            This card is still locked: send the selfie of the {previousName} first.
+            {t.guess.locked(card.rank)}
           </p>
         )}
 
@@ -160,14 +157,14 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
           <div className={styles.body}>
             <section aria-labelledby={`${inputId}-hints`}>
               <h3 id={`${inputId}-hints`} className={styles.label}>
-                {view.hints.length === 1 ? 'The hint' : `The ${view.hints.length} hints so far`}
+                {t.guess.hintsTitle(view.hints.length)}
               </h3>
               <ol className={styles.hints}>
                 {view.hints.map((hint) => (
                   <li key={hint.rank} className={hint.rank === view.rank ? styles.newHint : undefined}>
                     <span className={styles.hintRank}>{rankName(hint.rank)}</span>
                     <span className={styles.hintText}>{hint.text}</span>
-                    {hint.rank === view.rank && view.hints.length > 1 && <span className={styles.badge}>new</span>}
+                    {hint.rank === view.rank && view.hints.length > 1 && <span className={styles.badge}>{t.guess.newBadge}</span>}
                   </li>
                 ))}
               </ol>
@@ -177,34 +174,29 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
               <div className={`${styles.selfie} ${send.status === 'done' ? styles.justDone : ''}`} role="status">
                 {send.status === 'done' && (
                   <p className={styles.doneTitle}>
-                    {view.rank === KING ? 'All the spades are yours! 🎉' : 'Card collected! 🎉'}
+                    {view.rank === KING ? t.guess.allYours : t.guess.collected}
                   </p>
                 )}
                 {view.selfie.url && (
-                  <img className={styles.photo} src={view.selfie.url} alt={`Your selfie for the ${name}`} />
+                  <img className={styles.photo} src={view.selfie.url} alt={t.guess.selfieAlt(card.rank)} />
                 )}
                 <p className={styles.muted}>
-                  {view.selfie.reused
-                    ? `Same person as before: the selfie of the ${cardName(view.selfie.takenFor)}.`
-                    : 'Your selfie for this card.'}{' '}
+                  {view.selfie.reused ? t.guess.sameAsBefore(view.selfie.takenFor) : t.guess.yourSelfie}{' '}
                   {view.rank === KING
-                    ? 'Now write who you think it is, under the rules.'
+                    ? t.guess.nowGuess
                     : send.status === 'done'
-                      ? `The ${cardName(view.rank + 1)} is unlocked.`
-                      : 'A selfie cannot be changed once sent.'}
+                      ? t.guess.unlocked(view.rank + 1)
+                      : t.guess.cannotChange}
                 </p>
                 {send.status === 'done' && (
                   <button type="button" className={formStyles.submit} onClick={close}>
-                    Back to the cards
+                    {t.backToCards}
                   </button>
                 )}
               </div>
             ) : (
               <>
-                <p className={styles.muted}>
-                  Find a guest who matches {view.hints.length === 1 ? 'this hint' : 'all these hints'} and take a
-                  selfie with them.
-                </p>
+                <p className={styles.muted}>{t.guess.find(view.hints.length)}</p>
 
                 {view.previous && (
                   <div className={styles.previous}>
@@ -212,22 +204,20 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
                       <img
                         className={styles.thumb}
                         src={view.previous.url}
-                        alt={`Your selfie for the ${cardName(view.previous.takenFor)}`}
+                        alt={t.guess.selfieAlt(view.previous.takenFor)}
                       />
                     )}
                     <div className={styles.previousText}>
-                      <p className={styles.muted}>Does the person of your last selfie still match every hint?</p>
+                      <p className={styles.muted}>{t.guess.stillMatches}</p>
                       <button type="button" className={formStyles.secondary} onClick={confirm} disabled={sending}>
-                        {send.status === 'sending' && send.action === 'confirm'
-                          ? 'Confirming…'
-                          : 'Same person as before'}
+                        {send.status === 'sending' && send.action === 'confirm' ? t.guess.confirming : t.guess.samePerson}
                       </button>
                     </div>
                   </div>
                 )}
 
                 <form className={styles.form} onSubmit={upload}>
-                  {preview && <img className={styles.photo} src={preview} alt="The selfie you selected" />}
+                  {preview && <img className={styles.photo} src={preview} alt={t.guess.selectedAlt} />}
                   <input
                     id={inputId}
                     className="visually-hidden"
@@ -236,10 +226,10 @@ export function GuessChallenge({ card, locked, onCollected }: GuessChallengeProp
                     onChange={choose}
                   />
                   <label htmlFor={inputId} className={formStyles.secondary}>
-                    {file ? 'Choose another selfie' : view.previous ? 'Take a new selfie' : 'Take or choose a selfie'}
+                    {file ? t.guess.chooseAnother : view.previous ? t.guess.takeNew : t.guess.choose}
                   </label>
                   <button type="submit" className={formStyles.submit} disabled={!file || sending}>
-                    {send.status === 'sending' && send.action === 'upload' ? 'Uploading…' : 'Upload selfie'}
+                    {send.status === 'sending' && send.action === 'upload' ? t.guess.uploading : t.guess.upload}
                   </button>
                 </form>
               </>

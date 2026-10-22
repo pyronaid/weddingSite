@@ -1,6 +1,8 @@
 import { useId, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { toAdminError, type AdminQuestion } from '../../../services/admin';
+import { useMessages } from '../../../i18n';
+import { adminMessages } from '../messages/admin';
 import { useAdminRepository } from './AdminRepositoryContext';
 import styles from './admin.module.css';
 
@@ -19,6 +21,7 @@ const emptyDraft = () => ({ text: '', answers: ['', '', ''], correct: 0 });
 /** The quiz questions of a diamonds card: questions, answers and the correct one. */
 export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson = false }: QuestionsEditorProps) {
   const repository = useAdminRepository();
+  const t = useMessages(adminMessages).quiz;
   const [questions, setQuestions] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +48,12 @@ export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson
   return (
     <div className={styles.scenes}>
       <p className={styles.subTitle}>
-        Quiz questions <span className={styles.count}>({questions.length})</span>
+        {t.title} <span className={styles.count}>({questions.length})</span>
       </p>
-      {questions.length === 0 && <p className={styles.warning}>No questions yet: guests cannot play this card.</p>}
+      {questions.length === 0 && <p className={styles.warning}>{t.none}</p>}
       {inPerson && questions.length > 0 && (
         <p className={styles.hint}>
-          Asked in person: guests only see “Question n°” and the letters. Read the question and its answers in this
-          order to them.
+          {t.inPerson}
         </p>
       )}
 
@@ -59,7 +61,7 @@ export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson
         <QuestionItem
           key={question.id}
           question={question}
-          label={`question ${index + 1} of the ${cardName}`}
+          label={t.question(index + 1, cardName)}
           number={inPerson ? index + 1 : undefined}
           busy={busy}
           onSaveText={(text) => run(async () => replace(await repository.updateQuestion(question.id, text)))}
@@ -116,19 +118,21 @@ function QuestionItem({ question, label, number, busy, ...actions }: QuestionIte
   const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({});
   const [newAnswer, setNewAnswer] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const messages = useMessages(adminMessages);
+  const t = messages.quiz;
 
   const textChanged = text !== null && text.trim() !== question.text;
 
   return (
     <fieldset className={styles.question}>
       {number !== undefined ? (
-        <legend className={styles.questionNumber}>Question n° {number}</legend>
+        <legend className={styles.questionNumber}>{t.number(number)}</legend>
       ) : (
         <legend className="visually-hidden">{label}</legend>
       )}
       <div className={styles.sceneRow}>
         <textarea
-          aria-label={`Text of ${label}`}
+          aria-label={t.text(label)}
           rows={2}
           maxLength={500}
           value={text ?? question.text}
@@ -141,7 +145,7 @@ function QuestionItem({ question, label, number, busy, ...actions }: QuestionIte
             disabled={!textChanged || busy}
             onClick={async () => (await actions.onSaveText(text!.trim())) && setText(null)}
           >
-            Save question
+            {t.saveQuestion}
           </button>
           {confirming ? (
             <button
@@ -150,7 +154,7 @@ function QuestionItem({ question, label, number, busy, ...actions }: QuestionIte
               disabled={busy}
               onClick={() => void actions.onDelete()}
             >
-              Confirm delete
+              {messages.common.confirmDelete}
             </button>
           ) : (
             <button
@@ -158,9 +162,9 @@ function QuestionItem({ question, label, number, busy, ...actions }: QuestionIte
               className={formStyles.textButton}
               disabled={busy}
               onClick={() => setConfirming(true)}
-              aria-label={`Delete ${label}`}
+              aria-label={t.deleteLabel(label)}
             >
-              Delete question
+              {t.deleteQuestion}
             </button>
           )}
         </div>
@@ -182,12 +186,12 @@ function QuestionItem({ question, label, number, busy, ...actions }: QuestionIte
                 name={`${uid}-correct`}
                 checked={answer.correct}
                 disabled={busy}
-                aria-label={`Answer ${index + 1} is the correct one`}
+                aria-label={t.isCorrect(index + 1)}
                 onChange={() => void actions.onMarkCorrect(answer.id)}
               />
               <input
                 className={styles.answerText}
-                aria-label={`Answer ${index + 1} of ${label}`}
+                aria-label={t.answer(index + 1, label)}
                 maxLength={200}
                 value={draft ?? answer.text}
                 onChange={(event) => setAnswerDrafts((all) => ({ ...all, [answer.id]: event.target.value }))}
@@ -196,20 +200,20 @@ function QuestionItem({ question, label, number, busy, ...actions }: QuestionIte
                 type="button"
                 className={formStyles.textButton}
                 disabled={!changed || busy}
-                aria-label={`Save answer ${index + 1} of ${label}`}
+                aria-label={t.saveAnswer(index + 1, label)}
                 onClick={async () =>
                   (await actions.onSaveAnswer(answer.id, draft.trim())) &&
                   setAnswerDrafts(({ [answer.id]: _saved, ...rest }) => rest)
                 }
               >
-                Save
+                {messages.common.save}
               </button>
               <button
                 type="button"
                 className={formStyles.textButton}
                 disabled={busy || answer.correct || question.answers.length <= 2}
-                aria-label={`Delete answer ${index + 1} of ${label}`}
-                title={answer.correct ? 'Mark another answer as correct first' : undefined}
+                aria-label={t.deleteAnswer(index + 1, label)}
+                title={answer.correct ? t.markAnotherFirst : undefined}
                 onClick={() => void actions.onDeleteAnswer(answer.id)}
               >
                 ✕
@@ -228,14 +232,14 @@ function QuestionItem({ question, label, number, busy, ...actions }: QuestionIte
       >
         <input
           className={styles.answerText}
-          aria-label={`New answer for ${label}`}
-          placeholder="Another answer"
+          aria-label={t.newAnswer(label)}
+          placeholder={t.anotherAnswer}
           maxLength={200}
           value={newAnswer}
           onChange={(event) => setNewAnswer(event.target.value)}
         />
         <button type="submit" className={formStyles.textButton} disabled={!newAnswer.trim() || busy}>
-          Add answer
+          {t.addAnswer}
         </button>
       </form>
     </fieldset>
@@ -251,6 +255,7 @@ interface NewQuestionFormProps {
 function NewQuestionForm({ cardName, busy, onAdd }: NewQuestionFormProps) {
   const uid = useId();
   const [draft, setDraft] = useState(emptyDraft);
+  const t = useMessages(adminMessages).quiz;
 
   const filled = draft.answers.map((answer, index) => ({ text: answer.trim(), correct: index === draft.correct }));
   const answers = filled.filter((answer) => answer.text);
@@ -263,13 +268,13 @@ function NewQuestionForm({ cardName, busy, onAdd }: NewQuestionFormProps) {
   };
 
   return (
-    <form className={styles.newQuestion} onSubmit={submit} aria-label={`New question for the ${cardName}`}>
-      <p className={styles.subTitle}>New question</p>
+    <form className={styles.newQuestion} onSubmit={submit} aria-label={t.newQuestionLabel(cardName)}>
+      <p className={styles.subTitle}>{t.newQuestion}</p>
       <textarea
-        aria-label={`New question text for the ${cardName}`}
+        aria-label={t.newQuestionText(cardName)}
         rows={2}
         maxLength={500}
-        placeholder="e.g. Where did the couple meet?"
+        placeholder={t.newQuestionPlaceholder}
         value={draft.text}
         onChange={(event) => setDraft((current) => ({ ...current, text: event.target.value }))}
       />
@@ -280,14 +285,14 @@ function NewQuestionForm({ cardName, busy, onAdd }: NewQuestionFormProps) {
               type="radio"
               name={`${uid}-correct`}
               checked={draft.correct === index}
-              aria-label={`New answer ${index + 1} is the correct one`}
+              aria-label={t.newIsCorrect(index + 1)}
               onChange={() => setDraft((current) => ({ ...current, correct: index }))}
             />
             <input
               className={styles.answerText}
-              aria-label={`New answer ${index + 1} for the ${cardName}`}
+              aria-label={t.newAnswerLabel(index + 1, cardName)}
               maxLength={200}
-              placeholder={`Answer ${index + 1}`}
+              placeholder={t.answerPlaceholder(index + 1)}
               value={answer}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -306,13 +311,13 @@ function NewQuestionForm({ cardName, busy, onAdd }: NewQuestionFormProps) {
           disabled={draft.answers.length >= 6}
           onClick={() => setDraft((current) => ({ ...current, answers: [...current.answers, ''] }))}
         >
-          + Another answer
+          {t.plusAnswer}
         </button>
         <button type="submit" className={formStyles.textButton} disabled={!valid || busy}>
-          Add question
+          {t.addQuestion}
         </button>
       </div>
-      <p className={styles.hint}>Select the correct answer with the round button. At least two answers.</p>
+      <p className={styles.hint}>{t.newHint}</p>
     </form>
   );
 }

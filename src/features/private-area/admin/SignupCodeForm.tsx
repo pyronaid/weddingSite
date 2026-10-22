@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { TextField } from '../../../components/Form/TextField';
 import { toAdminError, type AdminError, type AdminRepository } from '../../../services/admin';
+import { useMessages } from '../../../i18n';
+import { adminMessages } from '../messages/admin';
 import { useAdminRepository } from './AdminRepositoryContext';
 import { useAdminQuery } from './useAdminQuery';
 import styles from './admin.module.css';
@@ -11,6 +13,8 @@ const loadSettings = (repository: AdminRepository) => repository.getSettings();
 /** The secret code guests must type to create an account. */
 export function SignupCodeForm() {
   const repository = useAdminRepository();
+  const messages = useMessages(adminMessages);
+  const t = messages.signupCode;
   const settings = useAdminQuery(loadSettings);
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -38,7 +42,7 @@ export function SignupCodeForm() {
   return (
     <section className={styles.panel} aria-labelledby="signup-code-title">
       <h3 id="signup-code-title" className={styles.panelTitle}>
-        Sign-up secret code
+        {t.title}
       </h3>
       {settings.status === 'error' ? (
         <p role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
@@ -47,7 +51,7 @@ export function SignupCodeForm() {
       ) : (
         <form className={styles.inline} onSubmit={submit} noValidate>
           <TextField
-            label="Code guests need to create an account"
+            label={t.label}
             name="signupCode"
             autoComplete="off"
             spellCheck={false}
@@ -58,13 +62,13 @@ export function SignupCodeForm() {
               setSaved(false);
             }}
             error={error ? (error.fieldErrors.signupCode ?? error.message) : undefined}
-            hint="Capital letters and spaces around it do not matter. Changing it does not affect existing accounts."
+            hint={t.hint}
           />
           <button type="submit" className={formStyles.submit} disabled={saving || value.trim() === current}>
-            {saving ? 'Saving…' : 'Save code'}
+            {saving ? messages.common.saving : t.save}
           </button>
           <p className={styles.saved} role="status">
-            {saved && 'Saved ✓'}
+            {saved && messages.common.saved}
           </p>
         </form>
       )}

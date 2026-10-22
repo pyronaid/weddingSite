@@ -2,9 +2,10 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } 
 import { Modal } from '../../../../components/Modal/Modal';
 import formStyles from '../../../../components/Form/Form.module.css';
 import { PhotoCheckError, preparePhoto } from '../../../../lib/preparePhoto';
-import { rankName, toGameError, type PhotoDraw, type PlayingCard } from '../../../../services/game';
+import { useMessages } from '../../../../i18n';
+import { cardName, toGameError, type PhotoDraw, type PlayingCard } from '../../../../services/game';
 import { useGameRepository } from '../../game/GameRepositoryContext';
-import { SUIT_META } from '../../game/suits';
+import { gameMessages } from '../../messages/game';
 import { useAuth } from '../../useAuth';
 import styles from './PhotoChallenge.module.css';
 
@@ -43,7 +44,8 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
   // Ignores the answer of a draw started before the latest open/close.
   const request = useRef(0);
 
-  const name = `${rankName(card.rank)} of ${SUIT_META[card.suit].label.toLowerCase()}`;
+  const t = useMessages(gameMessages);
+  const name = cardName(card.rank, card.suit);
 
   // Object URLs keep the image in memory: release the previous one.
   useEffect(() => {
@@ -98,7 +100,7 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
   };
 
   const replacing = card.collected || (draw.status === 'ready' && draw.draw.locked);
-  const label = `${replacing ? 'Change the photo' : 'Photo challenge'} for the ${name}`;
+  const label = t.photo.trigger(replacing, card.rank, card.suit);
 
   return (
     <>
@@ -107,10 +109,10 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
         <span aria-hidden="true">📷</span>
       </button>
 
-      <Modal open={draw.status !== 'closed'} onClose={close} title={`Photo challenge · ${name}`}>
+      <Modal open={draw.status !== 'closed'} onClose={close} title={t.photo.title(name)}>
         {draw.status === 'drawing' && (
           <p className={styles.muted} role="status">
-            Drawing your scene…
+            {t.photo.drawing}
           </p>
         )}
 
@@ -122,10 +124,10 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
 
         {draw.status === 'ready' && upload.status === 'done' && (
           <div className={styles.done} role="status">
-            <p className={styles.doneTitle}>Photo uploaded! 🎉</p>
-            <p>You collected the {name}. Everyone can now see it in the gallery.</p>
+            <p className={styles.doneTitle}>{t.photo.uploaded}</p>
+            <p>{t.photo.collected(card.rank, card.suit)}</p>
             <button type="button" className={formStyles.submit} onClick={close}>
-              Back to the cards
+              {t.backToCards}
             </button>
           </div>
         )}
@@ -133,21 +135,19 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
         {draw.status === 'ready' && upload.status !== 'done' && (
           <form className={styles.form} onSubmit={submit}>
             <figure className={styles.scene}>
-              <figcaption className={styles.sceneLabel}>Your scene</figcaption>
+              <figcaption className={styles.sceneLabel}>{t.photo.yourScene}</figcaption>
               <blockquote className={styles.sceneText}>{draw.draw.scene}</blockquote>
             </figure>
 
             <p className={styles.muted}>
-              {draw.draw.locked
-                ? 'You already uploaded a photo for this scene: the scene stays the same, you can only replace the photo.'
-                : 'Catch this scene in a photo and upload it. Closing this window draws a new scene next time!'}
+              {draw.draw.locked ? t.photo.locked : t.photo.unlocked}
             </p>
 
             {(preview ?? draw.draw.photoUrl) && (
               <img
                 className={styles.preview}
                 src={preview ?? draw.draw.photoUrl ?? undefined}
-                alt={preview ? 'The photo you selected' : 'Your current photo'}
+                alt={preview ? t.photo.selectedAlt : t.photo.currentAlt}
               />
             )}
 
@@ -159,7 +159,7 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
               onChange={choose}
             />
             <label htmlFor={inputId} className={formStyles.secondary}>
-              {file ? 'Choose another photo' : draw.draw.locked ? 'Choose a new photo' : 'Take or choose a photo'}
+              {file ? t.photo.chooseAnother : draw.draw.locked ? t.photo.chooseNew : t.photo.choose}
             </label>
 
             {upload.status === 'error' && (
@@ -169,7 +169,7 @@ export function PhotoChallenge({ card, onUploaded }: PhotoChallengeProps) {
             )}
 
             <button type="submit" className={formStyles.submit} disabled={!file || upload.status === 'uploading'}>
-              {upload.status === 'uploading' ? 'Uploading…' : 'Upload photo'}
+              {upload.status === 'uploading' ? t.photo.uploading : t.photo.upload}
             </button>
           </form>
         )}

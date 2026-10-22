@@ -1,7 +1,9 @@
 import { useId, useState, type FormEvent } from 'react';
 import formStyles from '../../../../components/Form/Form.module.css';
+import { useMessages } from '../../../../i18n';
 import { toGameError, type GuessStatus } from '../../../../services/game';
 import { useGameRepository } from '../../game/GameRepositoryContext';
+import { gameMessages } from '../../messages/game';
 import { useAuth } from '../../useAuth';
 import { LetterInputs } from '../LetterInputs/LetterInputs';
 import styles from './GuessPanel.module.css';
@@ -15,17 +17,18 @@ interface GuessPanelProps {
 
 /** "Guess who" box of the spades page: how far the player is, then the final guess. */
 export function GuessPanel({ status, onFound }: GuessPanelProps) {
+  const t = useMessages(gameMessages).guessPanel;
   if (!status) return null;
   const titleId = 'guess-title';
 
   return (
     <section className={`${styles.panel} ${status.found ? styles.found : ''}`} aria-labelledby={titleId}>
       <h3 id={titleId} className={styles.title}>
-        Guess who
+        {t.title}
       </h3>
       {status.found ? (
         <p className={styles.result} role="status">
-          🎉 You found <strong>{status.name}</strong>! The spades are complete.
+          {t.found(status.name)}
         </p>
       ) : status.complete && status.lengths ? (
         // Keyed by the lengths: a change from the organisers resets the boxes.
@@ -37,8 +40,8 @@ export function GuessPanel({ status, onFound }: GuessPanelProps) {
       ) : (
         <p className={styles.note}>
           {status.assigned
-            ? 'Collect all 13 spades, then write the name and surname of the person you think it is.'
-            : 'Open the Ace to read the first hint about the person you have to find.'}
+            ? t.collectAll
+            : t.openAce}
         </p>
       )}
     </section>
@@ -58,6 +61,8 @@ function GuessForm({
 }) {
   const repository = useGameRepository();
   const { auth } = useAuth();
+  const all = useMessages(gameMessages);
+  const t = all.guessPanel;
   const feedbackId = useId();
   const [firstName, setFirstName] = useState(() => emptyBoxes(lengths.firstName));
   const [lastName, setLastName] = useState(() => emptyBoxes(lengths.lastName));
@@ -88,33 +93,33 @@ function GuessForm({
 
   return (
     <form className={styles.form} onSubmit={submit} noValidate>
-      <p className={styles.note}>All the spades are yours: who is the person behind the hints?</p>
+      <p className={styles.note}>{t.question}</p>
       <fieldset className={styles.fieldset} disabled={submitting}>
-        <legend className={styles.legend}>Name ({lengths.firstName} letters)</legend>
+        <legend className={styles.legend}>{t.name(lengths.firstName)}</legend>
         <LetterInputs
           values={firstName}
           onChange={edit(setFirstName)}
           invalid={submission.status === 'wrong'}
           describedBy={feedbackId}
-          label="Name"
+          label={t.nameBoxes}
         />
       </fieldset>
       <fieldset className={styles.fieldset} disabled={submitting}>
-        <legend className={styles.legend}>Surname ({lengths.lastName} letters)</legend>
+        <legend className={styles.legend}>{t.surname(lengths.lastName)}</legend>
         <LetterInputs
           values={lastName}
           onChange={edit(setLastName)}
           invalid={submission.status === 'wrong'}
           describedBy={feedbackId}
-          label="Surname"
+          label={t.surnameBoxes}
         />
       </fieldset>
       <p id={feedbackId} className={styles.feedback} role="alert">
-        {submission.status === 'wrong' && 'That is not your person: read the hints again and try another name.'}
+        {submission.status === 'wrong' && t.wrong}
         {submission.status === 'error' && submission.message}
       </p>
       <button type="submit" className={formStyles.submit} disabled={!complete || submitting}>
-        {submitting ? 'Checking…' : 'Submit'}
+        {submitting ? all.checking : all.submit}
       </button>
     </form>
   );

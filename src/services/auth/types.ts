@@ -5,6 +5,8 @@ export interface AuthUser {
   verified: boolean;
   /** Organiser: sees the admin view (granted by a superuser, never self-assigned). */
   isAdmin: boolean;
+  /** Super admin: also edits the site content and language (implies isAdmin). */
+  isSuperAdmin: boolean;
 }
 
 export interface SignUpInput {

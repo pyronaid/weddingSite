@@ -1,6 +1,6 @@
 import { motion, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from 'framer-motion';
 import { useRef, type ReactNode } from 'react';
-import type { Photo, PhotoPair, SectionPhotos } from '../../config/wedding';
+import type { Photo, PhotoPair, SectionPhotos } from '../../services/site/types';
 import styles from './ScrollSection.module.css';
 
 interface ScrollSectionProps {

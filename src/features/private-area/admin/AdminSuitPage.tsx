@@ -3,44 +3,40 @@ import { Link, Navigate, useParams } from 'react-router';
 import formStyles from '../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { useMessages } from '../../../i18n';
 import type { AdminRepository } from '../../../services/admin';
 import { isSuit, type Suit } from '../../../services/game';
 import { SUIT_META } from '../game/suits';
 import { AREA_HOME } from '../guards';
+import { adminMessages } from '../messages/admin';
 import { AdminCardEditor } from './AdminCardEditor';
 import { PeopleEditor } from './PeopleEditor';
 import { useAdminQuery } from './useAdminQuery';
 import styles from './admin.module.css';
 
-const HELP: Record<Suit, string> = {
-  hearts: 'Set the secret letter of each card (Ace to 10) and the scenes guests may draw for the photo challenge.',
-  diamonds:
-    'Set the secret letter of each card (Ace to 10) and its quiz questions: the answers, and which one is correct.',
-  spades: 'Set the people to find in the “guess who” game: name, surname and one hint per card. Spades have no secret letters.',
-  clubs: 'Set the secret letter of each card (Ace to 10) and the riddle printed behind each QR code.',
-};
-
 /** Organisers' editor of one suit. */
 export function AdminSuitPage() {
   const { suit } = useParams();
-  useDocumentTitle(isSuit(suit) ? `Edit ${SUIT_META[suit].label}` : undefined);
+  const t = useMessages(adminMessages).suitPage;
+  useDocumentTitle(isSuit(suit) ? t.title(SUIT_META[suit].label) : undefined);
   if (!isSuit(suit)) return <Navigate to={AREA_HOME} replace />;
   return <AdminSuit key={suit} suit={suit} />;
 }
 
 function AdminSuit({ suit }: { suit: Suit }) {
   const { label, symbol } = SUIT_META[suit];
+  const t = useMessages(adminMessages).suitPage;
 
   return (
     <div className={styles.page} data-layout="wide">
-      <CardHeader id="admin-suit-title" eyebrow={`${symbol} Organisers`} title={label} />
-      <p className={styles.help}>{HELP[suit]} Changes are live for the guests as soon as you save.</p>
+      <CardHeader id="admin-suit-title" eyebrow={t.eyebrow(symbol)} title={label} />
+      <p className={styles.help}>{t.help[suit]} {t.live}</p>
 
       {/* Spades ("guess who") have nothing to set per card: only the people to find. */}
       {suit === 'spades' ? <PeopleEditor /> : <CardEditors suit={suit} />}
 
       <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
-        ← Back to the organisers' home
+        {t.back}
       </Link>
     </div>
   );
@@ -50,19 +46,20 @@ function AdminSuit({ suit }: { suit: Suit }) {
 function CardEditors({ suit }: { suit: Suit }) {
   const load = useCallback((repository: AdminRepository) => repository.getSuit(suit), [suit]);
   const query = useAdminQuery(load);
+  const messages = useMessages(adminMessages);
 
   return (
     <>
       {query.status === 'loading' && (
         <p className={styles.help} role="status">
-          Loading the cards…
+          {messages.suitPage.loading}
         </p>
       )}
       {query.status === 'error' && (
         <div role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
           {query.error.message}{' '}
           <button type="button" className={formStyles.textButton} onClick={query.retry}>
-            Try again
+            {messages.common.tryAgain}
           </button>
         </div>
       )}

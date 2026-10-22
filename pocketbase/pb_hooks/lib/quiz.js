@@ -3,6 +3,7 @@
 /** Helpers for pb_hooks/quiz.pb.js (loaded with require()). */
 
 const { isCollected, collect } = require(`${__hooks}/lib/collection.js`);
+const { t } = require(`${__hooks}/lib/i18n.js`);
 
 const QUIZ_SUIT = 'diamonds';
 /** Wrong answers allowed before they turn into penalties (all diamonds together). */
@@ -14,9 +15,9 @@ function findQuizCard(app, cardId) {
   try {
     card = app.findRecordById('cards', cardId || '');
   } catch {
-    throw new NotFoundError('Card not found.');
+    throw new NotFoundError(t(app, 'card_not_found'));
   }
-  if (card.getString('suit') !== QUIZ_SUIT) throw new NotFoundError('This card has no quiz.');
+  if (card.getString('suit') !== QUIZ_SUIT) throw new NotFoundError(t(app, 'no_quiz'));
   return card;
 }
 
@@ -56,7 +57,7 @@ function seenIds(attempt) {
  */
 function pickQuestion(app, cardId, seen, excludeId) {
   const all = app.findRecordsByFilter('quiz_questions', 'card = {:card}', '', 0, 0, { card: cardId });
-  if (all.length === 0) throw new NotFoundError('No questions for this card yet.');
+  if (all.length === 0) throw new NotFoundError(t(app, 'no_questions'));
   const others = all.filter((question) => question.id !== excludeId);
   const unseen = others.filter((question) => !seen.includes(question.id));
   const pool = unseen.length > 0 ? unseen : others.length > 0 ? others : all;
@@ -155,7 +156,7 @@ function answer(app, userId, card, questionId, answerId) {
       question: questionId,
     });
   } catch {
-    throw new BadRequestError('Please choose one of the answers.');
+    throw new BadRequestError(t(app, 'choose_answer'));
   }
 
   if (chosen.getBool('correct')) {

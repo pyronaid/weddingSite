@@ -5,6 +5,8 @@ import { PasswordField, TextField } from '../../../components/Form/TextField';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { PASSWORD_MIN_LENGTH, validateSignUp, type FieldErrors, type SignUpInput } from '../../../services/auth';
+import { useMessages } from '../../../i18n';
+import { authMessages } from '../messages/auth';
 import { useAuth } from '../useAuth';
 import { ResendVerification } from './ResendVerification';
 import styles from './pages.module.css';
@@ -14,7 +16,8 @@ type Field = keyof SignUpInput;
 const EMPTY: SignUpInput = { name: '', email: '', password: '', passwordConfirm: '', secretCode: '' };
 
 export function SignupPage() {
-  useDocumentTitle('Create an account');
+  const t = useMessages(authMessages);
+  useDocumentTitle(t.signup.documentTitle);
   const { auth } = useAuth();
   const [values, setValues] = useState<SignUpInput>(EMPTY);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors<Field>>({});
@@ -50,17 +53,17 @@ export function SignupPage() {
         <span className={styles.icon} aria-hidden="true">
           ✉️
         </span>
-        <CardHeader id="signup-done-title" eyebrow="Almost there" title="Check your inbox" />
+        <CardHeader id="signup-done-title" eyebrow={t.signup.almostThere} title={t.checkInbox} />
         <p className={styles.center}>
-          We sent a confirmation link to <strong>{sentTo}</strong>. Click it to activate your account, then come back to
-          log in.
+          {t.signup.sentTo} <strong>{sentTo}</strong>
+          {t.signup.sentAfter}
         </p>
         <p className={`${formStyles.notice} ${styles.center}`}>
-          Can&apos;t find it? Check the spam folder.
+          {t.signup.spam}
           <ResendVerification email={sentTo} startCoolingDown />
         </p>
         <Link to="/area/login" className={formStyles.secondary}>
-          Go to login
+          {t.goToLogin}
         </Link>
       </div>
     );
@@ -68,12 +71,12 @@ export function SignupPage() {
 
   return (
     <>
-      <CardHeader id="signup-title" eyebrow="Private area" title="Join us" />
-      <p className={styles.intro}>Create your account to access the reserved content.</p>
+      <CardHeader id="signup-title" eyebrow={t.privateArea} title={t.signup.title} />
+      <p className={styles.intro}>{t.signup.intro}</p>
 
       <form className={formStyles.form} onSubmit={handleSubmit} noValidate aria-labelledby="signup-title">
         <TextField
-          label="Full name"
+          label={t.signup.fullName}
           name="name"
           autoComplete="name"
           maxLength={100}
@@ -83,7 +86,7 @@ export function SignupPage() {
           required
         />
         <TextField
-          label="E-mail"
+          label={t.email}
           name="email"
           type="email"
           autoComplete="email"
@@ -94,17 +97,17 @@ export function SignupPage() {
           required
         />
         <PasswordField
-          label="Password"
+          label={t.password}
           name="password"
           autoComplete="new-password"
           value={values.password}
           onChange={update('password')}
           error={errorFor('password')}
-          hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
+          hint={t.passwordHint(PASSWORD_MIN_LENGTH)}
           required
         />
         <PasswordField
-          label="Confirm password"
+          label={t.signup.confirmPassword}
           name="passwordConfirm"
           autoComplete="new-password"
           value={values.passwordConfirm}
@@ -113,7 +116,7 @@ export function SignupPage() {
           required
         />
         <TextField
-          label="Secret code"
+          label={t.signup.secretCode}
           name="secretCode"
           autoComplete="off"
           autoCapitalize="none"
@@ -122,7 +125,7 @@ export function SignupPage() {
           value={values.secretCode}
           onChange={update('secretCode')}
           error={errorFor('secretCode')}
-          hint="You find it in your wedding invitation."
+          hint={t.signup.secretCodeHint}
           required
         />
 
@@ -133,13 +136,13 @@ export function SignupPage() {
         )}
 
         <button className={formStyles.submit} type="submit" disabled={submitting}>
-          {submitting ? 'Creating account…' : 'Create account'}
+          {submitting ? t.signup.submitting : t.signup.submit}
         </button>
       </form>
 
       <div className={styles.links}>
         <span>
-          Already have an account? <Link to="/area/login">Log in</Link>
+          {t.signup.haveAccount} <Link to="/area/login">{t.logIn}</Link>
         </span>
       </div>
     </>
