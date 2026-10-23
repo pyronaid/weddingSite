@@ -1,17 +1,9 @@
+import { messagesOf } from '../../i18n';
+import { cardMessages } from './messages';
 import { GameError, type GameErrorCode } from './types';
 
-const MESSAGES: Record<GameErrorCode, string> = {
-  unauthenticated: 'Your session has expired. Please log in again.',
-  not_found: 'This riddle does not exist or is not available yet.',
-  invalid_photo: 'This photo cannot be uploaded: use a JPEG, PNG or WebP image under 10 MB.',
-  rejected: 'This cannot be done right now.',
-  network: 'Unable to reach the server. Check your connection and try again.',
-  not_configured: 'The game is not available yet.',
-  unknown: 'Something went wrong. Please try again.',
-};
-
 export function gameError(code: GameErrorCode, cause?: unknown): GameError {
-  return new GameError(code, MESSAGES[code], { cause });
+  return new GameError(code, messagesOf(cardMessages).errors[code], { cause });
 }
 
 /** Maps a PocketBase SDK error (or anything else) to a GameError. */

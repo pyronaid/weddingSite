@@ -32,17 +32,18 @@ routerAdd(
 // Superusers may remove a photo from the admin UI (moderation).
 onRecordUpdateRequest((e) => {
   if (e.hasSuperuserAuth()) return e.next();
+  const { t } = require(`${__hooks}/lib/i18n.js`);
 
   // A just-uploaded file is still pending here.
   const uploaded = e.record.getUnsavedFiles('photo');
   if (!e.record.getString('photo') && uploaded.length === 0) {
-    throw new BadRequestError('Please choose a photo to upload.');
+    throw new BadRequestError(t(e.app, 'photo_missing'));
   }
   // A real photo, even shrunk to 2048 px, weighs well over 10 KB: this rejects
   // icons, 1x1 pixels and empty images.
   const MIN_BYTES = 10 * 1024;
   if (uploaded.length > 0 && uploaded[0].size < MIN_BYTES) {
-    throw new BadRequestError('This file is too small to be a photo.');
+    throw new BadRequestError(t(e.app, 'photo_too_small'));
   }
   e.next();
 }, 'photo_submissions');

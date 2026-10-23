@@ -8,6 +8,8 @@ import {
   type RsvpRepository,
   type RsvpSubmission,
 } from '../../services/rsvp';
+import { useMessages } from '../../i18n';
+import { homeMessages } from '../../pages/homeMessages';
 import formStyles from '../Form/Form.module.css';
 import styles from './RsvpForm.module.css';
 
@@ -28,6 +30,7 @@ const INITIAL_VALUES: RsvpSubmission = {
 };
 
 export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
+  const t = useMessages(homeMessages).rsvp;
   const [values, setValues] = useState<RsvpSubmission>(INITIAL_VALUES);
   const [errors, setErrors] = useState<RsvpErrors>({});
   const [status, setStatus] = useState<Status>('idle');
@@ -73,7 +76,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
     } catch (error) {
       console.error(error);
       setSubmitError(
-        error instanceof RsvpSubmissionError ? error.message : 'Something went wrong. Please try again.',
+        error instanceof RsvpSubmissionError ? error.message : t.genericError,
       );
       setStatus('error');
     }
@@ -82,11 +85,9 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
   if (status === 'success') {
     return (
       <div className={styles.success} role="status">
-        <p className={styles.successTitle}>Thank you, {values.fullName.trim().split(' ')[0]}!</p>
+        <p className={styles.successTitle}>{t.thanks(values.fullName.trim().split(' ')[0])}</p>
         <p>
-          {values.attending === 'yes'
-            ? 'We cannot wait to celebrate with you.'
-            : 'We will miss you, thank you for letting us know.'}
+          {values.attending === 'yes' ? t.comingThanks : t.notComingThanks}
         </p>
       </div>
     );
@@ -104,7 +105,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
   return (
     <form className={formStyles.form} onSubmit={handleSubmit} noValidate>
       <div className={formStyles.field}>
-        <label htmlFor={fieldId('fullName')}>Full name *</label>
+        <label htmlFor={fieldId('fullName')}>{t.fullName}</label>
         <input
           id={fieldId('fullName')}
           name="fullName"
@@ -120,7 +121,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
       </div>
 
       <div className={formStyles.field}>
-        <label htmlFor={fieldId('email')}>E-mail *</label>
+        <label htmlFor={fieldId('email')}>{t.email}</label>
         <input
           id={fieldId('email')}
           name="email"
@@ -138,11 +139,11 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
       </div>
 
       <fieldset className={formStyles.field}>
-        <legend>Will you attend? *</legend>
+        <legend>{t.attending}</legend>
         <div className={styles.choices}>
           <label className={styles.choice}>
             <input type="radio" name="attending" value="yes" checked={isAttending} onChange={handleChange} />
-            <span>Joyfully accept</span>
+            <span>{t.accept}</span>
           </label>
           <label className={styles.choice}>
             <input
@@ -152,7 +153,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
               checked={values.attending === 'no'}
               onChange={handleChange}
             />
-            <span>Regretfully decline</span>
+            <span>{t.decline}</span>
           </label>
         </div>
         {errorText('attending')}
@@ -161,7 +162,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
       {isAttending && (
         <>
           <div className={formStyles.field}>
-            <label htmlFor={fieldId('guests')}>Number of guests (you included) *</label>
+            <label htmlFor={fieldId('guests')}>{t.guests}</label>
             <select
               id={fieldId('guests')}
               name="guests"
@@ -180,7 +181,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
           </div>
 
           <div className={formStyles.field}>
-            <label htmlFor={fieldId('dietaryNotes')}>Allergies or dietary requirements</label>
+            <label htmlFor={fieldId('dietaryNotes')}>{t.dietary}</label>
             <input
               id={fieldId('dietaryNotes')}
               name="dietaryNotes"
@@ -196,7 +197,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
       )}
 
       <div className={formStyles.field}>
-        <label htmlFor={fieldId('message')}>A message for us</label>
+        <label htmlFor={fieldId('message')}>{t.message}</label>
         <textarea
           id={fieldId('message')}
           name="message"
@@ -229,7 +230,7 @@ export function RsvpForm({ repository, maxGuests }: RsvpFormProps) {
       )}
 
       <button className={formStyles.submit} type="submit" disabled={status === 'submitting'}>
-        {status === 'submitting' ? 'Sending…' : 'Send confirmation'}
+        {status === 'submitting' ? t.sending : t.send}
       </button>
     </form>
   );

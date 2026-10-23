@@ -1,4 +1,6 @@
 import type PocketBase from 'pocketbase';
+import { messagesOf } from '../../i18n';
+import { rsvpMessages } from './messages';
 import { RsvpSubmissionError, type RsvpRepository, type RsvpSubmission } from './types';
 
 const COLLECTION = 'rsvps';
@@ -26,7 +28,7 @@ export class PocketBaseRsvpRepository implements RsvpRepository {
         { fields: 'id' },
       );
     } catch (error) {
-      throw new RsvpSubmissionError('Unable to save your confirmation. Please try again later.', {
+      throw new RsvpSubmissionError(messagesOf(rsvpMessages).saveFailed, {
         cause: error,
       });
     }

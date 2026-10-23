@@ -2,6 +2,8 @@
 
 /** Helpers for pb_hooks/photos.pb.js (loaded with require()). */
 
+const { t } = require(`${__hooks}/lib/i18n.js`);
+
 const PHOTO_SUIT = 'hearts';
 const FACE_NAMES = { 11: 'Jack', 12: 'Queen', 13: 'King' };
 
@@ -11,9 +13,9 @@ function findPhotoCard(app, cardId) {
   try {
     card = app.findRecordById('cards', cardId || '');
   } catch {
-    throw new NotFoundError('Card not found.');
+    throw new NotFoundError(t(app, 'card_not_found'));
   }
-  if (card.getString('suit') !== PHOTO_SUIT) throw new NotFoundError('This card has no photo challenge.');
+  if (card.getString('suit') !== PHOTO_SUIT) throw new NotFoundError(t(app, 'no_photo_challenge'));
   return card;
 }
 
@@ -31,7 +33,7 @@ function findSubmission(app, userId, cardId) {
 /** Random scene of the card's bucket, avoiding `excludeId` when there is a choice. */
 function pickScene(app, cardId, excludeId) {
   const scenes = app.findRecordsByFilter('photo_scenes', 'card = {:card}', '', 0, 0, { card: cardId });
-  if (scenes.length === 0) throw new NotFoundError('No scenes for this card yet.');
+  if (scenes.length === 0) throw new NotFoundError(t(app, 'no_scenes'));
   const pool = scenes.length > 1 ? scenes.filter((scene) => scene.id !== excludeId) : scenes;
   return pool[Math.floor(Math.random() * pool.length)];
 }

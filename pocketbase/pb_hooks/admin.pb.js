@@ -102,8 +102,9 @@ routerAdd(
     const code = String(e.requestInfo().body.signupCode ?? '').trim();
     // Empty would let anyone sign up: require a real code.
     if (code.length < 3 || code.length > 50) {
-      throw new BadRequestError('Please check the highlighted values.', {
-        signupCode: new ValidationError('validation_length', 'The secret code must be 3 to 50 characters long.'),
+      const { t } = require(`${__hooks}/lib/i18n.js`);
+      throw new BadRequestError(t(e.app, 'check_fields'), {
+        signupCode: new ValidationError('validation_length', t(e.app, 'secret_code_length')),
       });
     }
     setSetting(e.app, 'signup_code', code);

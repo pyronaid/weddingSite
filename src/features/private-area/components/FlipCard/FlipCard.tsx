@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { cardImageUrl, hasLetters, isFaceCard, rankName, type PlayingCard } from '../../../../services/game';
-import { SUIT_META } from '../../game/suits';
+import { cardImageUrl, cardName, hasLetters, isFaceCard, type PlayingCard } from '../../../../services/game';
+import { useMessages } from '../../../../i18n';
+import { gameMessages } from '../../messages/game';
 import styles from './FlipCard.module.css';
 
 interface FlipCardProps {
@@ -16,19 +17,20 @@ interface FlipCardProps {
 export function FlipCard({ card }: FlipCardProps) {
   const [flipped, setFlipped] = useState(false);
   const face = isFaceCard(card.rank) || !hasLetters(card.suit);
-  const name = `${rankName(card.rank)} of ${SUIT_META[card.suit].label.toLowerCase()}`;
+  const t = useMessages(gameMessages).flip;
+  const name = cardName(card.rank, card.suit);
 
   let backContent: string | null = null;
-  let backDescription = 'card back';
+  let backDescription = t.back;
   if (card.collected && face) {
     backContent = '★';
-    backDescription = 'card back with a star';
+    backDescription = t.backStar;
   } else if (card.collected && card.letter) {
     backContent = card.letter;
-    backDescription = `card back with the letter ${card.letter}`;
+    backDescription = t.backLetter(card.letter);
   }
 
-  const label = `${name}${card.collected ? ', collected' : ', not collected'}${flipped ? `, showing the ${backDescription}` : ''}`;
+  const label = `${name}${card.collected ? t.collected : t.notCollected}${flipped ? t.showing(backDescription) : ''}`;
 
   return (
     <button

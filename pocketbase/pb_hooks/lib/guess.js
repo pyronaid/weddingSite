@@ -3,6 +3,7 @@
 /** Helpers for pb_hooks/guess.pb.js (loaded with require()). */
 
 const { collect } = require(`${__hooks}/lib/collection.js`);
+const { t } = require(`${__hooks}/lib/i18n.js`);
 
 const GUESS_SUIT = 'spades';
 const RANKS = 13;
@@ -26,9 +27,9 @@ function findGuessCard(app, cardId) {
   try {
     card = app.findRecordById('cards', cardId || '');
   } catch {
-    throw new NotFoundError('Card not found.');
+    throw new NotFoundError(t(app, 'card_not_found'));
   }
-  if (card.getString('suit') !== GUESS_SUIT) throw new NotFoundError('This card has no "guess who" hint.');
+  if (card.getString('suit') !== GUESS_SUIT) throw new NotFoundError(t(app, 'no_guess'));
   return card;
 }
 
@@ -59,7 +60,7 @@ function ensureAssignment(app, auth) {
   if (existing) return existing;
 
   const people = playablePeople(app);
-  if (people.length === 0) throw new NotFoundError('The game is not ready yet: there is nobody to find.');
+  if (people.length === 0) throw new NotFoundError(t(app, 'guess_nobody'));
   const self = normalizeName(auth.getString('name'));
   const others = people.filter((person) => normalizeName(fullName(person)) !== self);
   const pool = others.length > 0 ? others : people;
@@ -160,9 +161,9 @@ function requireOpenCard(app, auth, card) {
   const rank = card.getInt('rank');
   const state = selfiesByRank(app, auth.id);
   if (!isUnlocked(rank, state.byRank)) {
-    throw new BadRequestError('This card is still locked: send the selfie of the previous card first.');
+    throw new BadRequestError(t(app, 'guess_locked'));
   }
-  if (!findAssignment(app, auth.id)) throw new BadRequestError('Open the card to read its hint first.');
+  if (!findAssignment(app, auth.id)) throw new BadRequestError(t(app, 'guess_open_first'));
   return state;
 }
 
@@ -176,7 +177,7 @@ function saveSelfie(app, auth, card, fill) {
     try {
       txApp.save(selfie);
     } catch (error) {
-      throw new BadRequestError('This selfie cannot be saved: use a JPEG, PNG or WebP photo under 10 MB.', (error && error.value) || error);
+      throw new BadRequestError(t(txApp, 'selfie_invalid'), (error && error.value) || error);
     }
     collect(txApp, auth.id, card.id);
   });
@@ -186,8 +187,8 @@ function saveSelfie(app, auth, card, fill) {
 function uploadSelfie(app, auth, card, files) {
   const { byRank } = requireOpenCard(app, auth, card);
   if (byRank[card.getInt('rank')]) return cardView(app, auth, card); // double submit: already there
-  if (!files || files.length === 0) throw new BadRequestError('Please choose a selfie to upload.');
-  if (files[0].size < MIN_PHOTO_BYTES) throw new BadRequestError('This file is too small to be a photo.');
+  if (!files || files.length === 0) throw new BadRequestError(t(app, 'selfie_missing'));
+  if (files[0].size < MIN_PHOTO_BYTES) throw new BadRequestError(t(app, 'photo_too_small'));
   saveSelfie(app, auth, card, (selfie) => selfie.set('photo', files[0]));
   return cardView(app, auth, card);
 }
@@ -197,7 +198,7 @@ function confirmPrevious(app, auth, card) {
   const rank = card.getInt('rank');
   const { byRank } = requireOpenCard(app, auth, card);
   if (byRank[rank]) return cardView(app, auth, card);
-  if (rank === 1) throw new BadRequestError('The Ace needs a selfie of its own.');
+  if (rank === 1) throw new BadRequestError(t(app, 'selfie_ace'));
   const source = photoSelfie(app, byRank[rank - 1]);
   saveSelfie(app, auth, card, (selfie) => selfie.set('same_as', source.id));
   return cardView(app, auth, card);
@@ -235,7 +236,7 @@ function status(app, userId) {
 function solve(app, userId, body) {
   const current = status(app, userId);
   if (current.found) return { correct: true, name: current.name };
-  if (!current.complete) throw new BadRequestError('Collect all the spades before guessing.');
+  if (!current.complete) throw new BadRequestError(t(app, 'guess_too_early'));
 
   const assignment = findAssignment(app, userId);
   const person = app.findRecordById('guess_people', assignment.getString('person'));

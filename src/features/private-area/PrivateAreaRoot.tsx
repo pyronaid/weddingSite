@@ -1,8 +1,11 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Link, Outlet, useLocation } from 'react-router';
-import { wedding } from '../../config/wedding';
+import { useMessages } from '../../i18n';
+import { areaPhotos } from '../../services/site/slots';
+import { useSiteContent } from '../../site/SiteContentContext';
 import { AuthProvider } from './AuthProvider';
 import { FloatingPhotos } from './components/FloatingPhotos';
+import { shellMessages } from './messages/shell';
 import styles from './PrivateAreaRoot.module.css';
 
 /**
@@ -12,15 +15,17 @@ import styles from './PrivateAreaRoot.module.css';
 export function PrivateAreaRoot() {
   const { pathname } = useLocation();
   const reduceMotion = useReducedMotion();
-  const { partnerOne, partnerTwo } = wedding.couple;
+  const { content } = useSiteContent();
+  const { partnerOne, partnerTwo } = content.couple;
+  const t = useMessages(shellMessages);
 
   return (
     <AuthProvider>
       <div className={styles.page}>
-        <FloatingPhotos photos={wedding.privateAreaPhotos} />
+        <FloatingPhotos photos={areaPhotos(content.photos)} />
 
         <header className={styles.header}>
-          <Link to="/" className={styles.brand} aria-label="Back to the wedding site">
+          <Link to="/" className={styles.brand} aria-label={t.backToSite}>
             {partnerOne} <span>&amp;</span> {partnerTwo}
           </Link>
         </header>
@@ -39,7 +44,7 @@ export function PrivateAreaRoot() {
         </main>
 
         <footer className={styles.footer}>
-          <Link to="/">← Back to the wedding site</Link>
+          <Link to="/">{t.backToSiteArrow}</Link>
         </footer>
       </div>
     </AuthProvider>

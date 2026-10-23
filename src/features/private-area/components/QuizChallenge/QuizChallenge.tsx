@@ -1,16 +1,17 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { Modal } from '../../../../components/Modal/Modal';
 import formStyles from '../../../../components/Form/Form.module.css';
+import { useMessages } from '../../../../i18n';
 import {
+  cardName,
   isFaceCard,
-  rankName,
   toGameError,
   type PlayingCard,
   type QuizQuestion,
   type QuizStatus,
 } from '../../../../services/game';
 import { useGameRepository } from '../../game/GameRepositoryContext';
-import { SUIT_META } from '../../game/suits';
+import { gameMessages } from '../../messages/game';
 import { useAuth } from '../../useAuth';
 import styles from './QuizChallenge.module.css';
 
@@ -43,13 +44,14 @@ export function QuizChallenge({ card, onStatus, onCollected }: QuizChallengeProp
   const [submitting, setSubmitting] = useState(false);
   const request = useRef(0);
 
-  const name = `${rankName(card.rank)} of ${SUIT_META[card.suit].label.toLowerCase()}`;
-  const label = `${card.collected ? 'Quiz won' : 'Quiz'} for the ${name}`;
+  const t = useMessages(gameMessages);
+  const name = cardName(card.rank, card.suit);
+  const label = t.quiz.trigger(card.collected, card.rank, card.suit);
 
   const failure = (reason: unknown) => {
     const error = toGameError(reason);
     if (error.code === 'unauthenticated') auth.logout();
-    return error.code === 'not_found' ? 'There are no questions for this card yet: try again later.' : error.message;
+    return error.code === 'not_found' ? t.quiz.noQuestions : error.message;
   };
 
   const open = async () => {
@@ -85,10 +87,10 @@ export function QuizChallenge({ card, onStatus, onCollected }: QuizChallengeProp
         onCollected();
       } else {
         const feedback = result.stale
-          ? 'This question had already changed: here is your current one.'
+          ? t.quiz.stale
           : result.status.penalties > 0 && result.status.lives === 0
-            ? `Wrong answer: you got a penalty (${result.status.penalties} so far). Here is a new question.`
-            : `Wrong answer: you lost a life (${result.status.lives} left). Here is a new question.`;
+            ? t.quiz.penalty(result.status.penalties)
+            : t.quiz.lifeLost(result.status.lives);
         setState({ status: 'question', question: result.question, feedback });
       }
     } catch (reason) {
@@ -104,10 +106,10 @@ export function QuizChallenge({ card, onStatus, onCollected }: QuizChallengeProp
         <span aria-hidden="true">❓</span>
       </button>
 
-      <Modal open={state.status !== 'closed'} onClose={close} title={`Quiz · ${name}`}>
+      <Modal open={state.status !== 'closed'} onClose={close} title={t.quiz.title(name)}>
         {state.status === 'loading' && (
           <p className={styles.muted} role="status">
-            Picking your question…
+            {t.quiz.loading}
           </p>
         )}
 
@@ -119,21 +121,21 @@ export function QuizChallenge({ card, onStatus, onCollected }: QuizChallengeProp
 
         {state.status === 'won' && (
           <div className={styles.won} role="status">
-            <p className={styles.wonTitle}>Right answer! 🎉</p>
-            <p>You collected the {name}.</p>
+            <p className={styles.wonTitle}>{t.quiz.right}</p>
+            <p>{t.quiz.collected(card.rank, card.suit)}</p>
             {isFaceCard(card.rank) ? (
               <p>
-                You earned a <span className={styles.star}>★</span>
+                {t.earnedStar} <span className={styles.star}>★</span>
               </p>
             ) : (
               state.letter && (
                 <p>
-                  Your letter: <strong className={styles.letter}>{state.letter}</strong>
+                  {t.yourLetter} <strong className={styles.letter}>{state.letter}</strong>
                 </p>
               )
             )}
             <button type="button" className={formStyles.submit} onClick={close}>
-              Back to the cards
+              {t.backToCards}
             </button>
           </div>
         )}
@@ -147,14 +149,10 @@ export function QuizChallenge({ card, onStatus, onCollected }: QuizChallengeProp
             )}
             <fieldset className={styles.fieldset} disabled={submitting} aria-describedby={`${groupId}-hint`}>
               <legend className={styles.question}>
-                {state.question.inPerson ? `Question n° ${state.question.number}` : state.question.text}
+                {state.question.inPerson ? t.quiz.number(state.question.number) : state.question.text}
               </legend>
               {state.question.inPerson && (
-                <p className={styles.inPerson}>
-                  The {name} will ask you this question <strong>in person</strong> and read you the possible answers:
-                  go and find them, tell them it is question n° {state.question.number}, then pick the letter of your
-                  answer.
-                </p>
+                <p className={styles.inPerson}>{t.quiz.inPerson(card.rank, card.suit, state.question.number)}</p>
               )}
               <div className={`${styles.options} ${state.question.inPerson ? styles.letters : ''}`}>
                 {state.question.answers.map((answer) => (
@@ -172,10 +170,10 @@ export function QuizChallenge({ card, onStatus, onCollected }: QuizChallengeProp
               </div>
             </fieldset>
             <p id={`${groupId}-hint`} className={styles.muted}>
-              Not sure? Ask the other guests! A wrong answer costs a life.
+              {t.quiz.hint}
             </p>
             <button type="submit" className={formStyles.submit} disabled={!choice || submitting}>
-              {submitting ? 'Checking…' : 'Submit'}
+              {submitting ? t.checking : t.submit}
             </button>
           </form>
         )}

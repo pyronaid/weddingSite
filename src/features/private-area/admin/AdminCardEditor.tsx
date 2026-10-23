@@ -1,7 +1,9 @@
 import { useId, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { toAdminError, type AdminCard, type AdminCardChanges, type AdminError } from '../../../services/admin';
-import { cardImageUrl, hasLetters, isFaceCard, rankName } from '../../../services/game';
+import { useMessages } from '../../../i18n';
+import { cardImageUrl, cardName, hasLetters, isFaceCard } from '../../../services/game';
+import { adminMessages } from '../messages/admin';
 import { useAdminRepository } from './AdminRepositoryContext';
 import { QuestionsEditor } from './QuestionsEditor';
 import { ScenesEditor } from './ScenesEditor';
@@ -23,7 +25,9 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
   // Spades have no letters ("guess who"): nothing to set per card.
   const withLetter = !face && hasLetters(card.suit);
   const hasRiddle = card.riddle !== undefined;
-  const name = `${rankName(card.rank)} of ${card.suit}`;
+  const messages = useMessages(adminMessages);
+  const t = messages.card;
+  const name = cardName(card.rank, card.suit);
 
   // Only what changed is sent.
   const changes: AdminCardChanges = {};
@@ -65,14 +69,14 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
       <header className={styles.editorHeader}>
         <img src={cardImageUrl(card.suit, card.rank)} alt="" width={40} height={56} />
         <h3 id={`${uid}-title`}>{name}</h3>
-        {hasRiddle && !card.solution && <span className={styles.badge}>no solution yet</span>}
+        {hasRiddle && !card.solution && <span className={styles.badge}>{t.noSolution}</span>}
       </header>
 
       {editable ? (
         <form className={styles.fields} onSubmit={submit} noValidate>
           {withLetter && (
             <div className={`${formStyles.field} ${styles.letterField}`}>
-              <label htmlFor={`${uid}-letter`}>Secret letter</label>
+              <label htmlFor={`${uid}-letter`}>{t.letter}</label>
               <input
                 id={`${uid}-letter`}
                 value={letter}
@@ -89,7 +93,7 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
           {hasRiddle && (
             <>
               <div className={formStyles.field}>
-                <label htmlFor={`${uid}-riddle`}>Riddle</label>
+                <label htmlFor={`${uid}-riddle`}>{t.riddle}</label>
                 <textarea
                   id={`${uid}-riddle`}
                   rows={3}
@@ -101,7 +105,7 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
                 {fieldError('riddle') && <span className={formStyles.error}>{fieldError('riddle')}</span>}
               </div>
               <div className={formStyles.field}>
-                <label htmlFor={`${uid}-solution`}>Solution</label>
+                <label htmlFor={`${uid}-solution`}>{t.solution}</label>
                 <input
                   id={`${uid}-solution`}
                   value={solution}
@@ -114,7 +118,7 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
                   onChange={(event) => touch(setSolution)(event.target.value)}
                 />
                 <span id={`${uid}-solution-hint`} className={formStyles.hint}>
-                  Letters and digits only (spaces are removed): one box each for the guests.
+                  {t.solutionHint}
                 </span>
                 {fieldError('solution') && <span className={formStyles.error}>{fieldError('solution')}</span>}
               </div>
@@ -123,10 +127,10 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
 
           <div className={styles.saveRow}>
             <button type="submit" className={formStyles.textButton} disabled={!dirty || saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? messages.common.saving : messages.common.save}
             </button>
             <span role="status" className={styles.saved}>
-              {saved && !dirty && 'Saved ✓'}
+              {saved && !dirty && messages.common.saved}
             </span>
           </div>
           {error && Object.keys(error.fieldErrors).length === 0 && (
@@ -137,7 +141,7 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
         </form>
       ) : (
         <p className={styles.note}>
-          {card.suit === 'hearts' ? 'Its scene is told in person: nothing to set here.' : 'This card has no letter.'}
+          {card.suit === 'hearts' ? t.inPersonScene : t.noLetter}
         </p>
       )}
 

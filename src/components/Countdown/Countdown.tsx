@@ -1,4 +1,6 @@
 import { useCountdown } from '../../hooks/useCountdown';
+import { useMessages } from '../../i18n';
+import { homeMessages } from '../../pages/homeMessages';
 import styles from './Countdown.module.css';
 
 interface CountdownProps {
@@ -7,23 +9,24 @@ interface CountdownProps {
 
 export function Countdown({ targetIso }: CountdownProps) {
   const { days, hours, minutes, seconds, isOver } = useCountdown(targetIso);
+  const t = useMessages(homeMessages).countdown;
 
   if (isOver) {
-    return <p className={styles.done}>Just married! ♥</p>;
+    return <p className={styles.done}>{t.done}</p>;
   }
 
   const units = [
-    { label: 'Days', value: days },
-    { label: 'Hours', value: hours },
-    { label: 'Minutes', value: minutes },
-    { label: 'Seconds', value: seconds },
+    { label: t.days, value: days },
+    { label: t.hours, value: hours },
+    { label: t.minutes, value: minutes },
+    { label: t.seconds, value: seconds },
   ];
 
   return (
     // The visual timer updates every second; screen readers get a calmer summary.
     <div className={styles.wrapper}>
       <p className="visually-hidden">
-        {days} days, {hours} hours and {minutes} minutes to go.
+        {t.summary(days, hours, minutes)}
       </p>
       <ul className={styles.grid} aria-hidden="true">
         {units.map(({ label, value }) => (

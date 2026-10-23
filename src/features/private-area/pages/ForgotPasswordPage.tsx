@@ -6,6 +6,8 @@ import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useCooldown } from '../../../hooks/useCooldown';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { validateEmail } from '../../../services/auth';
+import { useMessages } from '../../../i18n';
+import { authMessages } from '../messages/auth';
 import { useAuth } from '../useAuth';
 import styles from './pages.module.css';
 import { useFormSubmit } from './useFormSubmit';
@@ -13,7 +15,8 @@ import { useFormSubmit } from './useFormSubmit';
 const RESEND_COOLDOWN_SECONDS = 60;
 
 export function ForgotPasswordPage() {
-  useDocumentTitle('Forgot password');
+  const t = useMessages(authMessages);
+  useDocumentTitle(t.forgot.documentTitle);
   const { auth } = useAuth();
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState<string>();
@@ -43,11 +46,11 @@ export function ForgotPasswordPage() {
         <span className={styles.icon} aria-hidden="true">
           🔑
         </span>
-        <CardHeader id="forgot-done-title" eyebrow="Password reset" title="Check your inbox" />
+        <CardHeader id="forgot-done-title" eyebrow={t.forgot.eyebrow} title={t.checkInbox} />
         {/* Same message whether or not the account exists: no account enumeration. */}
         <p className={styles.center} role="status">
-          If an account exists for <strong>{sentTo}</strong>, you will receive an e-mail with a link to choose a new
-          password.
+          {t.forgot.sentBefore} <strong>{sentTo}</strong>
+          {t.forgot.sentAfter}
         </p>
         {error && (
           <p className={`${formStyles.notice} ${formStyles.noticeError}`} role="alert">
@@ -60,10 +63,10 @@ export function ForgotPasswordPage() {
           onClick={() => void send(sentTo)}
           disabled={cooldown.isCoolingDown || submitting}
         >
-          {cooldown.isCoolingDown ? `Send again (${cooldown.remaining}s)` : 'Send again'}
+          {cooldown.isCoolingDown ? t.forgot.sendAgainIn(cooldown.remaining) : t.forgot.sendAgain}
         </button>
         <div className={styles.links}>
-          <Link to="/area/login">Back to login</Link>
+          <Link to="/area/login">{t.backToLogin}</Link>
         </div>
       </div>
     );
@@ -71,12 +74,12 @@ export function ForgotPasswordPage() {
 
   return (
     <>
-      <CardHeader id="forgot-title" eyebrow="Private area" title="Forgot password?" />
-      <p className={styles.intro}>Enter your e-mail and we will send you a link to reset it.</p>
+      <CardHeader id="forgot-title" eyebrow={t.privateArea} title={t.forgot.title} />
+      <p className={styles.intro}>{t.forgot.intro}</p>
 
       <form className={formStyles.form} onSubmit={handleSubmit} noValidate aria-labelledby="forgot-title">
         <TextField
-          label="E-mail"
+          label={t.email}
           name="email"
           type="email"
           autoComplete="email"
@@ -94,12 +97,12 @@ export function ForgotPasswordPage() {
         )}
 
         <button className={formStyles.submit} type="submit" disabled={submitting}>
-          {submitting ? 'Sending…' : 'Send reset link'}
+          {submitting ? t.forgot.submitting : t.forgot.submit}
         </button>
       </form>
 
       <div className={styles.links}>
-        <Link to="/area/login">Back to login</Link>
+        <Link to="/area/login">{t.backToLogin}</Link>
       </div>
     </>
   );

@@ -12,7 +12,9 @@ function toAuthUser(record: RecordModel | null): AuthUser | null {
     email: String(record.email ?? ''),
     name: String(record.name ?? ''),
     verified: Boolean(record.verified),
-    isAdmin: Boolean(record.is_admin),
+    // A super admin can do everything an organiser can.
+    isAdmin: Boolean(record.is_admin || record.is_superadmin),
+    isSuperAdmin: Boolean(record.is_superadmin),
   };
 }
 

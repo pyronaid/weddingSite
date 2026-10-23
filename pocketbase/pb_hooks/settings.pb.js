@@ -42,33 +42,10 @@ onBootstrap((e) => {
 
   e.app.save(settings);
 
-  // E-mail links must open the React private area, not the PocketBase admin UI.
-  const frontendUrl = env('FRONTEND_URL');
-  if (frontendUrl) {
-    const base = frontendUrl.replace(/\/+$/, '');
-    const users = e.app.findCollectionByNameOrId('users');
-
-    users.verificationTemplate.subject = 'Confirm your e-mail for {APP_NAME}';
-    users.verificationTemplate.body = [
-      '<p>Hello,</p>',
-      '<p>Thank you for signing up to the private area of {APP_NAME}.</p>',
-      '<p>Please confirm your e-mail address by clicking the button below.</p>',
-      `<p><a class="btn" href="${base}/area/verify-email?token={TOKEN}" target="_blank" rel="noopener">Confirm e-mail</a></p>`,
-      "<p><i>If you didn't sign up, you can safely ignore this e-mail.</i></p>",
-      '<p>With love,<br/>{APP_NAME}</p>',
-    ].join('\n');
-
-    users.resetPasswordTemplate.subject = 'Reset your {APP_NAME} password';
-    users.resetPasswordTemplate.body = [
-      '<p>Hello,</p>',
-      '<p>Click on the button below to choose a new password.</p>',
-      `<p><a class="btn" href="${base}/area/reset-password?token={TOKEN}" target="_blank" rel="noopener">Reset password</a></p>`,
-      "<p><i>If you didn't ask to reset your password, you can safely ignore this e-mail.</i></p>",
-      '<p>With love,<br/>{APP_NAME}</p>',
-    ].join('\n');
-
-    e.app.save(users);
-  }
+  // E-mail links must open the React private area, not the PocketBase admin
+  // UI; the texts follow the site language (see lib/emails.js).
+  const { applyEmailTemplates } = require(`${__hooks}/lib/emails.js`);
+  applyEmailTemplates(e.app);
 
   console.log('[settings] configuration synced from environment');
 });

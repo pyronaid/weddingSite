@@ -1,6 +1,8 @@
 import { useId, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
+import { useMessages } from '../../../i18n';
 import { toAdminError, type AdminScene } from '../../../services/admin';
+import { adminMessages } from '../messages/admin';
 import { useAdminRepository } from './AdminRepositoryContext';
 import styles from './admin.module.css';
 
@@ -13,6 +15,8 @@ interface ScenesEditorProps {
 /** The bucket of photo scenes of a numbered hearts card: add, edit, delete. */
 export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditorProps) {
   const repository = useAdminRepository();
+  const messages = useMessages(adminMessages);
+  const t = messages.scenes;
   const newId = useId();
   const [scenes, setScenes] = useState(initial);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -61,9 +65,9 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
   return (
     <div className={styles.scenes}>
       <p className={styles.subTitle}>
-        Scenes <span className={styles.count}>({scenes.length})</span>
+        {t.title} <span className={styles.count}>({scenes.length})</span>
       </p>
-      {scenes.length === 0 && <p className={styles.warning}>No scenes yet: guests cannot play this card.</p>}
+      {scenes.length === 0 && <p className={styles.warning}>{t.none}</p>}
       <ul className={styles.sceneList}>
         {scenes.map((scene, index) => {
           const draft = drafts[scene.id];
@@ -71,7 +75,7 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
           return (
             <li key={scene.id} className={styles.sceneRow}>
               <textarea
-                aria-label={`Scene ${index + 1} of the ${cardName}`}
+                aria-label={t.scene(index + 1, cardName)}
                 rows={2}
                 maxLength={300}
                 value={draft ?? scene.text}
@@ -83,9 +87,9 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
                   className={formStyles.textButton}
                   disabled={!changed || busy !== null}
                   onClick={() => void save(scene)}
-                  aria-label={`Save scene ${index + 1} of the ${cardName}`}
+                  aria-label={t.saveLabel(index + 1, cardName)}
                 >
-                  Save scene
+                  {t.saveScene}
                 </button>
                 {confirming === scene.id ? (
                   <button
@@ -94,7 +98,7 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
                     disabled={busy !== null}
                     onClick={() => void remove(scene)}
                   >
-                    Confirm delete
+                    {messages.common.confirmDelete}
                   </button>
                 ) : (
                   <button
@@ -102,9 +106,9 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
                     className={formStyles.textButton}
                     disabled={busy !== null}
                     onClick={() => setConfirming(scene.id)}
-                    aria-label={`Delete scene ${index + 1} of the ${cardName}`}
+                    aria-label={t.deleteLabel(index + 1, cardName)}
                   >
-                    Delete
+                    {messages.common.delete}
                   </button>
                 )}
               </div>
@@ -115,19 +119,19 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
 
       <form className={styles.sceneRow} onSubmit={add}>
         <label htmlFor={newId} className="visually-hidden">
-          New scene for the {cardName}
+          {t.newLabel(cardName)}
         </label>
         <textarea
           id={newId}
           rows={2}
           maxLength={300}
-          placeholder="New scene, e.g. “The bride's mother wearing sunglasses”"
+          placeholder={t.placeholder}
           value={newText}
           onChange={(event) => setNewText(event.target.value)}
         />
         <div className={styles.sceneActions}>
           <button type="submit" className={formStyles.textButton} disabled={!newText.trim() || busy !== null}>
-            {busy === 'new' ? 'Adding…' : 'Add scene'}
+            {busy === 'new' ? t.adding : t.add}
           </button>
         </div>
       </form>

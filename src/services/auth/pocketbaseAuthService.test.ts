@@ -27,6 +27,7 @@ describe('PocketBaseAuthService', () => {
       name: 'Anna',
       verified: true,
       isAdmin: false,
+      isSuperAdmin: false,
     });
     expect(service.getCurrentUser()).toBe(service.getCurrentUser());
   });

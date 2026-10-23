@@ -2,6 +2,8 @@
 
 /** Helpers for pb_hooks/admin.pb.js (loaded with require()). */
 
+const { t } = require(`${__hooks}/lib/i18n.js`);
+
 const SUITS = ['hearts', 'diamonds', 'spades', 'clubs'];
 const PHOTO_SUIT = 'hearts';
 const RIDDLE_SUIT = 'clubs';
@@ -10,19 +12,20 @@ const GUESS_SUIT = 'spades';
 const MIN_ANSWERS = 2;
 const isFaceCard = (rank) => rank >= 11;
 
-/** Admins are users flagged `is_admin` by a superuser. */
+/** Admins are users flagged `is_admin` (or `is_superadmin`, who can do everything) by a superuser. */
 function requireAdmin(e) {
   const auth = e.auth;
-  if (!auth || auth.collection().name !== 'users' || !auth.getBool('is_admin')) {
-    throw new ForbiddenError('Only the organisers can do this.');
+  const allowed = auth && auth.collection().name === 'users' && (auth.getBool('is_admin') || auth.getBool('is_superadmin'));
+  if (!allowed) {
+    throw new ForbiddenError(t(e.app, 'admins_only'));
   }
 }
 
-function findRecord(app, collection, id, label) {
+function findRecord(app, collection, id) {
   try {
     return app.findRecordById(collection, id || '');
   } catch {
-    throw new NotFoundError(`${label} not found.`);
+    throw new NotFoundError(t(app, 'not_found'));
   }
 }
 
@@ -32,7 +35,7 @@ function saveOrBadRequest(app, record) {
     app.save(record);
   } catch (error) {
     // The JS wrapper of a Go validation error keeps the per-field map in `value`.
-    throw new BadRequestError('Please check the highlighted values.', (error && error.value) || error);
+    throw new BadRequestError(t(app, 'check_fields'), (error && error.value) || error);
   }
 }
 
@@ -76,7 +79,7 @@ function cardView(app, card) {
 }
 
 function listSuit(app, suit) {
-  if (!SUITS.includes(suit)) throw new NotFoundError('Unknown suit.');
+  if (!SUITS.includes(suit)) throw new NotFoundError(t(app, 'unknown_suit'));
   return app.findRecordsByFilter('cards', 'suit = {:suit}', 'rank', 0, 0, { suit }).map((card) => cardView(app, card));
 }
 
@@ -85,17 +88,17 @@ function listSuit(app, suit) {
  * the card are accepted: the letter (Ace..10, not spades), riddle and solution (clubs).
  */
 function updateCard(app, cardId, body) {
-  const card = findRecord(app, 'cards', cardId, 'Card');
+  const card = findRecord(app, 'cards', cardId);
   const suit = card.getString('suit');
   const rank = card.getInt('rank');
 
   if (body.letter !== undefined) {
-    if (isFaceCard(rank)) throw new BadRequestError('Jack, Queen and King have no letter.');
-    if (suit === GUESS_SUIT) throw new BadRequestError('Spades have no letters: they are a "guess who" game.');
+    if (isFaceCard(rank)) throw new BadRequestError(t(app, 'face_no_letter'));
+    if (suit === GUESS_SUIT) throw new BadRequestError(t(app, 'spades_no_letter'));
     card.set('letter', String(body.letter).trim().toUpperCase());
   }
   if (body.riddle !== undefined || body.solution !== undefined) {
-    if (suit !== RIDDLE_SUIT) throw new BadRequestError('Only clubs have riddles.');
+    if (suit !== RIDDLE_SUIT) throw new BadRequestError(t(app, 'clubs_only'));
     if (body.riddle !== undefined) card.set('riddle', String(body.riddle).trim());
     // Stored uppercase without spaces: the same form guests' answers are compared in.
     if (body.solution !== undefined) card.set('solution', String(body.solution).replace(/\s+/g, '').toUpperCase());
@@ -105,9 +108,9 @@ function updateCard(app, cardId, body) {
 }
 
 function photoCard(app, cardId) {
-  const card = findRecord(app, 'cards', cardId, 'Card');
+  const card = findRecord(app, 'cards', cardId);
   if (card.getString('suit') !== PHOTO_SUIT || isFaceCard(card.getInt('rank'))) {
-    throw new BadRequestError('Only the numbered hearts have scenes.');
+    throw new BadRequestError(t(app, 'hearts_only'));
   }
   return card;
 }
@@ -122,7 +125,7 @@ function addScene(app, cardId, text) {
 }
 
 function updateScene(app, sceneId, text) {
-  const scene = findRecord(app, 'photo_scenes', sceneId, 'Scene');
+  const scene = findRecord(app, 'photo_scenes', sceneId);
   scene.set('text', String(text || '').trim());
   saveOrBadRequest(app, scene);
   return sceneView(scene);
@@ -133,7 +136,7 @@ function updateScene(app, sceneId, text) {
  * (scene_text), so uploaded photos are not affected.
  */
 function deleteScene(app, sceneId) {
-  app.delete(findRecord(app, 'photo_scenes', sceneId, 'Scene'));
+  app.delete(findRecord(app, 'photo_scenes', sceneId));
 }
 
 // ---- Quiz (diamonds) ----
@@ -141,8 +144,8 @@ function deleteScene(app, sceneId) {
 const cleanText = (value) => String(value ?? '').trim();
 
 function quizCard(app, cardId) {
-  const card = findRecord(app, 'cards', cardId, 'Card');
-  if (card.getString('suit') !== QUIZ_SUIT) throw new BadRequestError('Only diamonds have quiz questions.');
+  const card = findRecord(app, 'cards', cardId);
+  if (card.getString('suit') !== QUIZ_SUIT) throw new BadRequestError(t(app, 'diamonds_only'));
   return card;
 }
 
@@ -156,10 +159,10 @@ function addQuestion(app, cardId, body) {
   const options = Array.isArray(body.answers) ? body.answers : [];
   const answers = options.map((option) => ({ text: cleanText(option && option.text), correct: Boolean(option && option.correct) }));
   if (answers.length < MIN_ANSWERS || answers.some((answer) => !answer.text)) {
-    throw new BadRequestError(`A question needs at least ${MIN_ANSWERS} answers, none of them empty.`);
+    throw new BadRequestError(t(app, 'question_answers', { min: MIN_ANSWERS }));
   }
   if (answers.filter((answer) => answer.correct).length !== 1) {
-    throw new BadRequestError('Mark exactly one answer as the correct one.');
+    throw new BadRequestError(t(app, 'one_correct'));
   }
 
   let created;
@@ -181,7 +184,7 @@ function addQuestion(app, cardId, body) {
 }
 
 function updateQuestion(app, questionId, text) {
-  const question = findRecord(app, 'quiz_questions', questionId, 'Question');
+  const question = findRecord(app, 'quiz_questions', questionId);
   question.set('text', cleanText(text));
   saveOrBadRequest(app, question);
   return questionView(app, question);
@@ -189,11 +192,11 @@ function updateQuestion(app, questionId, text) {
 
 /** Deletes a question and its answers; players currently facing it get a new one. */
 function deleteQuestion(app, questionId) {
-  app.delete(findRecord(app, 'quiz_questions', questionId, 'Question'));
+  app.delete(findRecord(app, 'quiz_questions', questionId));
 }
 
 function addAnswer(app, questionId, body) {
-  const question = findRecord(app, 'quiz_questions', questionId, 'Question');
+  const question = findRecord(app, 'quiz_questions', questionId);
   const answer = new Record(app.findCollectionByNameOrId('quiz_answers'));
   answer.set('question', question.id);
   answer.set('text', cleanText(body.text));
@@ -209,10 +212,10 @@ function addAnswer(app, questionId, body) {
  * new correct answer instead.
  */
 function updateAnswer(app, answerId, body) {
-  const answer = findRecord(app, 'quiz_answers', answerId, 'Answer');
+  const answer = findRecord(app, 'quiz_answers', answerId);
   const questionId = answer.getString('question');
   if (body.correct === false && answer.getBool('correct')) {
-    throw new BadRequestError('Choose the new correct answer instead: a question always has one.');
+    throw new BadRequestError(t(app, 'keep_correct'));
   }
   app.runInTransaction((txApp) => {
     const target = txApp.findRecordById('quiz_answers', answerId);
@@ -232,11 +235,11 @@ function updateAnswer(app, answerId, body) {
 }
 
 function deleteAnswer(app, answerId) {
-  const answer = findRecord(app, 'quiz_answers', answerId, 'Answer');
+  const answer = findRecord(app, 'quiz_answers', answerId);
   const questionId = answer.getString('question');
-  if (answer.getBool('correct')) throw new BadRequestError('Choose another correct answer before deleting this one.');
+  if (answer.getBool('correct')) throw new BadRequestError(t(app, 'delete_correct'));
   if (siblings(app, questionId).length <= MIN_ANSWERS) {
-    throw new BadRequestError(`A question needs at least ${MIN_ANSWERS} answers.`);
+    throw new BadRequestError(t(app, 'min_answers', { min: MIN_ANSWERS }));
   }
   app.delete(answer);
   return questionView(app, app.findRecordById('quiz_questions', questionId));
@@ -268,12 +271,12 @@ function listPeople(app) {
 }
 
 /** Name, surname and all 13 hints are required: a player may be given anyone. */
-function personFields(body) {
+function personFields(app, body) {
   const hints = Array.isArray(body.hints) ? body.hints.map(cleanText) : [];
   const fields = { firstName: cleanText(body.firstName), lastName: cleanText(body.lastName), hints };
-  if (!fields.firstName || !fields.lastName) throw new BadRequestError('Please write the name and the surname.');
+  if (!fields.firstName || !fields.lastName) throw new BadRequestError(t(app, 'person_name'));
   if (hints.length !== GUESS_RANKS || hints.some((hint) => !hint)) {
-    throw new BadRequestError(`Please write all the ${GUESS_RANKS} hints, one per card.`);
+    throw new BadRequestError(t(app, 'person_hints', { count: GUESS_RANKS }));
   }
   return fields;
 }
@@ -304,19 +307,19 @@ function savePerson(app, person, fields) {
 }
 
 function addPerson(app, body) {
-  return savePerson(app, null, personFields(body));
+  return savePerson(app, null, personFields(app, body));
 }
 
 /** Edits apply at once, also for the players already looking for this person. */
 function updatePerson(app, personId, body) {
-  return savePerson(app, findRecord(app, 'guess_people', personId, 'Person'), personFields(body));
+  return savePerson(app, findRecord(app, 'guess_people', personId), personFields(app, body));
 }
 
 /** A person already given to a player cannot be deleted: their game depends on it. */
 function deletePerson(app, personId) {
-  const person = findRecord(app, 'guess_people', personId, 'Person');
+  const person = findRecord(app, 'guess_people', personId);
   const assigned = app.findRecordsByFilter('guess_assignments', 'person = {:person}', '', 1, 0, { person: person.id });
-  if (assigned.length > 0) throw new BadRequestError('This person is already being looked for by some guests: edit it instead.');
+  if (assigned.length > 0) throw new BadRequestError(t(app, 'person_in_use'));
   app.delete(person);
 }
 

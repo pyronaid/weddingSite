@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
+import { messagesOf } from '../../../i18n';
 import { AuthError } from '../../../services/auth';
+import { authServiceMessages } from '../../../services/auth/messages';
 
 /**
  * Small state machine shared by the auth forms:
@@ -19,7 +21,7 @@ export function useFormSubmit() {
       await action();
       return true;
     } catch (err) {
-      setError(err instanceof AuthError ? err : new AuthError('unknown', 'Something went wrong. Please try again.'));
+      setError(err instanceof AuthError ? err : new AuthError('unknown', messagesOf(authServiceMessages).errors.unknown));
       return false;
     } finally {
       inFlight.current = false;

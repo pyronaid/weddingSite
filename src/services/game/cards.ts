@@ -1,6 +1,6 @@
+import { messagesOf } from '../../i18n';
+import { cardMessages } from './messages';
 import type { PlayingCard, Rank, Suit } from './types';
-
-const RANK_NAMES: Record<number, string> = { 1: 'Ace', 11: 'Jack', 12: 'Queen', 13: 'King' };
 
 /** Jack, Queen and King: they show a star instead of a letter. */
 export const isFaceCard = (rank: Rank) => rank >= 11;
@@ -12,7 +12,14 @@ export const isFaceCard = (rank: Rank) => rank >= 11;
  */
 export const hasLetters = (suit: Suit) => suit !== 'spades';
 
-export const rankName = (rank: Rank) => RANK_NAMES[rank] ?? String(rank);
+/** "Ace", "6", "King" (in the site language). */
+export const rankName = (rank: Rank) => messagesOf(cardMessages).ranks[rank] ?? String(rank);
+
+/** "Hearts" (in the site language). */
+export const suitName = (suit: Suit) => messagesOf(cardMessages).suits[suit];
+
+/** "6 of spades" / "6 di picche". */
+export const cardName = (rank: Rank, suit: Suit) => messagesOf(cardMessages).card(rankName(rank), suitName(suit));
 
 /** Path of the front image in /public/cards. */
 export const cardImageUrl = (suit: Suit, rank: Rank) => `/cards/${suit}/${rank}.svg`;

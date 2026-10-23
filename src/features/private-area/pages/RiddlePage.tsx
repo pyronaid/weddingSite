@@ -3,8 +3,10 @@ import { Link, useParams } from 'react-router';
 import formStyles from '../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { useMessages } from '../../../i18n';
 import {
   cardImageUrl,
+  cardName,
   isFaceCard,
   rankName,
   toGameError,
@@ -13,6 +15,7 @@ import {
 } from '../../../services/game';
 import { LetterInputs } from '../components/LetterInputs/LetterInputs';
 import { useGameRepository } from '../game/GameRepositoryContext';
+import { gameMessages } from '../messages/game';
 import { SUIT_META, suitPath } from '../game/suits';
 import { useGameQuery } from '../game/useGameQuery';
 import { AREA_HOME } from '../guards';
@@ -24,12 +27,13 @@ export function RiddlePage() {
   const { code = '' } = useParams();
   const load = useCallback((repository: GameRepository) => repository.getRiddle(code), [code]);
   const query = useGameQuery(load);
-  useDocumentTitle('Riddle');
+  const t = useMessages(gameMessages);
+  useDocumentTitle(t.riddle.documentTitle);
 
   if (query.status === 'loading') {
     return (
       <p className={styles.status} role="status">
-        Unfolding the riddle…
+        {t.riddle.loading}
       </p>
     );
   }
@@ -38,17 +42,17 @@ export function RiddlePage() {
     const notFound = query.error.code === 'not_found';
     return (
       <div className={styles.page}>
-        <CardHeader id="riddle-title" eyebrow="Riddle" title={notFound ? 'Oops!' : 'Riddle'} />
+        <CardHeader id="riddle-title" eyebrow={t.riddle.eyebrow} title={notFound ? t.riddle.oops : t.riddle.eyebrow} />
         <div role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
           {query.error.message}{' '}
           {!notFound && query.error.code !== 'not_configured' && (
             <button type="button" className={formStyles.textButton} onClick={query.retry}>
-              Try again
+              {t.tryAgain}
             </button>
           )}
         </div>
         <Link to={AREA_HOME} className={formStyles.secondary}>
-          Go to your collection
+          {t.riddle.toCollection}
         </Link>
       </div>
     );
@@ -69,13 +73,14 @@ function RiddleContent({ code, riddle }: { code: string; riddle: Riddle }) {
   const repository = useGameRepository();
   const { auth } = useAuth();
   const feedbackId = useId();
+  const t = useMessages(gameMessages);
   const [letters, setLetters] = useState<string[]>(() => Array.from({ length: riddle.length }, () => ''));
   const [submission, setSubmission] = useState<Submission>(
     riddle.collected ? { status: 'solved', letter: riddle.letter } : { status: 'idle' },
   );
 
   const { label } = SUIT_META[riddle.suit];
-  const cardName = `${rankName(riddle.rank)} of ${label.toLowerCase()}`;
+  const name = cardName(riddle.rank, riddle.suit);
   const complete = letters.every(Boolean);
   const submitting = submission.status === 'submitting';
 
@@ -101,32 +106,32 @@ function RiddleContent({ code, riddle }: { code: string; riddle: Riddle }) {
 
   return (
     <div className={styles.page}>
-      <img className={styles.card} src={cardImageUrl(riddle.suit, riddle.rank)} alt={cardName} />
-      <CardHeader id="riddle-title" eyebrow="Riddle" title={`${rankName(riddle.rank)} of ${label}`} />
+      <img className={styles.card} src={cardImageUrl(riddle.suit, riddle.rank)} alt={name} />
+      <CardHeader id="riddle-title" eyebrow={t.riddle.eyebrow} title={t.riddle.heading(rankName(riddle.rank), label)} />
       <blockquote className={styles.riddle}>{riddle.text}</blockquote>
 
       {submission.status === 'solved' ? (
         <div className={styles.solved} role="status">
-          <p className={styles.solvedTitle}>You collected the {cardName}! 🎉</p>
+          <p className={styles.solvedTitle}>{t.riddle.solved(riddle.rank, riddle.suit)}</p>
           {isFaceCard(riddle.rank) ? (
             <p>
-              You earned a <span className={styles.star}>★</span>
+              {t.earnedStar} <span className={styles.star}>★</span>
             </p>
           ) : (
             submission.letter && (
               <p>
-                Your letter: <strong className={styles.letter}>{submission.letter}</strong>
+                {t.yourLetter} <strong className={styles.letter}>{submission.letter}</strong>
               </p>
             )
           )}
           <Link to={suitPath(riddle.suit)} className={formStyles.submit}>
-            See your {label.toLowerCase()}
+            {t.riddle.seeSuit(label)}
           </Link>
         </div>
       ) : (
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
           <fieldset className={styles.fieldset} disabled={submitting}>
-            <legend className={styles.legend}>Your answer ({riddle.length} letters)</legend>
+            <legend className={styles.legend}>{t.riddle.answer(riddle.length)}</legend>
             <LetterInputs
               values={letters}
               onChange={handleChange}
@@ -135,17 +140,17 @@ function RiddleContent({ code, riddle }: { code: string; riddle: Riddle }) {
             />
           </fieldset>
           <p id={feedbackId} className={styles.feedback} role="alert">
-            {submission.status === 'wrong' && 'Not quite! Read the riddle again and try another answer.'}
+            {submission.status === 'wrong' && t.riddle.wrong}
             {submission.status === 'error' && submission.message}
           </p>
           <button type="submit" className={formStyles.submit} disabled={!complete || submitting}>
-            {submitting ? 'Checking…' : 'Submit'}
+            {submitting ? t.checking : t.submit}
           </button>
         </form>
       )}
 
       <div className={styles.links}>
-        <Link to={AREA_HOME}>Back to your collection</Link>
+        <Link to={AREA_HOME}>{t.backToCollection}</Link>
       </div>
     </div>
   );

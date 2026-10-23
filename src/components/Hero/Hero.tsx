@@ -1,6 +1,8 @@
 import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import { useRef } from 'react';
-import type { Photo } from '../../config/wedding';
+import { useMessages } from '../../i18n';
+import { homeMessages } from '../../pages/homeMessages';
+import type { Photo } from '../../services/site/types';
 import styles from './Hero.module.css';
 
 interface HeroProps {
@@ -14,6 +16,7 @@ interface HeroProps {
 export function Hero({ photo, partnerOne, partnerTwo, tagline, dateLabel }: HeroProps) {
   const ref = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
+  const t = useMessages(homeMessages);
 
   // 0 when the hero top touches the viewport top, 1 when its bottom leaves it.
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
@@ -40,14 +43,14 @@ export function Hero({ photo, partnerOne, partnerTwo, tagline, dateLabel }: Hero
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.2, ease: 'easeOut' }}
       >
-        <p className={styles.tagline}>{tagline}</p>
+        {tagline && <p className={styles.tagline}>{tagline}</p>}
         <h1 className={styles.names}>
           {partnerOne} <span className={styles.amp}>&amp;</span> {partnerTwo}
         </h1>
         <p className={styles.date}>{dateLabel}</p>
       </motion.div>
 
-      <a href="#date" className={styles.scrollCue} aria-label="Scroll to the wedding details">
+      <a href="#date" className={styles.scrollCue} aria-label={t.scrollCue}>
         <span />
       </a>
     </header>

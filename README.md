@@ -5,6 +5,8 @@ A wedding website with two parts:
 - **Public page:** a single page with scroll animations. It covers the **date (with a live countdown)**, **location**, the **RSVP form** and the **IBAN for gifts**.
 - **Private area** (`/area`): login, sign-up with **e-mail confirmation**, and **forgot / reset password**. The forms sit on a centered card surrounded by floating photos. After login, a placeholder page is shown.
 
+The **super admin** (the bride and groom) edits the site's content, photos and **language (English or Italian)** from the site itself.
+
 It is built with **React + TypeScript + Vite** and uses **[PocketBase](https://pocketbase.io)** (Go + SQLite in a single binary) as the Backend-as-a-Service.
 
 ---
@@ -45,7 +47,9 @@ It is built with **React + TypeScript + Vite** and uses **[PocketBase](https://p
 .
 ├── public/images/                 # ← your photos
 ├── src/
-│   ├── config/wedding.ts          # ← ALL the wedding content lives here
+│   ├── config/wedding.ts          # default content (until the super admin's is loaded)
+│   ├── i18n/                      # languages: current language, typed dictionaries
+│   ├── site/                      # site content provider (PocketBase + browser cache)
 │   ├── config/runtimeConfig.ts    # env / runtime configuration loader
 │   ├── router.tsx                 # routes: "/" and "/area/*"
 │   ├── pages/HomePage.tsx         # the public single page
@@ -54,6 +58,7 @@ It is built with **React + TypeScript + Vite** and uses **[PocketBase](https://p
 │   ├── features/private-area/     # private area: layout, guards, auth context, pages
 │   ├── services/
 │   │   ├── auth/                  # AuthService interface + PocketBase implementation
+│   │   ├── site/                  # SiteRepository: content and photos of the public site
 │   │   └── rsvp/                  # RsvpRepository interface + PocketBase implementation
 │   ├── lib/pocketbase.ts          # shared PocketBase client
 │   └── styles/global.css          # design tokens + gradient background
@@ -69,10 +74,10 @@ It is built with **React + TypeScript + Vite** and uses **[PocketBase](https://p
 
 ## Customising the content
 
-1. **Text & data**: edit [`src/config/wedding.ts`](src/config/wedding.ts). It holds the names, date, venues, RSVP deadline, IBAN, the photos of each section, and the photos floating in the private area. No component needs to change.
-   - Write the `date` in ISO-8601 **with the UTC offset** (e.g. `2027-06-19T16:00:00+02:00`).
-2. **Photos**: put them in `public/images/` (`.jpg`/`.webp`, about 1200 px on the long side) and update the paths. The SVG files shipped in the repo are placeholders.
-3. **Colours & fonts**: change the CSS variables at the top of [`src/styles/global.css`](src/styles/global.css).
+1. **Content, language and photos: from the site.** A **super admin** opens *Site settings* from the private area (see [Super admin](#super-admin-site-settings)). Changes are live for everybody, no release needed.
+2. **Defaults:** [`src/config/wedding.ts`](src/config/wedding.ts) holds the content shown until the real one is loaded the first time, when no backend is configured, or if PocketBase cannot be reached. The default pictures are in `public/images/` (the SVG files are placeholders).
+3. **Texts of the site** (labels, buttons, rules…) are in typed dictionaries, English and Italian, next to the code that uses them (see [Languages](#languages)).
+4. **Colours & fonts**: change the CSS variables at the top of [`src/styles/global.css`](src/styles/global.css).
 
 ## Quick start: full stack with Docker
 
@@ -134,6 +139,7 @@ npm run dev                  # http://localhost:5173
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
 | `/area` (organisers)         | Organisers' home: the four suits to edit + the sign-up secret code | admins only     |
 | `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes | admins only     |
+| `/area/site`                 | Site settings: language, names, date, places, gift, photos | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -259,6 +265,31 @@ An organiser's `/area` shows their own home instead of the game:
 
 Changes are live for the guests as soon as they are saved. Everything goes through `pb_hooks/admin.pb.js` (`/api/admin/*`): every request checks `is_admin` and each endpoint writes only the fields it is meant to, so guests still never see letters, riddles or solutions they have not earned.
 
+### Super admin (site settings)
+
+Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) → `users` → open the user → tick `is_superadmin` → Save, then log out and in again. Like `is_admin`, users can never set it themselves. A super admin is also an organiser, and their home shows a **Site settings** link (`/area/site`):
+
+- **Language** of the whole site: English or Italian. Every guest sees the public page, the private area, the game, the organisers' screens, the server's messages and the confirmation/reset e-mails in it.
+- **The couple:** the two first names, the line above them ("We are getting married") and the hashtag.
+- **Date:** the wedding date and time, picked as the wall-clock time **in the wedding's time zone** (e.g. `Europe/Rome`). It is stored with the right UTC offset (summer or winter time), so the countdown is right for every guest, and the date is shown in that time zone wherever the guest is. The RSVP deadline.
+- **Ceremony** and optional **reception:** name, address, time, and an optional search text for the map (the address otherwise).
+- **Gift:** message, account holder, **IBAN** (checked with its checksum, in the browser and on the server, and stored without spaces), BIC, bank, payment reason. Optional details are hidden when empty.
+- **Photos:** every photo of the site: the big one at the top, the four around each section and the eight floating in the private area. Each can be replaced (shrunk, with EXIF/GPS data removed, before the upload), described for screen readers, or put back to the default picture.
+
+How it is stored and loaded:
+
+- `site_content` holds **one** record; `site_photos` one record per replaced photo (a slot without one shows the default). Anyone can read them (they are the public page); only super admins can write them (collection rules), and `pb_hooks/site.pb.js` validates every save.
+- The site loads the content once ([`SiteContentProvider`](src/site/SiteContentProvider.tsx)) and **caches it in the browser**: returning visitors see the page at once while it refreshes in the background. First-time visitors see a short loading screen (never the default names); after 6 s without an answer, or if PocketBase cannot be reached, the defaults are shown.
+
+### Languages
+
+- The super admin picks **one language for everybody** (no switcher for guests). It is stored in `site_content.language`.
+- **Texts** live in small typed dictionaries next to the code that uses them (`src/pages/homeMessages.ts`, `src/features/private-area/messages/*.ts`, `src/services/*/messages.ts`…). Each one is written as `const en = {...}` plus an `it` object of the same type: a missing key, or a text with different parameters, is a **compile error**. Components read them with `useMessages(dictionary)`; services (error messages) with `messagesOf(dictionary)`.
+- **Dates** are formatted for the language (`en-GB`, `it-IT`); card names follow it too ("6 of spades", "6 di picche").
+- Changing the language **re-renders the whole app at once** (`LanguageBoundary`) and updates `<html lang>`.
+- **Server messages** (`pb_hooks/lib/i18n.js`) and the **e-mails** (`pb_hooks/lib/emails.js`, re-applied when the content is saved) follow the same setting. PocketBase's own generic field messages (e.g. "Cannot be blank") stay in English.
+- **Adding a language:** add it to `LANGUAGES` in `src/i18n/language.ts` and to `LOCALES`; TypeScript then lists every dictionary missing it. Add it to the `language` select of `site_content` (a new migration), to `pb_hooks/lib/i18n.js` and to `pb_hooks/lib/emails.js`.
+
 ## PocketBase backend
 
 Everything the backend needs is in code, so a fresh instance is ready on first start:
@@ -268,7 +299,8 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `users` hardening: only verified users can log in, minimum password length 8, users cannot delete their own account through the API.
   - `cards`: the 52-card deck (`suit` + `rank` 1–13, unique together), seeded by the migration. Logged-in users can read it, only superusers can change it.
     It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
-  - `users.is_admin`: organisers (set by a superuser only).
+  - `users.is_admin`: organisers (set by a superuser only). `users.is_superadmin`: super admins (set by a superuser only).
+  - `site_content` (one record) and `site_photos`: the content of the public site, edited by the super admins (see above).
   - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
   - `quiz_questions`, `quiz_answers`: the diamonds quiz (organisers only; seeded with two example questions per card). `quiz_attempts`: per user and card, the current question, the questions already faced and the wrong answers (server only).
   - `guess_people`, `guess_hints`: the people of the spades "guess who" and their 13 hints (organisers only; seeded with two example people). `guess_assignments`: the person drawn for each user, its attempts and `found` (server only). `guess_selfies`: one per (user, card), a protected photo or `same_as` the earlier selfie confirmed; created only by the hook, visible to the owner and the organisers.
@@ -284,9 +316,11 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `guess.pb.js` serves the spades "guess who": the hints of a card (`POST /api/game/guess/{cardId}`), the selfie upload and the "same person as before" confirmation, the status and the final guess.
   - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code), admins only.
   - `signup.pb.js` checks the sign-up secret code.
+  - `site.pb.js` validates the site content (IBAN checksum, BIC, date with its offset, time zone, a reception with its address and time) and the photo slots, and re-applies the e-mails in the chosen language.
+  - `lib/i18n.js` holds the messages the hooks send to the guests, in English and Italian.
   - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
 
-> Because the hook rewrites the e-mail templates on every start, **edit them in `settings.pb.js`**, not in the admin UI.
+> Because the hooks rewrite the e-mail templates on every start and when the site content is saved, **edit them in `pb_hooks/lib/emails.js`**, not in the admin UI.
 
 The **image** ([`pocketbase/Dockerfile`](pocketbase/Dockerfile)):
 

@@ -5,6 +5,8 @@ import { PasswordField, TextField } from '../../../components/Form/TextField';
 import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { validateLogin, type FieldErrors } from '../../../services/auth';
+import { useMessages } from '../../../i18n';
+import { authMessages } from '../messages/auth';
 import { useAuth } from '../useAuth';
 import type { RedirectState } from '../guards';
 import { ResendVerification } from './ResendVerification';
@@ -12,7 +14,8 @@ import styles from './pages.module.css';
 import { useFormSubmit } from './useFormSubmit';
 
 export function LoginPage() {
-  useDocumentTitle('Log in');
+  const t = useMessages(authMessages);
+  useDocumentTitle(t.logIn);
   const { auth } = useAuth();
   const notice = (useLocation().state as RedirectState | null)?.notice;
 
@@ -35,14 +38,14 @@ export function LoginPage() {
 
   return (
     <>
-      <CardHeader id="login-title" eyebrow="Private area" title="Welcome back" />
-      <p className={styles.intro}>Log in to access the reserved content.</p>
+      <CardHeader id="login-title" eyebrow={t.privateArea} title={t.login.title} />
+      <p className={styles.intro}>{t.login.intro}</p>
 
       <form className={formStyles.form} onSubmit={handleSubmit} noValidate aria-labelledby="login-title">
         {notice && !error && <p className={`${formStyles.notice} ${formStyles.noticeSuccess}`}>{notice}</p>}
 
         <TextField
-          label="E-mail"
+          label={t.email}
           name="email"
           type="email"
           autoComplete="email"
@@ -53,7 +56,7 @@ export function LoginPage() {
           required
         />
         <PasswordField
-          label="Password"
+          label={t.password}
           name="password"
           autoComplete="current-password"
           value={password}
@@ -62,7 +65,7 @@ export function LoginPage() {
           required
         />
         <div className={styles.inlineRight}>
-          <Link to="/area/forgot-password">Forgot your password?</Link>
+          <Link to="/area/forgot-password">{t.login.forgot}</Link>
         </div>
 
         {error && (
@@ -73,13 +76,13 @@ export function LoginPage() {
         )}
 
         <button className={formStyles.submit} type="submit" disabled={submitting}>
-          {submitting ? 'Logging in…' : 'Log in'}
+          {submitting ? t.login.submitting : t.logIn}
         </button>
       </form>
 
       <div className={styles.links}>
         <span>
-          New here? <Link to="/area/signup">Create an account</Link>
+          {t.login.newHere} <Link to="/area/signup">{t.login.createAccount}</Link>
         </span>
       </div>
     </>

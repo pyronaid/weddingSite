@@ -1,4 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useMessages } from '../../i18n';
+import { componentMessages } from '../componentMessages';
 import styles from './Modal.module.css';
 
 interface ModalProps {
@@ -16,6 +18,7 @@ interface ModalProps {
  * or the × button closes it too. Content is mounted only while open.
  */
 export function Modal({ open, onClose, title, children, size = 'normal' }: ModalProps) {
+  const t = useMessages(componentMessages);
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -44,7 +47,7 @@ export function Modal({ open, onClose, title, children, size = 'normal' }: Modal
             <h2 id={titleId} className={styles.title}>
               {title}
             </h2>
-            <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
+            <button type="button" className={styles.close} onClick={onClose} aria-label={t.close}>
               ×
             </button>
           </header>

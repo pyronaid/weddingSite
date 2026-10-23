@@ -9,6 +9,8 @@ import { AREA_HOME } from '../../guards';
 import { FlipCard } from '../FlipCard/FlipCard';
 import { SecretPhrase } from '../SecretPhrase/SecretPhrase';
 import { SuitRules } from '../SuitRules/SuitRules';
+import { useMessages } from '../../../../i18n';
+import { gameMessages } from '../../messages/game';
 import styles from './SuitCollection.module.css';
 
 interface SuitCollectionProps {
@@ -27,6 +29,7 @@ interface SuitCollectionProps {
 /** All the cards of a suit, the collected ones highlighted, and the secret phrase (suits with letters). */
 export function SuitCollection({ suit, afterRules, renderCardAction, footer }: SuitCollectionProps) {
   const { label, symbol } = SUIT_META[suit];
+  const t = useMessages(gameMessages);
   const query = useSuitCards(suit);
   const cards = query.status === 'success' ? query.data : undefined;
   const letters = hasLetters(suit);
@@ -35,18 +38,16 @@ export function SuitCollection({ suit, afterRules, renderCardAction, footer }: S
 
   return (
     <div className={styles.page} data-layout="wide">
-      <CardHeader id="suit-title" eyebrow={`${symbol} Your collection`} title={label} />
+      <CardHeader id="suit-title" eyebrow={t.collection.eyebrow(symbol)} title={label} />
       <p className={styles.intro}>
-        {letters
-          ? 'Tap a card to flip it. Every card you collect hides a secret on its back: put the letters together to discover the secret phrase.'
-          : 'Tap a card to flip it: every card you collect shows a star on its back.'}
+        {letters ? t.collection.introLetters : t.collection.introStars}
       </p>
       <SuitRules suit={suit} />
       {afterRules}
 
       {query.status === 'loading' && (
         <p className={styles.status} role="status">
-          Shuffling your cards…
+          {t.collection.loading}
         </p>
       )}
 
@@ -55,7 +56,7 @@ export function SuitCollection({ suit, afterRules, renderCardAction, footer }: S
           {query.error.message}{' '}
           {query.error.code !== 'not_configured' && (
             <button type="button" className={formStyles.textButton} onClick={query.retry}>
-              Try again
+              {t.tryAgain}
             </button>
           )}
         </div>
@@ -65,9 +66,9 @@ export function SuitCollection({ suit, afterRules, renderCardAction, footer }: S
         <>
           {letters && <SecretPhrase phrase={phrase} />}
           <p className={styles.status}>
-            {collected}/{cards.length} cards collected
+            {t.collection.collected(collected, cards.length)}
           </p>
-          <ul className={styles.grid} aria-label={`${label} cards`}>
+          <ul className={styles.grid} aria-label={t.collection.list(label)}>
             {cards.map((card) => (
               <li key={card.id}>
                 <FlipCard card={card} />
@@ -81,7 +82,7 @@ export function SuitCollection({ suit, afterRules, renderCardAction, footer }: S
       {footer}
 
       <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
-        ← Back to your collection
+        {t.backToCollectionArrow}
       </Link>
     </div>
   );

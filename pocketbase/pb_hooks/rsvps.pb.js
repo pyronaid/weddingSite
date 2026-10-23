@@ -5,14 +5,15 @@
  * a guest who declines cannot bring people, one who accepts brings >= 1.
  */
 onRecordCreateRequest((e) => {
+  const { t } = require(`${__hooks}/lib/i18n.js`);
   const attending = e.record.getBool('attending');
   const guests = e.record.getInt('guests');
 
   if (!attending && guests !== 0) {
-    throw new BadRequestError('Guests must be 0 when not attending.');
+    throw new BadRequestError(t(e.app, 'rsvp_guests_not_attending'));
   }
   if (attending && guests < 1) {
-    throw new BadRequestError('At least 1 guest is required when attending.');
+    throw new BadRequestError(t(e.app, 'rsvp_guests_attending'));
   }
 
   e.next();

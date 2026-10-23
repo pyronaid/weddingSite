@@ -1,3 +1,6 @@
+import { messagesOf } from '../i18n';
+import { preparePhotoMessages } from './preparePhotoMessages';
+
 /** Raised when the chosen file is not a usable photo: the message is shown as is. */
 export class PhotoCheckError extends Error {
   constructor(message: string) {
@@ -25,7 +28,7 @@ export const MIN_PHOTO_SIDE = 320;
  */
 export async function preparePhoto(file: File, maxSide = 2048, quality = 0.85): Promise<Blob> {
   if (file.type && !file.type.startsWith('image/')) {
-    throw new PhotoCheckError('This file is not a photo: please choose a picture (JPEG, PNG or WebP).');
+    throw new PhotoCheckError(messagesOf(preparePhotoMessages).notAPhoto);
   }
 
   let bitmap: ImageBitmap;
@@ -33,14 +36,12 @@ export async function preparePhoto(file: File, maxSide = 2048, quality = 0.85): 
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
     if (ACCEPTED_TYPES.includes(file.type)) return file;
-    throw new PhotoCheckError(
-      'This photo format is not supported here: take the photo with the camera, or choose a JPEG, PNG or WebP picture.',
-    );
+    throw new PhotoCheckError(messagesOf(preparePhotoMessages).unsupported);
   }
 
   try {
     if (Math.min(bitmap.width, bitmap.height) < MIN_PHOTO_SIDE) {
-      throw new PhotoCheckError(`This picture is too small: a photo must be at least ${MIN_PHOTO_SIDE} px wide and tall.`);
+      throw new PhotoCheckError(messagesOf(preparePhotoMessages).tooSmall(MIN_PHOTO_SIDE));
     }
 
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));

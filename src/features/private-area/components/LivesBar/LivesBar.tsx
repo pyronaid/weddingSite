@@ -1,21 +1,24 @@
 import type { QuizStatus } from '../../../../services/game';
+import { useMessages } from '../../../../i18n';
+import { gameMessages } from '../../messages/game';
 import styles from './LivesBar.module.css';
 
 const DIAMOND = '♦︎';
 
 /** The quiz lives (3 diamonds) and, once they are over, the penalties. */
 export function LivesBar({ status }: { status?: QuizStatus }) {
+  const t = useMessages(gameMessages).lives;
   if (!status) return null;
   const { lives, maxLives, penalties } = status;
-  const summary = `${lives} of ${maxLives} lives left${penalties > 0 ? `, ${penalties} ${penalties === 1 ? 'penalty' : 'penalties'}` : ''}`;
+  const summary = t.summary(lives, maxLives, penalties);
 
   return (
-    <section className={styles.bar} aria-label="Your lives">
+    <section className={styles.bar} aria-label={t.region}>
       <p className="visually-hidden" role="status">
         {summary}
       </p>
       <div className={styles.row} aria-hidden="true">
-        <span className={styles.label}>Lives</span>
+        <span className={styles.label}>{t.lives}</span>
         {Array.from({ length: maxLives }, (_, index) => (
           <span key={index} className={index < lives ? styles.life : styles.lost}>
             {DIAMOND}
@@ -24,7 +27,7 @@ export function LivesBar({ status }: { status?: QuizStatus }) {
       </div>
       {penalties > 0 && (
         <div className={styles.row} aria-hidden="true">
-          <span className={styles.label}>Penalties</span>
+          <span className={styles.label}>{t.penalties}</span>
           {Array.from({ length: Math.min(penalties, 10) }, (_, index) => (
             <span key={index} className={styles.penalty}>
               {DIAMOND}

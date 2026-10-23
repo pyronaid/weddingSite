@@ -4,6 +4,7 @@ import { createMemoryRouter, Outlet, RouterProvider } from 'react-router';
 import { AuthError, type AuthService, type AuthUser } from '../../services/auth';
 import {
   GameError,
+  toGameError,
   type GameProgress,
   type GalleryPhoto,
   type GameRepository,
@@ -15,7 +16,8 @@ import {
 } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
-import { GuestOnly, RequireAdmin, RequireAuth } from './guards';
+import { GuestOnly, RequireAdmin, RequireAuth, RequireSuperAdmin } from './guards';
+import { setLanguage } from '../../i18n';
 import { DashboardPage } from './pages/DashboardPage';
 import { GalleryPage } from './pages/GalleryPage';
 import { LoginPage } from './pages/LoginPage';
@@ -38,7 +40,7 @@ function createFakeAuth(overrides: Partial<AuthService> = {}) {
     getCurrentUser: () => user,
     subscribe: (l) => (listeners.add(l), () => listeners.delete(l)),
     login: vi.fn(async (email: string) => {
-      const next = { id: '1', email, name: 'Anna Verdi', verified: true, isAdmin: email.startsWith('admin') };
+      const next = { id: '1', email, name: 'Anna Verdi', verified: true, isAdmin: email.startsWith('admin') || email.startsWith('super'), isSuperAdmin: email.startsWith('super') };
       setUser(next);
       return next;
     }),
@@ -270,6 +272,7 @@ function renderArea(
             ],
           },
           { element: <RequireAdmin />, children: [{ path: 'admin/suits/:suit', element: <AdminSuitPage /> }] },
+          { element: <RequireSuperAdmin />, children: [{ path: 'site', element: <h2>Site settings page</h2> }] },
           {
             element: <GuestOnly />,
             children: [
@@ -1240,6 +1243,49 @@ describe('private area', () => {
         hints: Array.from({ length: 13 }, (_, i) => `Luca hint ${i + 1}`),
       });
       expect(await within(section).findByText('Luca Neri')).toBeInTheDocument();
+    });
+  });
+
+  describe('languages and super admin', () => {
+    async function loggedIn(email: string) {
+      const auth = createFakeAuth();
+      await auth.login(email, 'x');
+      return auth;
+    }
+
+    it('shows the private area and the game in Italian when the site language is Italian', async () => {
+      setLanguage('it');
+      renderArea(await loggedIn('anna@example.com'), '/area/suits/spades');
+
+      expect(await screen.findByRole('heading', { name: 'Picche' })).toBeInTheDocument();
+      expect(await screen.findByRole('list', { name: 'Carte di picche' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^6 di picche, raccolta/ })).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Regole' })).toHaveTextContent(/Indovina chi/);
+    });
+
+    it('translates the dashboard counters and the service error messages', async () => {
+      setLanguage('it');
+      // As the repository builds it: the message in the site language.
+      const game = createFakeGame({ getProgress: vi.fn().mockRejectedValue(toGameError({ status: 0 })) });
+      renderArea(await loggedIn('anna@example.com'), '/area', game);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Impossibile raggiungere il server');
+      expect(screen.getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
+    });
+
+    it('gives super admins the site settings, and nobody else', async () => {
+      renderArea(await loggedIn('super@example.com'), '/area');
+      const link = await screen.findByRole('link', { name: /Site settings/ });
+      expect(link).toHaveAttribute('href', '/area/site');
+      await userEvent.setup().click(link);
+      expect(await screen.findByRole('heading', { name: 'Site settings page' })).toBeInTheDocument();
+    });
+
+    it('keeps organisers and guests out of the site settings', async () => {
+      const router = renderArea(await loggedIn('admin@example.com'), '/area/site');
+      expect(await screen.findByText('Organisers')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Site settings/ })).not.toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area');
     });
   });
 });
