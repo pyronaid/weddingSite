@@ -360,8 +360,14 @@ The frontend container reads it **at start-up** (written to `/env-config.js`), s
 | `PB_SMTP_HOST`, `PB_SMTP_PORT`, `PB_SMTP_USERNAME`, `PB_SMTP_PASSWORD`, `PB_SMTP_TLS` | SMTP server (SMTP is enabled when `PB_SMTP_HOST` is set) |
 | `PB_ORIGINS`                              | Allowed CORS origins, comma separated (default `*`)               |
 | `PB_RATE_LIMIT`                           | `false` disables the built-in rate limiter (default: enabled)     |
+| `PB_RATE_LIMIT_EXCLUDED_IPS`              | IPs the rate limits don't apply to (e.g. the venue Wi-Fi on the day), comma separated; `-` clears the list |
+| `PB_TRUSTED_PROXY_HEADERS`                | Behind a reverse proxy: header(s) holding the client IP, e.g. `X-Forwarded-For` (set in `deploy/docker-compose.prod.yml`) |
 
 ## Deploying to production
+
+**Step-by-step guide: [`bring_to_prod_instructions.md`](bring_to_prod_instructions.md)** (hosting, domain, e-mails, and the deploy pipeline). The production files are in [`deploy/`](deploy/), and the pipeline is [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): tests on every PR, build and deploy on every merge to `main`.
+
+In short:
 
 - **Two services**: the frontend container (static files) and PocketBase with a **persistent volume** on `/pb/pb_data`. Run **only one** PocketBase instance; it is SQLite-based.
 - Put both behind HTTPS (Caddy, Traefik, or your platform's load balancer), e.g. `www.example.com` → web and `api.example.com` → PocketBase.

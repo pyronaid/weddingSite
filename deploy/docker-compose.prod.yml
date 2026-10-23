@@ -1,0 +1,65 @@
+# Production stack: Caddy (HTTPS) in front of the site and PocketBase.
+# Copied to the server as /opt/wedding/docker-compose.yml, next to the
+# Caddyfile, deploy.sh and .env (see bring_to_prod_instructions.md).
+# Only Caddy is reachable from the internet: the other two services have no
+# published ports.
+name: wedding
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # HTTPS certificates: keep them, or Let's Encrypt limits may kick in.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - pocketbase
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/${GHCR_OWNER:?set GHCR_OWNER in .env}/wedding-web:${IMAGE_TAG:-latest}
+    environment:
+      POCKETBASE_URL: https://${API_DOMAIN}
+    restart: unless-stopped
+
+  pocketbase:
+    image: ghcr.io/${GHCR_OWNER}/wedding-pocketbase:${IMAGE_TAG:-latest}
+    environment:
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:?set PB_ADMIN_EMAIL in .env}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:?set PB_ADMIN_PASSWORD in .env}
+      FRONTEND_URL: https://${SITE_DOMAIN}
+      PB_APP_URL: https://${API_DOMAIN}
+      PB_APP_NAME: ${PB_APP_NAME:-Our Wedding}
+      PB_SENDER_NAME: ${PB_SENDER_NAME:-Our Wedding}
+      PB_SENDER_ADDRESS: ${PB_SENDER_ADDRESS:?set PB_SENDER_ADDRESS in .env}
+      # Only the site may call the API from a browser.
+      PB_ORIGINS: https://${SITE_DOMAIN}
+      PB_SMTP_HOST: ${PB_SMTP_HOST:?set PB_SMTP_HOST in .env}
+      PB_SMTP_PORT: ${PB_SMTP_PORT:-587}
+      PB_SMTP_USERNAME: ${PB_SMTP_USERNAME:-}
+      PB_SMTP_PASSWORD: ${PB_SMTP_PASSWORD:-}
+      PB_SMTP_TLS: ${PB_SMTP_TLS:-false}
+      # PocketBase is reachable only through Caddy, which writes this header:
+      # the rate limiter then sees each guest's real IP.
+      PB_TRUSTED_PROXY_HEADERS: X-Forwarded-For
+      # e.g. the venue's public IP on the wedding day; "-" clears the list.
+      PB_RATE_LIMIT_EXCLUDED_IPS: ${PB_RATE_LIMIT_EXCLUDED_IPS:-}
+    volumes:
+      # The database and every uploaded photo: back it up.
+      - pb_data:/pb/pb_data
+    restart: unless-stopped
+
+volumes:
+  pb_data:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,124 @@
+# CI/CD for the wedding site (see bring_to_prod_instructions.md, step 4).
+#
+#   pull request  -> typecheck, lint, tests
+#   push to main  -> the same, then both Docker images are built and pushed to
+#                    GitHub's registry (ghcr.io), then deployed to the server
+#                    over SSH (only once DEPLOY_ENABLED is set to true).
+#
+# Repository settings used (Settings -> Secrets and variables -> Actions):
+#   secrets   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+#   variables DEPLOY_ENABLED=true, optional DEPLOY_PATH (default /opt/wedding)
+#             and IMAGE_PLATFORMS (default linux/amd64; linux/arm64 for ARM servers)
+name: CI and deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # "Run workflow" button: redeploys the latest main.
+  workflow_dispatch:
+
+# Deploys never overlap: a newer push waits for the running one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck, lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  images:
+    name: Build and push the images
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        name: Image names
+        # Registry names must be lowercase; the tag is the commit.
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Site image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ vars.IMAGE_PLATFORMS || 'linux/amd64' }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/wedding-web:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/wedding-web:latest
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+      - name: PocketBase image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./pocketbase
+          platforms: ${{ vars.IMAGE_PLATFORMS || 'linux/amd64' }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/wedding-pocketbase:${{ steps.meta.outputs.tag }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/wedding-pocketbase:latest
+          cache-from: type=gha,scope=pocketbase
+          cache-to: type=gha,mode=max,scope=pocketbase
+
+  deploy:
+    name: Deploy to the server
+    needs: images
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    # Optional: add required reviewers to this environment to approve each deploy.
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: SSH key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Pinned host key: the job refuses to talk to any other server.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy
+        env:
+          TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/wedding' }}
+          TAG: ${{ needs.images.outputs.tag }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh_server() { ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$TARGET" "$@"; }
+          # The job's own token (valid until the job ends) lets the server pull the images.
+          printf '%s' "$REGISTRY_TOKEN" | ssh_server "docker login ghcr.io -u '$REGISTRY_USER' --password-stdin"
+          ssh_server "'$DEPLOY_PATH/deploy.sh' '$TAG'"
