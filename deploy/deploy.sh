@@ -20,7 +20,10 @@ for file in .env docker-compose.yml Caddyfile; do
   fi
 done
 
-CURRENT=$(sed -n 's/^IMAGE_TAG=//p' .env)
+# A value of .env, ignoring Windows line endings and quotes (as Compose does).
+env_value() { sed -n "s/^$1=//p" .env | tail -n 1 | tr -d '\r"'"'"; }
+
+CURRENT=$(env_value IMAGE_TAG)
 # Versions that passed their health check: the latest one and the one before it.
 GOOD=$(cat .good-tag 2>/dev/null || true)
 PREVIOUS_GOOD=$(cat .previous-good-tag 2>/dev/null || true)
@@ -33,15 +36,14 @@ if [ "${1:-}" = "rollback" ]; then
 else
   TAG="${1:?usage: ./deploy.sh <image tag> | rollback}"
 fi
-OWNER=$(sed -n 's/^GHCR_OWNER=//p' .env)
-
 # 1. Download the new images first: the site keeps running meanwhile. A
 #    rollback by hand may not be logged in to the registry any more: the
 #    images of earlier versions are still on the server, so that is fine.
 IMAGE_TAG="$TAG" docker compose pull web pocketbase || echo "Could not download the images: using the ones on the server."
-for image in wedding-web wedding-pocketbase; do
-  if ! docker image inspect "ghcr.io/$OWNER/$image:$TAG" > /dev/null 2>&1; then
-    echo "Image ghcr.io/$OWNER/$image:$TAG is not available: nothing was changed." >&2
+# The image names as Compose resolves them from docker-compose.yml and .env.
+for image in $(IMAGE_TAG="$TAG" docker compose config --images web pocketbase); do
+  if ! docker image inspect "$image" > /dev/null 2>&1; then
+    echo "Image $image is not available: nothing was changed." >&2
     exit 1
   fi
 done
@@ -58,7 +60,7 @@ ls -1t backups/pb_data-*.tgz | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r rm --
 
 # 3. Start the new version (its tag is kept in .env for manual `docker compose` commands).
 if grep -q '^IMAGE_TAG=' .env; then
-  sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$TAG/" .env
+  sed -i "s/^IMAGE_TAG=.*\$/IMAGE_TAG=$TAG/" .env
 else
   echo "IMAGE_TAG=$TAG" >> .env
 fi

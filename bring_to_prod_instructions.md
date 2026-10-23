@@ -467,6 +467,7 @@ Fill in `/opt/wedding/.env`:
 | "Too many requests" at the venue | Rate limits and shared Wi-Fi IP → section 5 |
 | A QR code opens the wrong address | Posters printed before the domain was set → reprint with `FRONTEND_URL` (step 4.5.6) |
 | Deploy says "Deploy is off" or "Deploy settings missing" | Open the *Check the deploy settings* step of the *Deploy to the server* job: it names what to add. Usually the environment isn't named exactly `deploy`, `DEPLOY_ENABLED` was saved as a secret instead of a variable, or one of the four secrets is missing |
+| Deploy says an image "is not available" but the log shows it was pulled, the name split in two lines | The files were copied from a Windows checkout with Windows line endings. Convert them once on the server: `sed -i 's/\r$//' /opt/wedding/.env /opt/wedding/Caddyfile /opt/wedding/docker-compose.yml`. Newer versions of `deploy.sh` and the repository's `.gitattributes` prevent it |
 | Deploy says "Missing /opt/wedding/.env" | Step 4.2 not finished: `cp .env.example .env` in `/opt/wedding` and fill it in (`ls -la` shows it) |
 | Deploy job fails at "SSH" | `DEPLOY_KNOWN_HOSTS` or `DEPLOY_SSH_KEY` wrong, or the key not in `/home/deploy/.ssh/authorized_keys` |
 | Deploy says "NOT healthy" | `ssh deploy@… 'cd /opt/wedding && docker compose logs --tail=100'`; then `./deploy.sh rollback` |
