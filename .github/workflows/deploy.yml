@@ -96,9 +96,9 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # The settings may live in this environment (Settings -> Environments ->
-    # deploy) or at repository level: inside the job both are visible.
+    # production) or at repository level: inside the job both are visible.
     # Optional: add required reviewers to the environment to approve each deploy.
-    environment: deploy
+    environment: production
     permissions:
       contents: read
       packages: read
