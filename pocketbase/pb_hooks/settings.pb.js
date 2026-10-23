@@ -39,6 +39,23 @@ onBootstrap((e) => {
 
   // Built-in rate limiter (defaults: 2 auth attempts / 3s, 20 creates / 5s per IP).
   settings.rateLimits.enabled = env('PB_RATE_LIMIT') !== 'false';
+  // IPs the limits do not apply to, e.g. the venue's Wi-Fi on the wedding day,
+  // where every guest shares one public IP. Unset: left as it is.
+  const excludedIps = env('PB_RATE_LIMIT_EXCLUDED_IPS');
+  if (excludedIps !== null) {
+    settings.rateLimits.excludedIPs = excludedIps === '-' ? [] : excludedIps.split(',').map((ip) => ip.trim()).filter(Boolean);
+  }
+
+  // Behind a reverse proxy (Caddy in production) every request comes from the
+  // proxy: read the guest's real IP from its header instead, or the rate
+  // limiter would treat all the guests as one. Only set this when PocketBase
+  // is reachable through the proxy alone (it overwrites the header).
+  const proxyHeaders = env('PB_TRUSTED_PROXY_HEADERS');
+  if (proxyHeaders) {
+    settings.trustedProxy.headers = proxyHeaders.split(',').map((header) => header.trim()).filter(Boolean);
+    // The right-most value is the one added by our proxy: it cannot be spoofed.
+    settings.trustedProxy.useLeftmostIP = false;
+  }
 
   e.app.save(settings);
 

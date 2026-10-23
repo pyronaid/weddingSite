@@ -1,0 +1,27 @@
+# HTTPS for the site and the API, with certificates from Let's Encrypt
+# renewed automatically. The domains come from .env (see docker-compose).
+{
+	email {$ACME_EMAIL}
+}
+
+# The wedding site. www.<domain> redirects to the bare domain.
+{$SITE_DOMAIN}, www.{$SITE_DOMAIN} {
+	@www host www.{$SITE_DOMAIN}
+	redir @www https://{$SITE_DOMAIN}{uri} permanent
+
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy web:8080
+}
+
+# PocketBase: the API, the photos and the admin UI (/_/).
+{$API_DOMAIN} {
+	# Photos are at most 10 MB (checked by PocketBase): refuse anything far larger early.
+	request_body {
+		max_size 25MB
+	}
+	header Strict-Transport-Security "max-age=31536000"
+	# Caddy replaces any X-Forwarded-For sent by the browser with the real
+	# client IP, which PocketBase trusts (PB_TRUSTED_PROXY_HEADERS).
+	reverse_proxy pocketbase:8090
+}
