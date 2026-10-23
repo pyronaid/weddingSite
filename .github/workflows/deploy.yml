@@ -89,10 +89,55 @@ jobs:
           cache-from: type=gha,scope=pocketbase
           cache-to: type=gha,mode=max,scope=pocketbase
 
+  # Says on the run page why the deploy runs or not, instead of skipping it
+  # silently: deploy off, a setting saved in the wrong place, a missing secret.
+  deploy-settings:
+    name: Check the deploy settings
+    needs: images
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          # Only checked for being set: a common mistake is saving DEPLOY_ENABLED as a secret.
+          ENABLED_AS_SECRET: ${{ secrets.DEPLOY_ENABLED != '' }}
+          HAS_HOST: ${{ secrets.DEPLOY_HOST != '' }}
+          HAS_USER: ${{ secrets.DEPLOY_USER != '' }}
+          HAS_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY != '' }}
+          HAS_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS != '' }}
+        run: |
+          where='Settings -> Secrets and variables -> Actions'
+          if [ "$(printf '%s' "$DEPLOY_ENABLED" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" != true ]; then
+            if [ "$ENABLED_AS_SECRET" = true ]; then
+              hint="DEPLOY_ENABLED is saved as a SECRET: delete it and create it in the Variables tab instead ($where -> Variables -> Repository variables)."
+            elif [ -n "$DEPLOY_ENABLED" ]; then
+              hint="The repository variable DEPLOY_ENABLED is '$DEPLOY_ENABLED': set it to true."
+            else
+              hint="Create the repository variable DEPLOY_ENABLED = true ($where -> Variables tab -> New repository variable). Not a secret, and not inside an environment."
+            fi
+            echo "::notice title=Deploy is off::$hint"
+            { echo "### Deploy skipped"; echo; echo "$hint"; } >> "$GITHUB_STEP_SUMMARY"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          missing=""
+          [ "$HAS_HOST" = true ] || missing="$missing DEPLOY_HOST"
+          [ "$HAS_USER" = true ] || missing="$missing DEPLOY_USER"
+          [ "$HAS_SSH_KEY" = true ] || missing="$missing DEPLOY_SSH_KEY"
+          [ "$HAS_KNOWN_HOSTS" = true ] || missing="$missing DEPLOY_KNOWN_HOSTS"
+          if [ -n "$missing" ]; then
+            echo "::error title=Deploy settings missing::Create these repository secrets ($where -> Secrets tab):$missing"
+            exit 1
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
   deploy:
     name: Deploy to the server
-    needs: images
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    needs: [images, deploy-settings]
+    if: needs.deploy-settings.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     # Optional: add required reviewers to this environment to approve each deploy.
     environment: production
@@ -118,7 +163,11 @@ jobs:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh_server() { ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$TARGET" "$@"; }
+          ssh_server() { ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 "$TARGET" "$@"; }
+          if ! ssh_server true; then
+            echo "::error title=Cannot connect to the server::Check DEPLOY_HOST, DEPLOY_USER, that the public key of DEPLOY_SSH_KEY is in ~/.ssh/authorized_keys of that user, and that DEPLOY_KNOWN_HOSTS comes from ssh-keyscan of the same server."
+            exit 1
+          fi
           # The job's own token (valid until the job ends) lets the server pull the images.
           printf '%s' "$REGISTRY_TOKEN" | ssh_server "docker login ghcr.io -u '$REGISTRY_USER' --password-stdin"
           ssh_server "'$DEPLOY_PATH/deploy.sh' '$TAG'"

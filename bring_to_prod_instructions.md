@@ -277,6 +277,7 @@ scp deploy/docker-compose.prod.yml $SERVER:/opt/wedding/docker-compose.yml
 scp deploy/Caddyfile deploy/deploy.sh deploy/.env.example $SERVER:/opt/wedding/
 ssh $SERVER 'cd /opt/wedding && chmod +x deploy.sh && cp -n .env.example .env && chmod 600 .env'
 ssh $SERVER 'nano /opt/wedding/.env'   # fill it in (below)
+ssh $SERVER 'ls -la /opt/wedding'       # .env is hidden from a plain `ls`: -a shows it
 ```
 
 Fill in `/opt/wedding/.env`:
@@ -304,7 +305,11 @@ Fill in `/opt/wedding/.env`:
 
    Compare the fingerprint of `wedding_known_hosts` (`ssh-keygen -lf wedding_known_hosts`) with the one the server shows (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run on the server). They must be equal.
 
-2. **GitHub → the repository → Settings → Secrets and variables → Actions:**
+2. **GitHub → the repository → Settings → Secrets and variables → Actions.** This page has **two tabs**:
+   - **Secrets:** the four `DEPLOY_*` connection values. Use **New repository secret**.
+   - **Variables:** `DEPLOY_ENABLED` and the optional ones. Use **New repository variable**.
+
+   Create them at repository level: values inside an **environment** (Settings → Environments) are not read here.
 
    | Kind | Name | Value |
    | --- | --- | --- |
@@ -317,6 +322,8 @@ Fill in `/opt/wedding/.env`:
    | Variable (optional) | `DEPLOY_PATH` | Only if you didn't use `/opt/wedding` |
 
    Then delete `wedding_deploy` from your computer, or keep it in a password manager.
+
+   If a run says **"Deploy is off"** or **"Deploy settings missing"** (on the run's summary page, under *Check the deploy settings*), it names exactly what to fix.
 
 3. Optional, for extra safety: **Settings → Environments → production → Required reviewers → you**. Every deploy then waits for your click in the Actions tab.
 
@@ -459,5 +466,7 @@ Fill in `/opt/wedding/.env`:
 | E-mails land in spam | SPF/DKIM/DMARC missing or duplicated → mail-tester.com tells which |
 | "Too many requests" at the venue | Rate limits and shared Wi-Fi IP → section 5 |
 | A QR code opens the wrong address | Posters printed before the domain was set → reprint with `FRONTEND_URL` (step 4.5.6) |
+| "Deploy to the server" is skipped | Open *Check the deploy settings* in the run: usually `DEPLOY_ENABLED` was created as a secret or inside an environment instead of as a **repository variable**, or its value isn't `true` |
+| Deploy says "Missing /opt/wedding/.env" | Step 4.2 not finished: `cp .env.example .env` in `/opt/wedding` and fill it in (`ls -la` shows it) |
 | Deploy job fails at "SSH" | `DEPLOY_KNOWN_HOSTS` or `DEPLOY_SSH_KEY` wrong, or the key not in `/home/deploy/.ssh/authorized_keys` |
 | Deploy says "NOT healthy" | `ssh deploy@… 'cd /opt/wedding && docker compose logs --tail=100'`; then `./deploy.sh rollback` |
