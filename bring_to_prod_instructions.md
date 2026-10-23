@@ -13,8 +13,8 @@ A step-by-step guide to putting the site online on your own domain. You will:
 **What you end up with**
 
 ```
- guests' phones ──HTTPS──▶  your-domain.it ─┐
-                       api.your-domain.it ──┤   one server (Docker)
+ guests' phones ──HTTPS──▶  gioevale.com ─┐
+                       api.gioevale.com ──┤   one server (Docker)
                                             ▼
                                   ┌────────────────────┐
                                   │ Caddy (HTTPS)      │  certificates renewed by itself
@@ -98,7 +98,7 @@ This site is light. The work is done by **one PocketBase process** (Go + SQLite)
    - **SSH key:** paste your public key.
    - **Backups:** enable them (≈ +20%; daily snapshots of the whole server: your safety net).
    - **Name:** `wedding`.
-4. Note the server's **IPv4** (e.g. `203.0.113.10`) and **IPv6**.
+4. Note the server's **IPv4** (e.g. `195.201.90.14`) and **IPv6**.
 5. Optional but good: **Firewalls → Create firewall**, allowing inbound TCP 22, 80, 443 and UDP 443, and apply it to the server.
 
 ### 1.2 Prepare the server (once, ~15 minutes)
@@ -106,7 +106,7 @@ This site is light. The work is done by **one PocketBase process** (Go + SQLite)
 Connect as root and run these (they are safe to copy and paste in order):
 
 ```bash
-ssh root@203.0.113.10
+ssh root@195.201.90.14
 
 # System up to date, automatic security updates, firewall.
 apt update && apt -y full-upgrade
@@ -134,7 +134,7 @@ sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd
 systemctl restart ssh
 ```
 
-Check, **from a second terminal**, that `ssh deploy@203.0.113.10` works before closing the root session.
+Check, **from a second terminal**, that `ssh deploy@195.201.90.14` works before closing the root session.
 
 ---
 
@@ -165,9 +165,9 @@ In the registrar's DNS panel (or at Cloudflare DNS, free, if you move the DNS th
 
 | Type | Name | Value | Notes |
 | --- | --- | --- | --- |
-| `A` | `@` (the domain itself) | `203.0.113.10` | The site |
-| `A` | `www` | `203.0.113.10` | Redirects to the domain |
-| `A` | `api` | `203.0.113.10` | PocketBase: API, photos, admin UI |
+| `A` | `@` (the domain itself) | `195.201.90.14` | The site |
+| `A` | `www` | `195.201.90.14` | Redirects to the domain |
+| `A` | `api` | `195.201.90.14` | PocketBase: API, photos, admin UI |
 | `AAAA` | `@`, `www`, `api` | the server's IPv6 | Optional but recommended |
 
 - **If you use Cloudflare DNS**, set the three records to **"DNS only"** (grey cloud): Caddy then gets the HTTPS certificates directly. Cloudflare's proxy is not needed for 100 guests.
@@ -215,7 +215,7 @@ The menu names below may move a little in Brevo's UI.
    - **Copy them exactly.**
    - **Only one SPF record per domain:** if the registrar already created one (e.g. for its own mail forwarding), merge the `include:` parts into that single `v=spf1 … ~all` record.
    - Click **Authenticate** once the DNS records work (can take up to a few hours).
-3. **Senders → Add a sender:** `noreply@your-domain.it`, name "Giulia & Marco".
+3. **Senders → Add a sender:** `noreply@gioevale.com`, name "Giovanni & Valentina".
 4. **SMTP & API → SMTP → Generate a new SMTP key.** Note:
    - server `smtp-relay.brevo.com`;
    - port `587`;
@@ -224,7 +224,7 @@ The menu names below may move a little in Brevo's UI.
 5. These go into the server's `.env` (step 4.2):
 
    ```ini
-   PB_SENDER_ADDRESS=noreply@your-domain.it
+   PB_SENDER_ADDRESS=noreply@gioevale.com
    PB_SMTP_HOST=smtp-relay.brevo.com
    PB_SMTP_PORT=587
    PB_SMTP_USERNAME=xxxx@smtp-brevo.com
@@ -236,13 +236,13 @@ The menu names below may move a little in Brevo's UI.
 
 ### 3.3 Test it (after the first deploy)
 
-1. **PocketBase test e-mail:** admin UI `https://api.your-domain.it/_/` → **Settings → Mail settings → Send test email**.
+1. **PocketBase test e-mail:** admin UI `https://api.gioevale.com/_/` → **Settings → Mail settings → Send test email**.
 2. **Full guest flow on the site:** sign up with a personal address → confirmation e-mail → click → log in; then "Forgot password".
 3. **Spam check:** send one e-mail to the address shown at [mail-tester.com](https://www.mail-tester.com) and aim for **9/10 or more**. A low score almost always means a missing or duplicated SPF/DKIM record.
 
 ### 3.4 Optional: receiving e-mails
 
-The site only **sends**. If you want an address guests can write to (e.g. `sposi@your-domain.it`), add **forwarding** to your personal mailbox:
+The site only **sends**. If you want an address guests can write to (e.g. `sposi@gioevale.com`), add **forwarding** to your personal mailbox:
 - **Cloudflare Email Routing:** free, if the DNS is at Cloudflare;
 - your **registrar's forwarding**;
 - [ImprovMX](https://improvmx.com): free.
@@ -272,11 +272,12 @@ The deploy step stays **off** until you set the variable `DEPLOY_ENABLED=true` (
 From **your computer**, in the repository folder:
 
 ```bash
-SERVER=deploy@203.0.113.10
+SERVER=deploy@195.201.90.14
 scp deploy/docker-compose.prod.yml $SERVER:/opt/wedding/docker-compose.yml
 scp deploy/Caddyfile deploy/deploy.sh deploy/.env.example $SERVER:/opt/wedding/
 ssh $SERVER 'cd /opt/wedding && chmod +x deploy.sh && cp -n .env.example .env && chmod 600 .env'
 ssh $SERVER 'nano /opt/wedding/.env'   # fill it in (below)
+ssh $SERVER 'ls -la /opt/wedding'       # .env is hidden from a plain `ls`: -a shows it
 ```
 
 Fill in `/opt/wedding/.env`:
@@ -284,10 +285,10 @@ Fill in `/opt/wedding/.env`:
 | Setting | Value |
 | --- | --- |
 | `GHCR_OWNER` | Your GitHub user, lowercase (`pyronaid`) |
-| `SITE_DOMAIN`, `API_DOMAIN` | `your-domain.it` and `api.your-domain.it` |
+| `SITE_DOMAIN`, `API_DOMAIN` | `gioevale.com` and `api.gioevale.com` |
 | `ACME_EMAIL` | Your e-mail (Let's Encrypt writes here only about certificate problems) |
 | `PB_ADMIN_EMAIL`, `PB_ADMIN_PASSWORD` | The **superuser** of PocketBase's admin UI. A long random password, e.g. from `openssl rand -base64 24`, kept in a password manager |
-| `PB_APP_NAME`, `PB_SENDER_NAME` | e.g. `Giulia & Marco` (shown in the e-mails) |
+| `PB_APP_NAME`, `PB_SENDER_NAME` | e.g. `Giovanni & Valentina` (shown in the e-mails) |
 | SMTP | From step 3.2 |
 
 > If you change `deploy/docker-compose.prod.yml` or `deploy/Caddyfile` in the repository later, copy them to the server again with the same `scp` commands. The pipeline only updates the images.
@@ -298,17 +299,21 @@ Fill in `/opt/wedding/.env`:
 
    ```bash
    ssh-keygen -t ed25519 -f wedding_deploy -C "github-actions deploy" -N ""
-   ssh-copy-id -i wedding_deploy.pub deploy@203.0.113.10   # or append it to /home/deploy/.ssh/authorized_keys
-   ssh-keyscan -t ed25519 203.0.113.10 > wedding_known_hosts
+   ssh-copy-id -i wedding_deploy.pub deploy@195.201.90.14   # or append it to /home/deploy/.ssh/authorized_keys
+   ssh-keyscan -t ed25519 195.201.90.14 > wedding_known_hosts
    ```
 
    Compare the fingerprint of `wedding_known_hosts` (`ssh-keygen -lf wedding_known_hosts`) with the one the server shows (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`, run on the server). They must be equal.
 
-2. **GitHub → the repository → Settings → Secrets and variables → Actions:**
+2. **GitHub → the repository → Settings → Environments → New environment**, named exactly **`deploy`**: the workflow deploys through it. In it:
+   - **Environment secrets → Add secret:** the four `DEPLOY_*` values below.
+   - **Environment variables → Add variable:** `DEPLOY_ENABLED` and the optional ones.
+
+   Repository-level values (**Settings → Secrets and variables → Actions**, Secrets and Variables tabs) work too, if you prefer them there.
 
    | Kind | Name | Value |
    | --- | --- | --- |
-   | Secret | `DEPLOY_HOST` | `203.0.113.10` |
+   | Secret | `DEPLOY_HOST` | `195.201.90.14` |
    | Secret | `DEPLOY_USER` | `deploy` |
    | Secret | `DEPLOY_SSH_KEY` | The whole content of `wedding_deploy` (the private key) |
    | Secret | `DEPLOY_KNOWN_HOSTS` | The content of `wedding_known_hosts` |
@@ -317,6 +322,8 @@ Fill in `/opt/wedding/.env`:
    | Variable (optional) | `DEPLOY_PATH` | Only if you didn't use `/opt/wedding` |
 
    Then delete `wedding_deploy` from your computer, or keep it in a password manager.
+
+   If a run says **"Deploy is off"** or **"Deploy settings missing"** (on the run's summary page, under *Check the deploy settings*), it names exactly what to fix.
 
 3. Optional, for extra safety: **Settings → Environments → production → Required reviewers → you**. Every deploy then waits for your click in the Actions tab.
 
@@ -328,16 +335,16 @@ Fill in `/opt/wedding/.env`:
 2. **GitHub → Actions → "CI and deploy" → Run workflow** (branch `main`), or merge any PR.
 3. Follow the run. The first one takes ~5–10 minutes; later ones are faster thanks to the build cache.
 4. **Check the site:**
-   - `https://your-domain.it` shows the site, with the padlock;
-   - `https://www.your-domain.it` redirects to it;
-   - `https://api.your-domain.it/api/health` answers `{"message":"API is healthy."…}`.
+   - `https://gioevale.com` shows the site, with the padlock;
+   - `https://www.gioevale.com` redirects to it;
+   - `https://api.gioevale.com/api/health` answers `{"message":"API is healthy."…}`.
 5. **If the HTTPS certificate is not issued:**
    - check the DNS, and that ports 80/443 are open (Hetzner firewall + `ufw`);
    - read the logs: `ssh deploy@… 'cd /opt/wedding && docker compose logs caddy --tail=50'`.
 
 ### 4.5 First configuration of the site (once, ~1 hour)
 
-1. **Admin UI:** `https://api.your-domain.it/_/`, log in with `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`.
+1. **Admin UI:** `https://api.gioevale.com/_/`, log in with `PB_ADMIN_EMAIL` / `PB_ADMIN_PASSWORD`.
    - **Turn on MFA** (password + a one-time code by e-mail): **Collections → `_superusers` → ⚙ (edit collection) → Options**, enable **OTP** and **MFA**, Save. The admin UI is on the internet, so protect it. It needs the e-mails of step 3 to work.
 2. **Backups:** **Settings → Backups:**
    - enable the **automatic backups**, e.g. `0 3 * * *` (every night at 03:00), keeping 7;
@@ -359,7 +366,7 @@ Fill in `/opt/wedding/.env`:
 6. **Clubs posters with the real address.** The QR codes point to `FRONTEND_URL`. Print them **after** the domain works, from your computer:
 
    ```bash
-   PB_URL=https://api.your-domain.it FRONTEND_URL=https://your-domain.it \
+   PB_URL=https://api.gioevale.com FRONTEND_URL=https://gioevale.com \
    PB_ADMIN_EMAIL=… PB_ADMIN_PASSWORD=… npm run posters
    ```
 
@@ -418,7 +425,7 @@ Fill in `/opt/wedding/.env`:
     4. After the wedding, set `PB_RATE_LIMIT_EXCLUDED_IPS=-` the same way: `-` clears the list.
   - **If you can't get the IP in advance: raise the limits for the day.** In the admin UI → **Settings → Rate limits**, e.g. logins 50 / 3 s, creates 200 / 5 s, API 3000 / 10 s. Put the defaults back after the wedding.
   - **Optional:** ask the venue whether their Wi-Fi has a "client isolation" or captive portal that would stop phones from reaching the site, and test it at a visit.
-- **Monitoring:** a free monitor, e.g. [UptimeRobot](https://uptimerobot.com) or Better Stack, on `https://your-domain.it/healthz` and `https://api.your-domain.it/api/health`, alerting your phone.
+- **Monitoring:** a free monitor, e.g. [UptimeRobot](https://uptimerobot.com) or Better Stack, on `https://gioevale.com/healthz` and `https://api.gioevale.com/api/health`, alerting your phone.
 - **Disk space:**
   - **Check:** `ssh deploy@… df -h /` should show plenty free.
   - **Resize if needed:** in the Hetzner console you can upgrade the server or add a volume in minutes.
@@ -453,11 +460,13 @@ Fill in `/opt/wedding/.env`:
 | Symptom | Likely cause → fix |
 | --- | --- |
 | No padlock / certificate error | DNS not pointing to the server yet, or ports 80/443 closed → check `nslookup`, firewall; `docker compose logs caddy` |
-| The site loads but says it cannot reach the server | `API_DOMAIN` wrong, or the `api` DNS record missing; check `https://api.your-domain.it/api/health` |
+| The site loads but says it cannot reach the server | `API_DOMAIN` wrong, or the `api` DNS record missing; check `https://api.gioevale.com/api/health` |
 | Errors about CORS in the browser console | The site is opened on a different address than `SITE_DOMAIN` (e.g. `www` without redirect) → fix `.env`, `docker compose up -d` |
 | Confirmation e-mails don't arrive | Admin UI → Logs; check the SMTP settings in `.env`; port 587 with `PB_SMTP_TLS=false`; sender address of your authenticated domain |
 | E-mails land in spam | SPF/DKIM/DMARC missing or duplicated → mail-tester.com tells which |
 | "Too many requests" at the venue | Rate limits and shared Wi-Fi IP → section 5 |
 | A QR code opens the wrong address | Posters printed before the domain was set → reprint with `FRONTEND_URL` (step 4.5.6) |
+| Deploy says "Deploy is off" or "Deploy settings missing" | Open the *Check the deploy settings* step of the *Deploy to the server* job: it names what to add. Usually the environment isn't named exactly `deploy`, `DEPLOY_ENABLED` was saved as a secret instead of a variable, or one of the four secrets is missing |
+| Deploy says "Missing /opt/wedding/.env" | Step 4.2 not finished: `cp .env.example .env` in `/opt/wedding` and fill it in (`ls -la` shows it) |
 | Deploy job fails at "SSH" | `DEPLOY_KNOWN_HOSTS` or `DEPLOY_SSH_KEY` wrong, or the key not in `/home/deploy/.ssh/authorized_keys` |
 | Deploy says "NOT healthy" | `ssh deploy@… 'cd /opt/wedding && docker compose logs --tail=100'`; then `./deploy.sh rollback` |

@@ -12,6 +12,14 @@ cd "$(dirname "$0")"
 KEEP_BACKUPS=10
 VOLUME=wedding_pb_data
 
+# The settings must be in place first (bring_to_prod_instructions.md, step 4.2).
+for file in .env docker-compose.yml Caddyfile; do
+  if [ ! -f "$file" ]; then
+    echo "Missing $(pwd)/$file: see step 4.2 of bring_to_prod_instructions.md (.env comes from .env.example)." >&2
+    exit 1
+  fi
+done
+
 CURRENT=$(sed -n 's/^IMAGE_TAG=//p' .env)
 # Versions that passed their health check: the latest one and the one before it.
 GOOD=$(cat .good-tag 2>/dev/null || true)

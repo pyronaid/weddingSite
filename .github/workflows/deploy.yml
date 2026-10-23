@@ -5,7 +5,8 @@
 #                    GitHub's registry (ghcr.io), then deployed to the server
 #                    over SSH (only once DEPLOY_ENABLED is set to true).
 #
-# Repository settings used (Settings -> Secrets and variables -> Actions):
+# Settings used, in the environment "deploy" (Settings -> Environments) or at
+# repository level (Settings -> Secrets and variables -> Actions):
 #   secrets   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
 #   variables DEPLOY_ENABLED=true, optional DEPLOY_PATH (default /opt/wedding)
 #             and IMAGE_PLATFORMS (default linux/amd64; linux/arm64 for ARM servers)
@@ -92,15 +93,55 @@ jobs:
   deploy:
     name: Deploy to the server
     needs: images
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Optional: add required reviewers to this environment to approve each deploy.
+    # The settings may live in this environment (Settings -> Environments ->
+    # production) or at repository level: inside the job both are visible.
+    # Optional: add required reviewers to the environment to approve each deploy.
     environment: production
     permissions:
       contents: read
       packages: read
     steps:
+      # Says on the run page why the deploy runs or not, instead of skipping
+      # it silently: deploy off, a setting saved in the wrong place, a missing secret.
+      - name: Check the deploy settings
+        id: check
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          # Only checked for being set: a common mistake is saving DEPLOY_ENABLED as a secret.
+          ENABLED_AS_SECRET: ${{ secrets.DEPLOY_ENABLED != '' }}
+          HAS_HOST: ${{ secrets.DEPLOY_HOST != '' }}
+          HAS_USER: ${{ secrets.DEPLOY_USER != '' }}
+          HAS_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY != '' }}
+          HAS_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS != '' }}
+        run: |
+          where="the environment 'deploy' (Settings -> Environments -> deploy) or the repository (Settings -> Secrets and variables -> Actions)"
+          if [ "$(printf '%s' "$DEPLOY_ENABLED" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" != true ]; then
+            if [ "$ENABLED_AS_SECRET" = true ]; then
+              hint="DEPLOY_ENABLED is saved as a SECRET: delete it and add it as a VARIABLE (value true) in $where."
+            elif [ -n "$DEPLOY_ENABLED" ]; then
+              hint="The variable DEPLOY_ENABLED is '$DEPLOY_ENABLED': set it to true."
+            else
+              hint="Add the variable DEPLOY_ENABLED = true in $where. If you used another environment name, rename it to 'deploy'."
+            fi
+            echo "::notice title=Deploy is off::$hint"
+            { echo "### Deploy skipped"; echo; echo "$hint"; } >> "$GITHUB_STEP_SUMMARY"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          missing=""
+          [ "$HAS_HOST" = true ] || missing="$missing DEPLOY_HOST"
+          [ "$HAS_USER" = true ] || missing="$missing DEPLOY_USER"
+          [ "$HAS_SSH_KEY" = true ] || missing="$missing DEPLOY_SSH_KEY"
+          [ "$HAS_KNOWN_HOSTS" = true ] || missing="$missing DEPLOY_KNOWN_HOSTS"
+          if [ -n "$missing" ]; then
+            echo "::error title=Deploy settings missing::Add these secrets in $where:$missing"
+            exit 1
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
       - name: SSH key
+        if: steps.check.outputs.enabled == 'true'
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
@@ -111,6 +152,7 @@ jobs:
           # Pinned host key: the job refuses to talk to any other server.
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
       - name: Deploy
+        if: steps.check.outputs.enabled == 'true'
         env:
           TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/wedding' }}
@@ -118,7 +160,11 @@ jobs:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh_server() { ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$TARGET" "$@"; }
+          ssh_server() { ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 "$TARGET" "$@"; }
+          if ! ssh_server true; then
+            echo "::error title=Cannot connect to the server::Check DEPLOY_HOST, DEPLOY_USER, that the public key of DEPLOY_SSH_KEY is in ~/.ssh/authorized_keys of that user, and that DEPLOY_KNOWN_HOSTS comes from ssh-keyscan of the same server."
+            exit 1
+          fi
           # The job's own token (valid until the job ends) lets the server pull the images.
           printf '%s' "$REGISTRY_TOKEN" | ssh_server "docker login ghcr.io -u '$REGISTRY_USER' --password-stdin"
           ssh_server "'$DEPLOY_PATH/deploy.sh' '$TAG'"
