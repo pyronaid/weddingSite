@@ -7,7 +7,9 @@ A step-by-step guide to putting the site online on your own domain. You will:
 - **Send** the confirmation and password-reset e-mails reliably.
 - **Deploy** with a pipeline, so every change you merge goes live by itself.
 
-> Prices and free tiers change often (Hetzner, for example, changed its cloud prices twice in 2026).
+The guide uses **OVHcloud** (a French company, EU data centres) for the server **and** the domain, so everything is in one account.
+
+> Prices and free tiers change often (OVHcloud raised its VPS prices in April 2026; Hetzner raised its cloud prices twice in 2026).
 > The figures below were checked in October 2026: **always confirm them on the provider's page** before buying.
 
 **What you end up with**
@@ -30,7 +32,7 @@ A step-by-step guide to putting the site online on your own domain. You will:
 | Item | Cost |
 | --- | --- |
 | Domain | €5–20 per year |
-| Server | €5–25 per month, only for the months you need it |
+| Server | ≈ €6.5–10 per month (OVHcloud VPS-1, VAT excluded), only for the months you need it |
 | E-mails | Free on a free tier |
 
 **Time:** half a day the first time, mostly waiting for DNS. Do it **at least 2–3 months before the wedding**, before the invitations with the link and QR codes go out.
@@ -64,7 +66,7 @@ This site is light. The work is done by **one PocketBase process** (Go + SQLite)
   - Spades selfies: up to 1,300 more.
   - With thumbnails that is **≈ 2–4 GB**, plus the site's own photos.
 
-**Recommended size:** 2 vCPU, 4 GB RAM, 40 GB SSD, located in the **EU**. Guests are in Italy, and EU hosting keeps their e-mails and photos under GDPR.
+**Minimum size:** 2 vCPU, 4 GB RAM, 40 GB SSD, located in the **EU**. Guests are in Italy, and EU hosting keeps their e-mails and photos under GDPR. OVHcloud's smallest VPS is well above this.
 
 **Two rules from the architecture:**
 1. **Exactly one PocketBase instance, with a persistent disk.** It is SQLite-based, so no "scale to N replicas" and no serverless.
@@ -74,39 +76,62 @@ This site is light. The work is done by **one PocketBase process** (Go + SQLite)
 
 | | Option | Examples (EU regions) | Approx. price | Fits this repo | Good | Less good |
 | --- | --- | --- | --- | --- | --- | --- |
-| **A** ⭐ | **A small virtual server (VPS) with Docker** | [Hetzner Cloud](https://www.hetzner.com/cloud) (DE/FI), [Netcup](https://www.netcup.com) (DE), [Aruba Cloud](https://www.arubacloud.com) (IT), [OVHcloud VPS](https://www.ovhcloud.com) (FR), [DigitalOcean](https://www.digitalocean.com) (DE/NL) | €5–25/month | **100%: the files above and the pipeline target exactly this** | Cheapest; full control; fixed price; one place for everything; backups by the provider | You run a Linux server: 30 minutes of setup (below), then updates run by themselves |
+| **A** ⭐ | **A small virtual server (VPS) with Docker** | [**OVHcloud VPS**](https://www.ovhcloud.com/it/vps/) (FR/DE/PL/…), [Aruba Cloud](https://www.arubacloud.com) (IT), [Netcup](https://www.netcup.com) (DE), [Hetzner Cloud](https://www.hetzner.com/cloud) (DE/FI, much pricier since 2026), [DigitalOcean](https://www.digitalocean.com) (DE/NL) | €6–25/month | **100%: the files above and the pipeline target exactly this** | Cheapest; full control; fixed price; one place for everything; backups by the provider | You run a Linux server: 30 minutes of setup (below), then updates run by themselves |
 | B | **Container platform with a volume** | [Fly.io](https://fly.io) (one machine + volume), [Railway](https://railway.com), [Render](https://render.com) (with a paid disk) | $5–25/month | Partly: reuse the two Dockerfiles, but write the platform's config instead of `deploy/` | No server to maintain; HTTPS included | Pricing by usage; vendor-specific config; persistent disks need care (single region, one instance) |
 | C | **Managed PocketBase + static hosting** | [PocketHost](https://pockethost.io) for PocketBase + [Cloudflare Pages](https://pages.cloudflare.com) / [Netlify](https://www.netlify.com) for the site | ≈ $10/month + free | Partly: upload `pb_migrations` and `pb_hooks`, set the same settings by hand; check that hooks with `require()` work there | Almost nothing to maintain | Less control (rate limits, backups, logs); two providers; you must check the plan's limits |
 
-**Recommendation: option A on Hetzner Cloud.**
-- **Why:** best price/performance in the EU, and the repository's pipeline deploys to it as is.
-- **If Hetzner has no availability or is too expensive** (in mid-2026 it reported limited availability of some plans): pick **Netcup** or **Aruba Cloud** (Italian, data centres in Italy). Every command below works on any Ubuntu server.
-- **Plan to pick:** a "shared vCPU" plan with 2 vCPU / 4 GB.
-  - **Intel/AMD (x86):** nothing to change.
-  - **ARM** (Hetzner CAX, cheaper): set `IMAGE_PLATFORMS=linux/arm64` (step 4.3).
+**Recommendation: option A, an OVHcloud VPS-1.**
 
-### 1.1 Create the server (Hetzner example)
+| | VPS-1 (Oct 2026) |
+| --- | --- |
+| vCores | 4 |
+| RAM | 8 GB |
+| Disk | 75 GB SSD |
+| Traffic | Unlimited (400 Mbit/s) |
+| Price | ≈ €6.5 per month, VAT excluded |
+| Backup | A daily backup of the whole server is included |
 
-1. Create an account at [hetzner.com/cloud](https://www.hetzner.com/cloud) and a project, e.g. "wedding".
+- **Why:**
+  - It's roughly twice the size this site needs, for about the price of a pizza a month.
+  - OVHcloud is an EU company and also sells the domain.
+  - The repository's pipeline deploys to it as is.
+- **VPS-2** (≈ €10/month) is not needed for 100 guests.
+- **VPS-1 runs on Intel/AMD (x86):** nothing to change in the pipeline. Only for an ARM server would you set `IMAGE_PLATFORMS=linux/arm64` (step 4.3).
+- **If OVHcloud doesn't suit you**, **Aruba Cloud** (Italian, data centres in Italy) or **Netcup** work the same: every command below runs on any Ubuntu server.
+
+### 1.1 Order the server at OVHcloud
+
+The menu names below may move a little in OVHcloud's Control Panel.
+
+1. **Create an account** at [ovhcloud.com](https://www.ovhcloud.com/it/) and turn on **two-factor authentication** (account menu → Security).
 2. On **your computer**, if you don't have an SSH key yet, create one: `ssh-keygen -t ed25519 -C "you@example.com"`.
    - **Your public key** is in `~/.ssh/id_ed25519.pub`.
-3. **Add Server:**
-   - **Location:** Nuremberg/Falkenstein/Helsinki.
+3. **Order:** [ovhcloud.com → VPS](https://www.ovhcloud.com/it/vps/) → **VPS-1** → Configure:
+   - **Location:** an EU data centre, e.g. France (Gravelines/Strasbourg) or Germany, or Italy if it is offered for VPS.
    - **Image:** **Ubuntu 24.04**.
-   - **Type:** 2 vCPU / 4 GB (shared).
-   - **Networking:** public IPv4 **and** IPv6.
-   - **SSH key:** paste your public key.
-   - **Backups:** enable them (≈ +20%; daily snapshots of the whole server: your safety net).
-   - **Name:** `wedding`.
-4. Note the server's **IPv4** (e.g. `203.0.113.10`) and **IPv6**.
-5. Optional but good: **Firewalls → Create firewall**, allowing inbound TCP 22, 80, 443 and UDP 443, and apply it to the server.
+   - **Commitment:** **without commitment** (monthly). The site is needed only for a few months; a 12-month commitment is cheaper per month but can't be stopped early.
+   - **Options:** the **daily backup is included** (kept 24 h). The paid automated backup, kept 7 days, is optional, since step 4.5 sets up PocketBase's own nightly backups.
+   - **SSH key:** if the order form offers it, paste your public key.
+4. **The delivery e-mail** arrives within minutes. It gives:
+   - the server's **IPv4** (e.g. `203.0.113.10`);
+   - the user, **`ubuntu`**, which has `sudo`; root cannot log in over SSH;
+   - a **secure link to the temporary password**.
+
+   The Control Panel (**Bare Metal Cloud → Virtual private servers →** your VPS) also shows the **IPv6**, if there is one. It has a **KVM** console too, to reach the server even if SSH stops working.
+5. **First login:** `ssh ubuntu@203.0.113.10`.
+   - **Without an SSH key at order time:** use the temporary password. You are asked to change it at once, then the session closes: log in again with the new password, and keep it (`sudo` asks for it).
+   - **Then add your key**, from your computer: `ssh-copy-id ubuntu@203.0.113.10`.
+6. Optional: OVHcloud's **Edge Network Firewall** (Control Panel → **Network → Public IP addresses** → the VPS's IP → Edge Network Firewall) can allow only TCP 22, 80 and 443.
+   - It covers IPv4 only and doesn't support HTTP/3 (browsers then simply use HTTP/2).
+   - The server's own firewall (`ufw`, below) is enough on its own.
 
 ### 1.2 Prepare the server (once, ~15 minutes)
 
-Connect as root and run these (they are safe to copy and paste in order):
+Connect as `ubuntu`, become root with `sudo -i`, and run these (they are safe to copy and paste in order):
 
 ```bash
-ssh root@203.0.113.10
+ssh ubuntu@203.0.113.10
+sudo -i
 
 # System up to date, automatic security updates, firewall.
 apt update && apt -y full-upgrade
@@ -120,7 +145,7 @@ curl -fsSL https://get.docker.com | sh
 adduser --disabled-password --gecos "" deploy
 usermod -aG docker deploy
 install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
-cp ~/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys
+cp /home/ubuntu/.ssh/authorized_keys /home/deploy/.ssh/authorized_keys
 chown deploy:deploy /home/deploy/.ssh/authorized_keys && chmod 600 /home/deploy/.ssh/authorized_keys
 
 # The site's folder.
@@ -129,12 +154,14 @@ install -d -o deploy -g deploy /opt/wedding
 # Firewall: SSH, HTTP, HTTPS (+ HTTP/3).
 ufw allow OpenSSH && ufw allow 80/tcp && ufw allow 443/tcp && ufw allow 443/udp && ufw --force enable
 
-# Log in with keys only.
-sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+# Log in with keys only. A file in sshd_config.d is used because cloud images
+# enable passwords there, and the first file read wins over the main config.
+echo 'PasswordAuthentication no' > /etc/ssh/sshd_config.d/00-keys-only.conf
 systemctl restart ssh
+sshd -T | grep -i '^passwordauthentication'   # must print: passwordauthentication no
 ```
 
-Check, **from a second terminal**, that `ssh deploy@203.0.113.10` works before closing the root session.
+Check, **from a second terminal**, that `ssh deploy@203.0.113.10` (and `ssh ubuntu@203.0.113.10`) work with your key before closing the root session. If you ever lock yourself out, use the **KVM** console in the Control Panel.
 
 ---
 
@@ -147,21 +174,28 @@ Check, **from a second terminal**, that `ssh deploy@203.0.113.10` works before c
 
   | Extension | Who can register | Price | Registrars |
   | --- | --- | --- | --- |
-  | `.it` | You need an address in the EU/EEA | ≈ €5–15/year | Italian registrars such as [Aruba](https://www.aruba.it), [Register.it](https://www.register.it), or [OVHcloud](https://www.ovhcloud.com) |
-  | `.com` | Anyone | ≈ €10–15/year | [Cloudflare Registrar](https://www.cloudflare.com/products/registrar/) (sells at cost), [Porkbun](https://porkbun.com), [Namecheap](https://www.namecheap.com) |
+  | `.it` | You need an address in the EU/EEA | ≈ €5–15/year | [**OVHcloud**](https://www.ovhcloud.com/it/domains/) (recommended here: same account as the server), [Aruba](https://www.aruba.it), [Register.it](https://www.register.it) |
+  | `.com` | Anyone | ≈ €10–15/year | **OVHcloud**, [Cloudflare Registrar](https://www.cloudflare.com/products/registrar/) (sells at cost), [Porkbun](https://porkbun.com), [Namecheap](https://www.namecheap.com) |
   | `.wedding` | Anyone | Pricier, ≈ €30–50/year | Check your registrar |
 
   - **Check the yearly renewal price** too, not only the first year.
 
 ### 2.2 Buy it
 
-1. Search the name at the registrar, buy it for **2 years** so it doesn't expire around the wedding, and turn on **auto-renew**.
+1. At OVHcloud: [ovhcloud.com → Domain names](https://www.ovhcloud.com/it/domains/), search the name, and add it to the cart. Choose the **free DNS zone** (OVHcloud's DNS), not a hosting plan: the VPS is the hosting. Buy it for **2 years** so it doesn't expire around the wedding, and turn on **auto-renew** (Control Panel → Billing → Renewals).
 2. Turn on **two-factor authentication** on the registrar account: whoever controls the domain controls the site and its e-mails.
 3. Keep **WHOIS privacy** on. For `.it` the personal data of private individuals is hidden automatically.
 
 ### 2.3 Point it to the server (DNS)
 
-In the registrar's DNS panel (or at Cloudflare DNS, free, if you move the DNS there), create:
+At OVHcloud: Control Panel → **Web Cloud → Domain names →** your domain → **DNS zone** tab → **Add an entry**. Other registrars have a similar DNS panel.
+
+OVHcloud fills a new domain's zone with **default records**: `A`/`AAAA` pointing to an OVHcloud parking page, `MX` for its mail redirection, and an SPF `TXT`. Before adding new ones:
+- **modify** the existing `A` and `AAAA` records of the domain and of `www` (or delete them);
+- don't leave two `A` records for the same name;
+- leave the `MX`/SPF ones for now: step 3 explains them.
+
+The records you need:
 
 | Type | Name | Value | Notes |
 | --- | --- | --- | --- |
@@ -170,7 +204,8 @@ In the registrar's DNS panel (or at Cloudflare DNS, free, if you move the DNS th
 | `A` | `api` | `203.0.113.10` | PocketBase: API, photos, admin UI |
 | `AAAA` | `@`, `www`, `api` | the server's IPv6 | Optional but recommended |
 
-- **If you use Cloudflare DNS**, set the three records to **"DNS only"** (grey cloud): Caddy then gets the HTTPS certificates directly. Cloudflare's proxy is not needed for 100 guests.
+- **TTL:** keep the default, or lower it (e.g. 300 s) while you set things up.
+- **If you moved the DNS to Cloudflare** instead, set the three records to **"DNS only"** (grey cloud): Caddy then gets the HTTPS certificates directly. Cloudflare's proxy is not needed for 100 guests.
 - **Wait for the records to work** (minutes to a few hours). From your computer, `nslookup api.giuliaemarco.it` (or `dig +short api.giuliaemarco.it`) must answer with the server's IP **before** the first deploy (step 4.4).
 
 The e-mail records (SPF, DKIM, DMARC) come in step 3.
@@ -189,7 +224,7 @@ With ~100 guests that is a few hundred e-mails in total, mostly the days after t
 
 Use a **transactional e-mail provider** (an SMTP relay), not your personal Gmail and not a mail server on the VPS:
 - deliverability (not ending up in spam) needs a reputable sender;
-- most hosts, Hetzner included, **block outgoing ports 25 and 465** on new servers. Port **587** is open.
+- many hosts block outgoing mail ports 25 and 465 on new servers, and OVHcloud blocks port 25 if its anti-spam system flags a server. An SMTP relay on port **587** avoids all of this.
 
 | Provider | Free tier (Oct 2026) | Notes |
 | --- | --- | --- |
@@ -213,7 +248,7 @@ The menu names below may move a little in Brevo's UI.
      - **SPF** (`TXT` on `@`, `v=spf1 include:… ~all`);
      - **DMARC** (`TXT` on `_dmarc`, e.g. `v=DMARC1; p=none; rua=mailto:you@yourmail.com`).
    - **Copy them exactly.**
-   - **Only one SPF record per domain:** if the registrar already created one (e.g. for its own mail forwarding), merge the `include:` parts into that single `v=spf1 … ~all` record.
+   - **Only one SPF record per domain.** OVHcloud's zone usually already has one (`v=spf1 include:mx.ovh.com ~all`). **Edit it**, adding Brevo's `include:` (e.g. `v=spf1 include:mx.ovh.com include:spf.brevo.com ~all`, with the exact value Brevo shows), instead of creating a second one.
    - Click **Authenticate** once the DNS records work (can take up to a few hours).
 3. **Senders → Add a sender:** `noreply@your-domain.it`, name "Giulia & Marco".
 4. **SMTP & API → SMTP → Generate a new SMTP key.** Note:
@@ -244,7 +279,7 @@ The menu names below may move a little in Brevo's UI.
 
 The site only **sends**. If you want an address guests can write to (e.g. `sposi@your-domain.it`), add **forwarding** to your personal mailbox:
 - **Cloudflare Email Routing:** free, if the DNS is at Cloudflare;
-- your **registrar's forwarding**;
+- **OVHcloud's e-mail redirection**, included with the domain (Control Panel → **Web Cloud → Emails →** your domain → **Redirection**). It uses the OVHcloud `MX` records already in the zone;
 - [ImprovMX](https://improvmx.com): free.
 
 This adds `MX` records and an SPF `include:`; keep a **single** SPF record, merged.
@@ -332,7 +367,7 @@ Fill in `/opt/wedding/.env`:
    - `https://www.your-domain.it` redirects to it;
    - `https://api.your-domain.it/api/health` answers `{"message":"API is healthy."…}`.
 5. **If the HTTPS certificate is not issued:**
-   - check the DNS, and that ports 80/443 are open (Hetzner firewall + `ufw`);
+   - check the DNS, and that ports 80/443 are open (`ufw status`, and the Edge Network Firewall if you turned it on);
    - read the logs: `ssh deploy@… 'cd /opt/wedding && docker compose logs caddy --tail=50'`.
 
 ### 4.5 First configuration of the site (once, ~1 hour)
@@ -341,7 +376,7 @@ Fill in `/opt/wedding/.env`:
    - **Turn on MFA** (password + a one-time code by e-mail): **Collections → `_superusers` → ⚙ (edit collection) → Options**, enable **OTP** and **MFA**, Save. The admin UI is on the internet, so protect it. It needs the e-mails of step 3 to work.
 2. **Backups:** **Settings → Backups:**
    - enable the **automatic backups**, e.g. `0 3 * * *` (every night at 03:00), keeping 7;
-   - better still, store them **off the server**: same page → S3 storage (Hetzner Object Storage, Backblaze B2 or Cloudflare R2, a few cents a month).
+   - better still, store them **off the server**: same page → S3 storage, e.g. **OVHcloud Object Storage** (S3-compatible, same account), Backblaze B2 or Cloudflare R2, a few cents a month.
    - **These nightly backups include the photos.** The per-deploy copies in `/opt/wedding/backups/` include only the database.
 3. **The couple (super admins):**
    1. Sign up on the site (with the secret code `#wedding`) and confirm the e-mail.
@@ -387,7 +422,7 @@ Fill in `/opt/wedding/.env`:
      ./deploy.sh rollback                         # also restarts PocketBase
      ```
 
-   - **Last resort:** Hetzner's daily server backup (Hetzner console → the server → Backups → Restore).
+   - **Last resort:** OVHcloud's daily backup of the whole server (Control Panel → your VPS → **Automated backup** tab → **Restore**). The included one only goes back 24 h, so use it quickly.
 4. **Changes that are not code:** none of these need a deploy:
    - **Content and photos:** Site settings.
    - **Game content:** the organisers' screens.
@@ -421,7 +456,7 @@ Fill in `/opt/wedding/.env`:
 - **Monitoring:** a free monitor, e.g. [UptimeRobot](https://uptimerobot.com) or Better Stack, on `https://your-domain.it/healthz` and `https://api.your-domain.it/api/health`, alerting your phone.
 - **Disk space:**
   - **Check:** `ssh deploy@… df -h /` should show plenty free.
-  - **Resize if needed:** in the Hetzner console you can upgrade the server or add a volume in minutes.
+  - **Resize if needed:** in the OVHcloud Control Panel → your VPS → **Upgrade**, you can move to a bigger model in minutes (the disk grows with it).
 - **The day before:** download a backup from the admin UI (Settings → Backups → download) to your computer.
 
 ---
@@ -438,7 +473,7 @@ Fill in `/opt/wedding/.env`:
 
 2. **Leave the site online** for a few weeks so guests can see the gallery. Then:
    - turn the PocketBase rate limits back to normal (`PB_RATE_LIMIT_EXCLUDED_IPS=-`, or the defaults in the admin UI);
-   - after the last download, delete the server: Hetzner bills by the hour, so the bill stops when it is deleted.
+   - after the last download, stop the server: Control Panel → **Billing → My services →** the VPS → **Cancel/Terminate**. Without commitment it ends at the end of the current month. Don't forget the paid options, such as Object Storage.
 3. **Privacy:** the site holds the guests' names, e-mails and photos.
    - Delete the server, and its backups (also the S3 ones), once you have kept what you want.
    - Tell the guests (a line in the invitation or on the site) that photos are shared with the other guests and deleted after the wedding.
