@@ -26,7 +26,7 @@ describe('PocketBaseAuthService', () => {
       email: 'anna@example.com',
       name: 'Anna',
       verified: true,
-      isAdmin: false,
+      adminSuits: [],
       isSuperAdmin: false,
     });
     expect(service.getCurrentUser()).toBe(service.getCurrentUser());

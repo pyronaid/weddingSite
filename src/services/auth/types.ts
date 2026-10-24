@@ -1,13 +1,29 @@
+import { SUITS, type Suit } from '../game/types';
+
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   verified: boolean;
-  /** Organiser: sees the admin view (granted by a superuser, never self-assigned). */
-  isAdmin: boolean;
-  /** Super admin: also edits the site content and language (implies isAdmin). */
+  /**
+   * The suits this user organises (edits in the organisers' area), granted by
+   * a superuser, never self-assigned. Organisers play the game like everybody.
+   */
+  adminSuits: Suit[];
+  /** Super admin: edits every suit, the site content, the language and the sign-up code. */
   isSuperAdmin: boolean;
 }
+
+/** The suits the user may edit: theirs, or every suit for a super admin. */
+export function editableSuits(user: AuthUser | null): Suit[] {
+  if (!user) return [];
+  return user.isSuperAdmin ? [...SUITS] : user.adminSuits;
+}
+
+export const canEditSuit = (user: AuthUser | null, suit: Suit) => editableSuits(user).includes(suit);
+
+/** Organises at least one suit (or is a super admin). */
+export const isOrganiser = (user: AuthUser | null) => editableSuits(user).length > 0;
 
 export interface SignUpInput {
   name: string;

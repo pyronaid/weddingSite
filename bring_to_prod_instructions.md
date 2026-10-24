@@ -354,9 +354,9 @@ Fill in `/opt/wedding/.env`:
    1. Sign up on the site (with the secret code `#wedding`) and confirm the e-mail.
    2. In the admin UI: **users** → you → tick **`is_superadmin`** → Save.
    3. Log out and in again.
-   - **Organisers:** the same, with `is_admin`.
+   - **Organisers:** the same, choosing their suits in **`admin_suits`** (e.g. only clubs). They still play the game, and edit only those suits.
 4. **Site settings** (private area → *Site settings*): **language**, names, date and time zone, RSVP deadline, ceremony/reception, gift text and **IBAN**, and all the **photos**. These texts are shown as written, so write them in the chosen language.
-5. **The game content** (organisers' home):
+5. **The game content** (the *Organisers* section of the private area home):
    - **Sign-up code:** change it, and put the new one on the invitations.
    - **Letters** of every suit.
    - **Clubs:** the riddles and their **solutions**.

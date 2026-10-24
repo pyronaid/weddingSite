@@ -14,7 +14,7 @@ const superAdmin: AuthUser = {
   email: 'super@example.com',
   name: 'Sara',
   verified: true,
-  isAdmin: true,
+  adminSuits: [],
   isSuperAdmin: true,
 };
 

@@ -24,8 +24,8 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        // Organisers only (users flagged is_admin by a superuser).
-        lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireAdmin }),
+        // The organisers of that suit only (admin_suits, set by a superuser), and super admins.
+        lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireSuitAdmin }),
         children: [{ path: 'admin/suits/:suit', lazy: async () => ({ Component: (await pages()).AdminSuitPage }) }],
       },
       {

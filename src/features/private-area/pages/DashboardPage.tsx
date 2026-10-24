@@ -5,20 +5,17 @@ import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { SUITS } from '../../../services/game';
 import { SuitCard } from '../components/SuitCard/SuitCard';
 import { useGameProgress } from '../game/useGameProgress';
-import { AdminDashboard } from '../admin/AdminDashboard';
+import { OrganiserPanel } from '../admin/OrganiserPanel';
 import { useMessages } from '../../../i18n';
 import { authMessages } from '../messages/auth';
 import { useAuth } from '../useAuth';
 import styles from './pages.module.css';
 
-/** Landing page of the private area: game intro and progress per suit. */
+/**
+ * Landing page of the private area: game intro and progress per suit, for
+ * everybody. Organisers play too: their suits to edit come below.
+ */
 export function DashboardPage() {
-  const { user } = useAuth();
-  // Organisers get their own home: what to edit in each suit.
-  return user?.isAdmin ? <AdminDashboard /> : <PlayerDashboard />;
-}
-
-function PlayerDashboard() {
   const t = useMessages(authMessages);
   useDocumentTitle(t.privateArea);
   const { user, auth } = useAuth();
@@ -55,6 +52,8 @@ function PlayerDashboard() {
           ))}
         </div>
       </section>
+
+      <OrganiserPanel />
 
       <button type="button" className={formStyles.secondary} onClick={() => auth.logout()}>
         {t.dashboard.logOut}

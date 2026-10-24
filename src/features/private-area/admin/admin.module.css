@@ -425,3 +425,11 @@
   font-weight: 700;
   color: var(--card-text);
 }
+
+/* Organisers' section of the private area home. */
+.organiser {
+  display: grid;
+  gap: 0.9rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--card-border);
+}
