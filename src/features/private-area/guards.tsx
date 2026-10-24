@@ -1,4 +1,6 @@
-import { Navigate, Outlet, useLocation, type Location } from 'react-router';
+import { Navigate, Outlet, useLocation, useParams, type Location } from 'react-router';
+import { canEditSuit } from '../../services/auth';
+import { isSuit } from '../../services/game';
 import { useAuth } from './useAuth';
 
 export const AREA_HOME = '/area';
@@ -21,12 +23,16 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-/** Only for organisers (`isAdmin`); other logged-in users go back to the area home. */
-export function RequireAdmin() {
+/**
+ * Only for the organisers of the suit in the URL (`:suit`), or super admins;
+ * everybody else goes back to the area home. The server checks it too.
+ */
+export function RequireSuitAdmin() {
   const { user } = useAuth();
+  const { suit } = useParams();
   const location = useLocation();
   if (!user) return <Navigate to={LOGIN_PATH} replace state={{ from: location } satisfies RedirectState} />;
-  if (!user.isAdmin) return <Navigate to={AREA_HOME} replace />;
+  if (!isSuit(suit) || !canEditSuit(user, suit)) return <Navigate to={AREA_HOME} replace />;
   return <Outlet />;
 }
 

@@ -66,7 +66,7 @@ export interface AdminSettings {
   signupCode: string;
 }
 
-/** Organisers' operations; every one is checked by the server (is_admin). */
+/** Organisers' operations; every one is checked by the server (the suits of `admin_suits`, or a super admin). */
 export interface AdminRepository {
   getSuit(suit: Suit): Promise<AdminCard[]>;
   updateCard(cardId: string, changes: AdminCardChanges): Promise<AdminCard>;

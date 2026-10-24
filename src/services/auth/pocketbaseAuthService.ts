@@ -1,5 +1,6 @@
 import type PocketBase from 'pocketbase';
 import type { RecordModel } from 'pocketbase';
+import { isSuit } from '../game/types';
 import { toAuthError } from './errors';
 import type { AuthService, AuthUser, SignUpInput } from './types';
 
@@ -12,8 +13,8 @@ function toAuthUser(record: RecordModel | null): AuthUser | null {
     email: String(record.email ?? ''),
     name: String(record.name ?? ''),
     verified: Boolean(record.verified),
-    // A super admin can do everything an organiser can.
-    isAdmin: Boolean(record.is_admin || record.is_superadmin),
+    // Unknown values (a suit added on the server first) are ignored.
+    adminSuits: (Array.isArray(record.admin_suits) ? record.admin_suits : []).filter(isSuit),
     isSuperAdmin: Boolean(record.is_superadmin),
   };
 }

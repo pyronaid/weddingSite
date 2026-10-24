@@ -16,7 +16,7 @@ import {
 } from '../../services/game';
 import { AuthProvider } from './AuthProvider';
 import { GameRepositoryProvider } from './game/GameRepositoryContext';
-import { GuestOnly, RequireAdmin, RequireAuth, RequireSuperAdmin } from './guards';
+import { GuestOnly, RequireAuth, RequireSuitAdmin, RequireSuperAdmin } from './guards';
 import { setLanguage } from '../../i18n';
 import { DashboardPage } from './pages/DashboardPage';
 import { GalleryPage } from './pages/GalleryPage';
@@ -40,7 +40,15 @@ function createFakeAuth(overrides: Partial<AuthService> = {}) {
     getCurrentUser: () => user,
     subscribe: (l) => (listeners.add(l), () => listeners.delete(l)),
     login: vi.fn(async (email: string) => {
-      const next = { id: '1', email, name: 'Anna Verdi', verified: true, isAdmin: email.startsWith('admin') || email.startsWith('super'), isSuperAdmin: email.startsWith('super') };
+      // admin@… organises every suit, clubs@… only the clubs, clubshearts@… two suits, super@… is a super admin.
+      const adminSuits: Suit[] = email.startsWith('admin')
+        ? ['hearts', 'diamonds', 'spades', 'clubs']
+        : email.startsWith('clubshearts')
+          ? ['clubs', 'hearts']
+          : email.startsWith('clubs')
+            ? ['clubs']
+            : [];
+      const next: AuthUser = { id: '1', email, name: 'Anna Verdi', verified: true, adminSuits, isSuperAdmin: email.startsWith('super') };
       setUser(next);
       return next;
     }),
@@ -271,7 +279,7 @@ function renderArea(
               { path: 'gallery', element: <GalleryPage /> },
             ],
           },
-          { element: <RequireAdmin />, children: [{ path: 'admin/suits/:suit', element: <AdminSuitPage /> }] },
+          { element: <RequireSuitAdmin />, children: [{ path: 'admin/suits/:suit', element: <AdminSuitPage /> }] },
           { element: <RequireSuperAdmin />, children: [{ path: 'site', element: <h2>Site settings page</h2> }] },
           {
             element: <GuestOnly />,
@@ -1002,13 +1010,58 @@ describe('private area', () => {
       return auth;
     }
 
-    it('shows organisers their own home with the four suits and the secret code', async () => {
-      const admin = createFakeAdmin();
-      renderArea(await loggedInAdmin(), '/area', createFakeGame(), admin);
+    it('lets organisers of every suit play, with the four suits to edit below their collection', async () => {
+      renderArea(await loggedInAdmin(), '/area');
 
-      expect(await screen.findByText('Organisers')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Clubs: Letters & riddles' })).toHaveAttribute('href', '/area/admin/suits/clubs');
-      expect(screen.getByRole('link', { name: 'Hearts: Letters & scenes' })).toHaveAttribute('href', '/area/admin/suits/hearts');
+      // Their own game, like every guest.
+      expect(await screen.findByRole('link', { name: 'Hearts: 3 of 13 cards collected' })).toHaveAttribute('href', '/area/suits/hearts');
+      const panel = screen.getByRole('region', { name: 'Organisers' });
+      expect(within(panel).getByRole('link', { name: 'Clubs: Letters & riddles' })).toHaveAttribute('href', '/area/admin/suits/clubs');
+      expect(within(panel).getByRole('link', { name: 'Hearts: Letters & scenes' })).toHaveAttribute('href', '/area/admin/suits/hearts');
+      expect(within(panel).getAllByRole('link')).toHaveLength(4);
+      // The sign-up code and the site settings are for super admins.
+      expect(screen.queryByLabelText(/code guests need/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Site settings/ })).not.toBeInTheDocument();
+    });
+
+    it('gives the organiser of some suits only those suits, and the game', async () => {
+      const auth = createFakeAuth();
+      await auth.login('clubshearts@example.com', 'x');
+      renderArea(auth, '/area');
+
+      expect(await screen.findByRole('link', { name: 'Clubs: 1 of 13 cards collected' })).toBeInTheDocument();
+      const panel = screen.getByRole('region', { name: 'Organisers' });
+      expect(panel).toHaveTextContent('You organise Clubs and Hearts');
+      expect(within(panel).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+        '/area/admin/suits/clubs',
+        '/area/admin/suits/hearts',
+      ]);
+    });
+
+    it('opens only the editors of the suits the organiser has', async () => {
+      const auth = createFakeAuth();
+      await auth.login('clubs@example.com', 'x');
+      const router = renderArea(auth, '/area/admin/suits/clubs');
+      expect(await screen.findByRole('article', { name: '7 of clubs' })).toBeInTheDocument();
+
+      await act(() => router.navigate('/area/admin/suits/hearts'));
+      expect(await screen.findByRole('region', { name: 'Organisers' })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area');
+    });
+
+    it('nobody else gets the organisers section', async () => {
+      const auth = createFakeAuth();
+      await auth.login('anna@example.com', 'x');
+      renderArea(auth, '/area');
+      await screen.findByRole('link', { name: 'Hearts: 3 of 13 cards collected' });
+      expect(screen.queryByRole('region', { name: 'Organisers' })).not.toBeInTheDocument();
+    });
+
+    it('lets super admins change the sign-up secret code', async () => {
+      const admin = createFakeAdmin();
+      const auth = createFakeAuth();
+      await auth.login('super@example.com', 'x');
+      renderArea(auth, '/area', createFakeGame(), admin);
 
       const code = await screen.findByLabelText(/code guests need/i);
       await waitFor(() => expect(code).toHaveValue('#wedding'));

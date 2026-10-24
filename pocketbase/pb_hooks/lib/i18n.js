@@ -48,6 +48,8 @@ const MESSAGES = {
     guess_too_early: 'Collect all the spades before guessing.',
     // Organisers
     admins_only: 'Only the organisers can do this.',
+    suit_admins_only: 'Only the organisers of this suit can do this.',
+    superadmins_only: 'Only the bride and groom (super admins) can do this.',
     not_found: 'Not found.',
     unknown_suit: 'Unknown suit.',
     face_no_letter: 'Jack, Queen and King have no letter.',
@@ -97,6 +99,8 @@ const MESSAGES = {
     selfie_ace: 'L\'Asso ha bisogno di un selfie tutto suo.',
     guess_too_early: 'Raccogli tutte le picche prima di indovinare.',
     admins_only: 'Solo gli organizzatori possono farlo.',
+    suit_admins_only: 'Solo gli organizzatori di questo seme possono farlo.',
+    superadmins_only: 'Solo gli sposi (super admin) possono farlo.',
     not_found: 'Non trovato.',
     unknown_suit: 'Seme sconosciuto.',
     face_no_letter: 'Fante, Donna e Re non hanno una lettera.',

@@ -137,8 +137,8 @@ npm run dev                  # http://localhost:5173
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
 | `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase (not spades) | logged-in only  |
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
-| `/area` (organisers)         | Organisers' home: the four suits to edit + the sign-up secret code | admins only     |
-| `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes | admins only     |
+| `/area` (organisers)         | The same game home, plus an *Organisers* section: the suits they edit (+ site settings and sign-up code for super admins) | organisers of those suits |
+| `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes, diamonds quiz, spades people | organisers of that suit |
 | `/area/site`                 | Site settings: language, names, date, places, gift, photos | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
@@ -251,23 +251,25 @@ FRONTEND_URL=http://192.168.1.20:5173 npm run posters
 
 ### Organisers (admin view)
 
-Organisers are normal users with **`is_admin`** switched on. Only a superuser can do it: admin UI (`/_/`) → `users` → open the user → tick `is_admin` → Save, then the user logs out and in again. Users can never set it themselves (sign-up and profile rules forbid it).
+Organisers are normal guests who also edit **some suits**: the list **`admin_suits`** of their user (hearts, diamonds, spades, clubs, any combination). Only a superuser can set it: admin UI (`/_/`) → `users` → open the user → pick the suits in `admin_suits` → Save, then the user logs out and in again. Users can never set it themselves (sign-up and profile rules forbid it).
 
-An organiser's `/area` shows their own home instead of the game:
+- A **clubs** organiser edits only the clubs; with **clubs and hearts**, both. Everybody else gets "forbidden", on the site and on the server.
+- Organisers **play the game like every guest**: their `/area` is the usual home with their collection, plus an **Organisers** section with one card per suit they edit. (They know their suits' answers: keep it in mind for the prize.)
+- The **sign-up secret code** is the same for every guest, so it is for **super admins** only.
 
-- the **four suits**, each opening an editor (one panel per card, except the spades):
+The editor of each suit (one panel per card, except the spades):
   - **secret letter** of Ace to 10 (hearts, diamonds and clubs; Jack, Queen and King have none, the spades have none at all);
   - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
   - **diamonds**: the **quiz questions** of every card: add, edit and delete questions and answers, and pick the correct answer (a question always keeps at least two answers and exactly one correct);
   - **spades**: only the **people to find** of the "guess who" game: name, surname and the 13 hints (Ace to King), all required. Drag a hint by its ⠿ handle (mouse or finger; or focus the handle and use the arrow keys) to give it to another card without retyping: the cards stay, the texts move, and nothing changes until Save. Each person shows how many guests were given it and how many found it; a person already given to a guest can be edited (live for those guests too) but not deleted;
   - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text);
-- the **sign-up secret code** (3–50 characters).
+- and, for super admins, the **sign-up secret code** (3–50 characters).
 
-Changes are live for the guests as soon as they are saved. Everything goes through `pb_hooks/admin.pb.js` (`/api/admin/*`): every request checks `is_admin` and each endpoint writes only the fields it is meant to, so guests still never see letters, riddles or solutions they have not earned.
+Changes are live for the guests as soon as they are saved. Everything goes through `pb_hooks/admin.pb.js` (`/api/admin/*`): every request checks that the user organises the suit of the card, scene, question, answer or person it touches (`admin_suits`, or a super admin), and each endpoint writes only the fields it is meant to, so guests still never see letters, riddles or solutions they have not earned.
 
 ### Super admin (site settings)
 
-Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) → `users` → open the user → tick `is_superadmin` → Save, then log out and in again. Like `is_admin`, users can never set it themselves. A super admin is also an organiser, and their home shows a **Site settings** link (`/area/site`):
+Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) → `users` → open the user → tick `is_superadmin` → Save, then log out and in again. Like `admin_suits`, users can never set it themselves. A super admin organises **every** suit, and their *Organisers* section also has the sign-up code and a **Site settings** link (`/area/site`):
 
 - **Language** of the whole site: English or Italian. Every guest sees the public page, the private area, the game, the organisers' screens, the server's messages and the confirmation/reset e-mails in it.
 - **The couple:** the two first names, the line above them ("We are getting married") and the hashtag.
@@ -299,7 +301,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `users` hardening: only verified users can log in, minimum password length 8, users cannot delete their own account through the API.
   - `cards`: the 52-card deck (`suit` + `rank` 1–13, unique together), seeded by the migration. Logged-in users can read it, only superusers can change it.
     It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
-  - `users.is_admin`: organisers (set by a superuser only). `users.is_superadmin`: super admins (set by a superuser only).
+  - `users.admin_suits`: the suits a user organises (set by a superuser only; it replaced the yes/no `is_admin`, whose organisers got every suit). `users.is_superadmin`: super admins (set by a superuser only).
   - `site_content` (one record) and `site_photos`: the content of the public site, edited by the super admins (see above).
   - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
   - `quiz_questions`, `quiz_answers`: the diamonds quiz (organisers only; seeded with two example questions per card). `quiz_attempts`: per user and card, the current question, the questions already faced and the wrong answers (server only).
@@ -314,7 +316,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `photos.pb.js` draws the photo challenge scenes (`POST /api/game/photos/{cardId}/draw`) and collects the card when a photo is uploaded.
   - `quiz.pb.js` serves the diamonds quiz: current question, answers, lives and penalties.
   - `guess.pb.js` serves the spades "guess who": the hints of a card (`POST /api/game/guess/{cardId}`), the selfie upload and the "same person as before" confirmation, the status and the final guess.
-  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code), admins only.
+  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code), each endpoint for the organisers of its suit only (the secret code for super admins).
   - `signup.pb.js` checks the sign-up secret code.
   - `site.pb.js` validates the site content (IBAN checksum, BIC, date with its offset, time zone, a reception with its address and time) and the photo slots, and re-applies the e-mails in the chosen language.
   - `lib/i18n.js` holds the messages the hooks send to the guests, in English and Italian.

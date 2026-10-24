@@ -12,13 +12,51 @@ const GUESS_SUIT = 'spades';
 const MIN_ANSWERS = 2;
 const isFaceCard = (rank) => rank >= 11;
 
-/** Admins are users flagged `is_admin` (or `is_superadmin`, who can do everything) by a superuser. */
-function requireAdmin(e) {
+/**
+ * The suits a user organises: the ones in `admin_suits`, set by a superuser;
+ * every suit for a super admin (`is_superadmin`).
+ */
+function adminSuitsOf(auth) {
+  if (!auth || auth.collection().name !== 'users') return [];
+  if (auth.getBool('is_superadmin')) return SUITS;
+  return auth.getStringSlice('admin_suits').filter((suit) => SUITS.includes(suit));
+}
+
+/** Organisers of at least one suit, and super admins. */
+function requireOrganiser(e) {
+  if (adminSuitsOf(e.auth).length === 0) throw new ForbiddenError(t(e.app, 'admins_only'));
+}
+
+/** The organisers of `suit`, and super admins. */
+function requireSuitAdmin(e, suit) {
+  requireOrganiser(e);
+  if (!adminSuitsOf(e.auth).includes(suit)) throw new ForbiddenError(t(e.app, 'suit_admins_only'));
+}
+
+/** Super admins only (settings that are not about one suit, e.g. the sign-up code). */
+function requireSuperAdmin(e) {
   const auth = e.auth;
-  const allowed = auth && auth.collection().name === 'users' && (auth.getBool('is_admin') || auth.getBool('is_superadmin'));
-  if (!allowed) {
-    throw new ForbiddenError(t(e.app, 'admins_only'));
+  if (!auth || auth.collection().name !== 'users' || !auth.getBool('is_superadmin')) {
+    throw new ForbiddenError(t(e.app, 'superadmins_only'));
   }
+}
+
+/** The suit of a card, or of the scene, quiz question or answer it holds. */
+function suitOf(app, kind, id) {
+  if (kind === 'card') return findRecord(app, 'cards', id).getString('suit');
+  if (kind === 'scene') return suitOf(app, 'card', findRecord(app, 'photo_scenes', id).getString('card'));
+  if (kind === 'question') return suitOf(app, 'card', findRecord(app, 'quiz_questions', id).getString('card'));
+  if (kind === 'answer') return suitOf(app, 'question', findRecord(app, 'quiz_answers', id).getString('question'));
+  throw new Error(`Unknown kind ${kind}`);
+}
+
+/**
+ * The organisers of the suit `id` belongs to. Non-organisers are refused
+ * before anything is looked up, so they cannot probe which ids exist.
+ */
+function requireAdminOf(e, kind, id) {
+  requireOrganiser(e);
+  requireSuitAdmin(e, suitOf(e.app, kind, id));
 }
 
 function findRecord(app, collection, id) {
@@ -324,7 +362,9 @@ function deletePerson(app, personId) {
 }
 
 module.exports = {
-  requireAdmin,
+  requireSuitAdmin,
+  requireSuperAdmin,
+  requireAdminOf,
   listPeople,
   addPerson,
   updatePerson,

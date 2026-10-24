@@ -3,20 +3,20 @@ import type { Suit } from '../../../services/game';
 
 const en = {
   dashboard: {
-    eyebrow: 'Organisers',
-    hello: (name: string) => `Hello, ${name}!`,
-    fallbackName: 'organiser',
-    intro:
+    title: 'Organisers',
+    /** Super admins prepare everything. */
+    introAll:
       'Prepare the game: choose a suit to edit the secret letters of its cards, the photo scenes of the hearts, the quiz of the diamonds, the people to find of the spades and the riddles of the clubs.',
-    suitsTitle: 'The four suits',
+    /** The organisers of some suits only, e.g. "Clubs and Hearts". */
+    introSome: (suits: string) =>
+      `You organise ${suits}: edit their cards and challenges here. You play the game like every other guest.`,
+    and: 'and',
     captions: {
       hearts: 'Letters & scenes',
       diamonds: 'Letters & quiz',
       spades: 'Guess who',
       clubs: 'Letters & riddles',
     } as Record<Suit, string>,
-    logout: 'Log out',
-    backToSite: 'Back to the wedding site',
   },
   suitPage: {
     title: (suit: string) => `Edit ${suit}`,
@@ -126,20 +126,18 @@ export const adminMessages: Dictionary<typeof en> = {
   en,
   it: {
     dashboard: {
-      eyebrow: 'Organizzatori',
-      hello: (name) => `Ciao, ${name}!`,
-      fallbackName: 'organizzatore',
-      intro:
+      title: 'Organizzatori',
+      introAll:
         'Prepara il gioco: scegli un seme per modificare le lettere segrete delle sue carte, le scene fotografiche dei cuori, il quiz dei quadri, le persone da trovare delle picche e gli indovinelli dei fiori.',
-      suitsTitle: 'I quattro semi',
+      introSome: (suits) =>
+        `Organizzi ${suits}: qui modifichi le loro carte e le loro sfide. Giochi come tutti gli altri ospiti.`,
+      and: 'e',
       captions: {
         hearts: 'Lettere e scene',
         diamonds: 'Lettere e quiz',
         spades: 'Indovina chi',
         clubs: 'Lettere e indovinelli',
       },
-      logout: 'Esci',
-      backToSite: 'Torna al sito del matrimonio',
     },
     suitPage: {
       title: (suit) => `Modifica ${suit}`,
