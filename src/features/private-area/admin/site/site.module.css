@@ -193,3 +193,110 @@
   max-width: 380px;
   justify-self: center;
 }
+
+/* ---- Tabs ---- */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.tab {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--card-muted);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tab:hover {
+  border-color: var(--card-accent);
+}
+
+.tab[aria-selected='true'] {
+  border-color: var(--card-accent);
+  background: var(--card-accent);
+  color: var(--card-bg);
+  font-weight: 700;
+}
+
+.tab:focus-visible {
+  outline: 3px solid var(--pink-400);
+  outline-offset: 2px;
+}
+
+.tabPanel {
+  display: grid;
+  gap: 1.1rem;
+}
+
+/* ---- Organisers (users) ---- */
+
+.userList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.userList[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.userRow {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+}
+
+.userName {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.suitToggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.suitToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.suitToggle input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--collected);
+}
+
+.suitOn {
+  border-color: var(--collected);
+  background: rgba(47, 158, 91, 0.18);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}

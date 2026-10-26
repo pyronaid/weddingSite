@@ -21,6 +21,8 @@
  *   POST   /api/admin/guess/people              {firstName, lastName, hints: [13 texts]}
  *   PATCH  /api/admin/guess/people/{personId}   {firstName, lastName, hints: [13 texts]}
  *   DELETE /api/admin/guess/people/{personId}   (refused once given to a player)
+ *   GET    /api/admin/users?q=&page=            registered users, 20 per page, by name or e-mail (super admins)
+ *   PATCH  /api/admin/users/{userId}            {adminSuits: [suits]} (super admins)
  *   GET    /api/admin/settings                  {signupCode}
  *   PATCH  /api/admin/settings                  {signupCode}
  */
@@ -227,6 +229,31 @@ routerAdd(
     admin.requireSuitAdmin(e, 'spades');
     admin.deletePerson(e.app, e.request.pathValue('personId'));
     return e.noContent(204);
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Registered users: the super admins assign the suits ----
+
+routerAdd(
+  'GET',
+  '/api/admin/users',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    const query = e.requestInfo().query;
+    return e.json(200, admin.listUsers(e.app, query.q || '', query.page || '1'));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'PATCH',
+  '/api/admin/users/{userId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    return e.json(200, admin.setUserSuits(e.app, e.request.pathValue('userId'), e.requestInfo().body.adminSuits));
   },
   $apis.requireAuth('users'),
 );

@@ -33,5 +33,12 @@ export const GALLERY_PATH = `${AREA_HOME}/gallery`;
 /** Super admin: content, language and photos of the public site. */
 export const SITE_SETTINGS_PATH = `${AREA_HOME}/site`;
 
+/** The tabs of the site settings, each at /area/site/<tab>. */
+export const SETTINGS_TABS = ['general', 'photos', 'organisers', 'signup-code'] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
+export const isSettingsTab = (value: unknown): value is SettingsTab =>
+  typeof value === 'string' && (SETTINGS_TABS as readonly string[]).includes(value);
+export const siteSettingsPath = (tab: SettingsTab) => `${SITE_SETTINGS_PATH}/${tab}`;
+
 /** Organisers' editor of a suit. */
 export const adminSuitPath = (suit: Suit) => `${AREA_HOME}/admin/suits/${suit}`;

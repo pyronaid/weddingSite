@@ -61,6 +61,27 @@ export interface AdminPerson extends PersonFields {
   found: number;
 }
 
+/** A registered user, as the super admins see them to assign the suits. */
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  verified: boolean;
+  /** The suits they organise. */
+  adminSuits: Suit[];
+  /** Super admins organise every suit anyway. */
+  isSuperAdmin: boolean;
+}
+
+export interface AdminUsersPage {
+  items: AdminUser[];
+  /** 1-based; clamped by the server to the existing pages. */
+  page: number;
+  perPage: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface AdminSettings {
   /** Code required to create an account. */
   signupCode: string;
@@ -85,6 +106,10 @@ export interface AdminRepository {
   updatePerson(personId: string, person: PersonFields): Promise<AdminPerson>;
   /** Refused once the person was given to a player. */
   deletePerson(personId: string): Promise<void>;
+  /** Super admins: one page (20) of the registered users whose name or e-mail contains `query`. */
+  listUsers(query: string, page: number): Promise<AdminUsersPage>;
+  /** Super admins: the suits a user organises. */
+  setUserSuits(userId: string, suits: Suit[]): Promise<AdminUser>;
   getSettings(): Promise<AdminSettings>;
   updateSettings(settings: AdminSettings): Promise<AdminSettings>;
 }

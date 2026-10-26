@@ -5,6 +5,8 @@ import type {
   AdminCard,
   AdminCardChanges,
   AdminPerson,
+  AdminUser,
+  AdminUsersPage,
   AdminQuestion,
   AdminRepository,
   AdminScene,
@@ -89,6 +91,15 @@ export class PocketBaseAdminRepository implements AdminRepository {
 
   async deletePerson(personId: string): Promise<void> {
     await this.call(`/guess/people/${encodeURIComponent(personId)}`, 'DELETE');
+  }
+
+  listUsers(query: string, page: number): Promise<AdminUsersPage> {
+    const params = new URLSearchParams({ q: query, page: String(page) });
+    return this.call(`/users?${params}`, 'GET');
+  }
+
+  setUserSuits(userId: string, suits: Suit[]): Promise<AdminUser> {
+    return this.call(`/users/${encodeURIComponent(userId)}`, 'PATCH', { adminSuits: suits });
   }
 
   getSettings(): Promise<AdminSettings> {

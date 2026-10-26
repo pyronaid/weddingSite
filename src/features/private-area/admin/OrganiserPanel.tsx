@@ -7,13 +7,13 @@ import { useAuth } from '../useAuth';
 import pageStyles from '../pages/pages.module.css';
 import { adminMessages } from '../messages/admin';
 import { siteSettingsMessages } from '../messages/siteSettings';
-import { SignupCodeForm } from './SignupCodeForm';
 import styles from './admin.module.css';
 
 /**
  * The organisers' part of the private area home, under the player's own
  * collection: one card per suit the user edits. Super admins also get the
- * site settings and the sign-up code. Nothing for the other guests.
+ * link to the site settings (content, photos, organisers, sign-up code).
+ * Nothing for the other guests.
  */
 export function OrganiserPanel() {
   const { user } = useAuth();
@@ -45,9 +45,6 @@ export function OrganiserPanel() {
           <SuitCard key={suit} suit={suit} to={adminSuitPath(suit)} caption={t.captions[suit]} />
         ))}
       </div>
-
-      {/* The same code for every guest: not one suit's business. */}
-      {user?.isSuperAdmin && <SignupCodeForm />}
     </section>
   );
 }

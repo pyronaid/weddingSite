@@ -245,6 +245,8 @@ function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminReposit
     deletePerson: vi.fn(async () => {}),
     getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
     updateSettings: vi.fn(async (settings) => settings),
+    listUsers: vi.fn(async () => ({ items: [], page: 1, perPage: 20, totalItems: 0, totalPages: 1 })),
+    setUserSuits: vi.fn(),
     ...overrides,
   };
 }
@@ -280,7 +282,7 @@ function renderArea(
             ],
           },
           { element: <RequireSuitAdmin />, children: [{ path: 'admin/suits/:suit', element: <AdminSuitPage /> }] },
-          { element: <RequireSuperAdmin />, children: [{ path: 'site', element: <h2>Site settings page</h2> }] },
+          { element: <RequireSuperAdmin />, children: [{ path: 'site/:tab?', element: <h2>Site settings page</h2> }] },
           {
             element: <GuestOnly />,
             children: [
@@ -1057,20 +1059,15 @@ describe('private area', () => {
       expect(screen.queryByRole('region', { name: 'Organisers' })).not.toBeInTheDocument();
     });
 
-    it('lets super admins change the sign-up secret code', async () => {
+    it('keeps the sign-up code out of the organisers home: it is in the site settings', async () => {
       const admin = createFakeAdmin();
       const auth = createFakeAuth();
       await auth.login('super@example.com', 'x');
       renderArea(auth, '/area', createFakeGame(), admin);
 
-      const code = await screen.findByLabelText(/code guests need/i);
-      await waitFor(() => expect(code).toHaveValue('#wedding'));
-      const user = userEvent.setup();
-      await user.clear(code);
-      await user.type(code, '#Sposi2027');
-      await user.click(screen.getByRole('button', { name: 'Save code' }));
-      expect(admin.updateSettings).toHaveBeenCalledWith({ signupCode: '#Sposi2027' });
-      expect(await screen.findByText('Saved ✓')).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: /Site settings/ })).toBeInTheDocument();
+      expect(screen.queryByLabelText(/code guests need/i)).not.toBeInTheDocument();
+      expect(admin.getSettings).not.toHaveBeenCalled();
     });
 
     it('keeps guests out of the admin pages', async () => {

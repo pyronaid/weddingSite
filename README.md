@@ -137,9 +137,9 @@ npm run dev                  # http://localhost:5173
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
 | `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase (not spades) | logged-in only  |
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
-| `/area` (organisers)         | The same game home, plus an *Organisers* section: the suits they edit (+ site settings and sign-up code for super admins) | organisers of those suits |
+| `/area` (organisers)         | The same game home, plus an *Organisers* section: the suits they edit (+ the site settings link for super admins) | organisers of those suits |
 | `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes, diamonds quiz, spades people | organisers of that suit |
-| `/area/site`                 | Site settings: language, names, date, places, gift, photos | super admins only |
+| `/area/site/:tab?`           | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, sign-up code | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -149,7 +149,7 @@ npm run dev                  # http://localhost:5173
 
 Flows and security choices:
 
-- **Sign up** requires the **secret code** given to the guests (default `#wedding`; capital letters and surrounding spaces do not matter). It is checked by the server (`pb_hooks/signup.pb.js`), never stored with the user, and organisers can change it from their home page.
+- **Sign up** requires the **secret code** given to the guests (default `#wedding`; capital letters and surrounding spaces do not matter). It is checked by the server (`pb_hooks/signup.pb.js`), never stored with the user, and super admins can change it in *Site settings* → *Sign-up code*.
 - **Sign up** creates the user and sends a confirmation e-mail. **Only verified users can log in**: this is enforced by the server (`authRule = "verified = true"`), not just by the UI.
 - Logging in **before confirming** shows "please confirm your e-mail", with a **resend** button (60 s cooldown).
 - **Forgot password** always shows the same message, whether or not the account exists, so nobody can find out which e-mails are registered.
@@ -251,25 +251,33 @@ FRONTEND_URL=http://192.168.1.20:5173 npm run posters
 
 ### Organisers (admin view)
 
-Organisers are normal guests who also edit **some suits**: the list **`admin_suits`** of their user (hearts, diamonds, spades, clubs, any combination). Only a superuser can set it: admin UI (`/_/`) → `users` → open the user → pick the suits in `admin_suits` → Save, then the user logs out and in again. Users can never set it themselves (sign-up and profile rules forbid it).
+Organisers are normal guests who also edit **some suits**: the list **`admin_suits`** of their user (hearts, diamonds, spades, clubs, any combination). A **super admin** sets it from the site: *Site settings* → **Organisers** (see [below](#super-admin-site-settings)); a superuser can also do it from the admin UI (`/_/` → `users` → `admin_suits`). The change applies the next time the user opens the private area. Users can never set it themselves (sign-up and profile rules forbid it).
 
 - A **clubs** organiser edits only the clubs; with **clubs and hearts**, both. Everybody else gets "forbidden", on the site and on the server.
 - Organisers **play the game like every guest**: their `/area` is the usual home with their collection, plus an **Organisers** section with one card per suit they edit. (They know their suits' answers: keep it in mind for the prize.)
-- The **sign-up secret code** is the same for every guest, so it is for **super admins** only.
+- The **sign-up secret code** is the same for every guest, so it is for **super admins** only (*Site settings* → **Sign-up code**).
 
 The editor of each suit (one panel per card, except the spades):
   - **secret letter** of Ace to 10 (hearts, diamonds and clubs; Jack, Queen and King have none, the spades have none at all);
   - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
   - **diamonds**: the **quiz questions** of every card: add, edit and delete questions and answers, and pick the correct answer (a question always keeps at least two answers and exactly one correct);
   - **spades**: only the **people to find** of the "guess who" game: name, surname and the 13 hints (Ace to King), all required. Drag a hint by its ⠿ handle (mouse or finger; or focus the handle and use the arrow keys) to give it to another card without retyping: the cards stay, the texts move, and nothing changes until Save. Each person shows how many guests were given it and how many found it; a person already given to a guest can be edited (live for those guests too) but not deleted;
-  - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text);
-- and, for super admins, the **sign-up secret code** (3–50 characters).
+  - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text).
 
 Changes are live for the guests as soon as they are saved. Everything goes through `pb_hooks/admin.pb.js` (`/api/admin/*`): every request checks that the user organises the suit of the card, scene, question, answer or person it touches (`admin_suits`, or a super admin), and each endpoint writes only the fields it is meant to, so guests still never see letters, riddles or solutions they have not earned.
 
 ### Super admin (site settings)
 
-Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) → `users` → open the user → tick `is_superadmin` → Save, then log out and in again. Like `admin_suits`, users can never set it themselves. A super admin organises **every** suit, and their *Organisers* section also has the sign-up code and a **Site settings** link (`/area/site`):
+Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) → `users` → open the user → tick `is_superadmin` → Save, then log out and in again. Like `admin_suits`, users can never set it themselves. A super admin organises **every** suit, and their *Organisers* section also has a **Site settings** link. The settings are split in **tabs**, each with its own address (bookmarkable; the arrow keys move between tabs):
+
+| Tab | Address | What |
+| --- | --- | --- |
+| **General** | `/area/site` or `/area/site/general` | language, the couple, date, places, gift (IBAN) |
+| **Photos** | `/area/site/photos` | every photo of the site |
+| **Organisers** | `/area/site/organisers` | who organises which suit |
+| **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters) |
+
+The *General* and *Photos* tabs:
 
 - **Language** of the whole site: English or Italian. Every guest sees the public page, the private area, the game, the organisers' screens, the server's messages and the confirmation/reset e-mails in it.
 - **The couple:** the two first names, the line above them ("We are getting married") and the hashtag.
@@ -277,6 +285,8 @@ Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) �
 - **Ceremony** and optional **reception:** name, address, time, and an optional search text for the map (the address otherwise).
 - **Gift:** message, account holder, **IBAN** (checked with its checksum, in the browser and on the server, and stored without spaces), BIC, bank, payment reason. Optional details are hidden when empty.
 - **Photos:** every photo of the site: the big one at the top, the four around each section and the eight floating in the private area. Each can be replaced (shrunk, with EXIF/GPS data removed, before the upload), described for screen readers, or put back to the default picture.
+
+The *Organisers* tab lists the **registered guests, 20 per page**, sorted by name, with a **search by name or e-mail** (any part of it, capital letters ignored). The search starts 300 ms after the last keystroke, so typing a name sends one request, not one per letter, and only the answer to the latest search is shown. Each guest has a toggle per suit, **saved at once** (and put back, with the reason, if the server refuses); super admins edit every suit, so they have none. It goes through two super-admin-only endpoints of `pb_hooks/admin.pb.js`: `GET /api/admin/users?q=&page=` (filtering and paging happen in the database: the browser never receives the whole list) and `PATCH /api/admin/users/{id}` with `{ "adminSuits": [...] }`, which writes only `admin_suits`.
 
 How it is stored and loaded:
 
@@ -316,7 +326,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `photos.pb.js` draws the photo challenge scenes (`POST /api/game/photos/{cardId}/draw`) and collects the card when a photo is uploaded.
   - `quiz.pb.js` serves the diamonds quiz: current question, answers, lives and penalties.
   - `guess.pb.js` serves the spades "guess who": the hints of a card (`POST /api/game/guess/{cardId}`), the selfie upload and the "same person as before" confirmation, the status and the final guess.
-  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code), each endpoint for the organisers of its suit only (the secret code for super admins).
+  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code, who organises which suit), each endpoint for the organisers of its suit only (the secret code and the users for super admins).
   - `signup.pb.js` checks the sign-up secret code.
   - `site.pb.js` validates the site content (IBAN checksum, BIC, date with its offset, time zone, a reception with its address and time) and the photo slots, and re-applies the e-mails in the chosen language.
   - `lib/i18n.js` holds the messages the hooks send to the guests, in English and Italian.

@@ -361,7 +361,63 @@ function deletePerson(app, personId) {
   app.delete(person);
 }
 
+// ---- Registered users (super admins assign the suits) ----
+
+const USERS_PER_PAGE = 20;
+
+function userView(user) {
+  return {
+    id: user.id,
+    name: user.getString('name'),
+    email: user.getString('email'),
+    verified: user.getBool('verified'),
+    adminSuits: user.getStringSlice('admin_suits'),
+    isSuperAdmin: user.getBool('is_superadmin'),
+  };
+}
+
+/**
+ * One page of the registered users, by name, optionally only those whose name
+ * or e-mail contains `query` (case-insensitive). Counted in SQL: the page
+ * never loads more than USERS_PER_PAGE users.
+ */
+function listUsers(app, query, page) {
+  const q = cleanText(query).slice(0, 100);
+  // "contains", with % and _ taken literally (e-mails often have an _): escaped
+  // here and declared with ESCAPE, which SQLite needs to honour the escapes.
+  const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+  const where = q
+    ? $dbx.exp("[[name]] LIKE {:pattern} ESCAPE '\\' OR [[email]] LIKE {:pattern} ESCAPE '\\'", { pattern })
+    : $dbx.exp('1=1');
+  const totalItems = app.countRecords('users', where);
+  const totalPages = Math.max(1, Math.ceil(totalItems / USERS_PER_PAGE));
+  const current = Math.min(Math.max(1, parseInt(page, 10) || 1), totalPages);
+  // The same condition as the count, so pages and totals always agree.
+  const items = arrayOf(new Record());
+  app
+    .recordQuery('users')
+    .andWhere(where)
+    .orderBy('LOWER([[name]]) ASC', 'email ASC')
+    .limit(USERS_PER_PAGE)
+    .offset((current - 1) * USERS_PER_PAGE)
+    .all(items);
+  return { items: items.map(userView), page: current, perPage: USERS_PER_PAGE, totalItems, totalPages };
+}
+
+/** Sets the suits a user organises (any of the four, no duplicates). */
+function setUserSuits(app, userId, suits) {
+  const user = findRecord(app, 'users', userId);
+  const list = Array.isArray(suits) ? suits.map(String) : [];
+  if (list.some((suit) => !SUITS.includes(suit))) throw new BadRequestError(t(app, 'unknown_suit'));
+  // In the usual order, whatever order they were ticked in.
+  user.set('admin_suits', SUITS.filter((suit) => list.includes(suit)));
+  saveOrBadRequest(app, user);
+  return userView(user);
+}
+
 module.exports = {
+  listUsers,
+  setUserSuits,
   requireSuitAdmin,
   requireSuperAdmin,
   requireAdminOf,
