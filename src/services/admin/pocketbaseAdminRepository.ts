@@ -5,6 +5,7 @@ import type {
   AdminCard,
   AdminCardChanges,
   AdminPerson,
+  AdminRsvpsPage,
   AdminUser,
   AdminUsersPage,
   AdminQuestion,
@@ -12,6 +13,7 @@ import type {
   AdminScene,
   AdminSettings,
   NewQuestion,
+  RsvpFilter,
   PersonFields,
 } from './types';
 
@@ -100,6 +102,13 @@ export class PocketBaseAdminRepository implements AdminRepository {
 
   setUserSuits(userId: string, suits: Suit[]): Promise<AdminUser> {
     return this.call(`/users/${encodeURIComponent(userId)}`, 'PATCH', { adminSuits: suits });
+  }
+
+  async listRsvps(query: string, attending: RsvpFilter, page: number): Promise<AdminRsvpsPage> {
+    const params = new URLSearchParams({ q: query, attending, page: String(page) });
+    const data = await this.call<AdminRsvpsPage>(`/rsvps?${params}`, 'GET');
+    // PocketBase dates ("2027-06-19 10:00:00.000Z") made ISO: every browser parses them.
+    return { ...data, items: data.items.map((rsvp) => ({ ...rsvp, created: rsvp.created.replace(' ', 'T') })) };
   }
 
   getSettings(): Promise<AdminSettings> {

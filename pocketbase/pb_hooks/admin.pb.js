@@ -4,7 +4,7 @@
  * Admin endpoints used by the organisers' view of the site. Every handler
  * first checks that the user organises the suit concerned (`admin_suits`,
  * or a super admin); the sign-up code is for super admins only. Each one
- * writes only the fields it is meant to.
+ * writes only the fields it is meant to; the RSVPs are read only.
  *
  *   GET    /api/admin/suits/{suit}              cards with letter, riddle/solution (clubs), scenes (hearts)
  *   PATCH  /api/admin/cards/{cardId}            {letter?, riddle?, solution?}
@@ -23,6 +23,7 @@
  *   DELETE /api/admin/guess/people/{personId}   (refused once given to a player)
  *   GET    /api/admin/users?q=&page=            registered users, 20 per page, by name or e-mail (super admins)
  *   PATCH  /api/admin/users/{userId}            {adminSuits: [suits]} (super admins)
+ *   GET    /api/admin/rsvps?q=&attending=&page= RSVPs, 20 per page, newest first, + headcount (super admins)
  *   GET    /api/admin/settings                  {signupCode}
  *   PATCH  /api/admin/settings                  {signupCode}
  */
@@ -254,6 +255,20 @@ routerAdd(
     const admin = require(`${__hooks}/lib/admin.js`);
     admin.requireSuperAdmin(e);
     return e.json(200, admin.setUserSuits(e.app, e.request.pathValue('userId'), e.requestInfo().body.adminSuits));
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- RSVPs: the super admins read the replies ----
+
+routerAdd(
+  'GET',
+  '/api/admin/rsvps',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    const query = e.requestInfo().query;
+    return e.json(200, admin.listRsvps(e.app, query.q || '', query.attending || '', query.page || '1'));
   },
   $apis.requireAuth('users'),
 );

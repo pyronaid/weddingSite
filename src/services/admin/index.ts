@@ -28,6 +28,7 @@ export function createAdminRepository(): AdminRepository {
     deletePerson: fail,
     listUsers: fail,
     setUserSuits: fail,
+    listRsvps: fail,
     getSettings: fail,
     updateSettings: fail,
   };

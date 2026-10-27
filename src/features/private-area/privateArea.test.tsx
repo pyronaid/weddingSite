@@ -247,6 +247,14 @@ function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminReposit
     updateSettings: vi.fn(async (settings) => settings),
     listUsers: vi.fn(async () => ({ items: [], page: 1, perPage: 20, totalItems: 0, totalPages: 1 })),
     setUserSuits: vi.fn(),
+    listRsvps: vi.fn(async () => ({
+      items: [],
+      page: 1,
+      perPage: 20,
+      totalItems: 0,
+      totalPages: 1,
+      summary: { replies: 0, attending: 0, declined: 0, guests: 0 },
+    })),
     ...overrides,
   };
 }

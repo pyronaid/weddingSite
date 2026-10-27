@@ -363,7 +363,8 @@ function deletePerson(app, personId) {
 
 // ---- Registered users (super admins assign the suits) ----
 
-const USERS_PER_PAGE = 20;
+/** Lists of the super admins (users, RSVPs) are paginated, this many per page. */
+const PER_PAGE = 20;
 
 function userView(user) {
   return {
@@ -377,31 +378,103 @@ function userView(user) {
 }
 
 /**
- * One page of the registered users, by name, optionally only those whose name
- * or e-mail contains `query` (case-insensitive). Counted in SQL: the page
- * never loads more than USERS_PER_PAGE users.
+ * `[[a]] LIKE '%q%' OR [[b]] LIKE '%q%'` (case-insensitive for ASCII), with
+ * % and _ taken literally (e-mails often have an _): escaped here and
+ * declared with ESCAPE, which SQLite needs to honour the escapes.
  */
-function listUsers(app, query, page) {
-  const q = cleanText(query).slice(0, 100);
-  // "contains", with % and _ taken literally (e-mails often have an _): escaped
-  // here and declared with ESCAPE, which SQLite needs to honour the escapes.
+function containsAny(columns, q) {
   const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-  const where = q
-    ? $dbx.exp("[[name]] LIKE {:pattern} ESCAPE '\\' OR [[email]] LIKE {:pattern} ESCAPE '\\'", { pattern })
-    : $dbx.exp('1=1');
-  const totalItems = app.countRecords('users', where);
-  const totalPages = Math.max(1, Math.ceil(totalItems / USERS_PER_PAGE));
+  return $dbx.exp(columns.map((column) => `[[${column}]] LIKE {:pattern} ESCAPE '\\'`).join(' OR '), { pattern });
+}
+
+/**
+ * One page of `collection` matching `where`: counted in SQL, then never more
+ * than PER_PAGE records loaded. The page is clamped to the existing ones.
+ */
+function paginate(app, collection, where, orderBy, page, view) {
+  const totalItems = app.countRecords(collection, where);
+  const totalPages = Math.max(1, Math.ceil(totalItems / PER_PAGE));
   const current = Math.min(Math.max(1, parseInt(page, 10) || 1), totalPages);
   // The same condition as the count, so pages and totals always agree.
   const items = arrayOf(new Record());
   app
-    .recordQuery('users')
+    .recordQuery(collection)
     .andWhere(where)
-    .orderBy('LOWER([[name]]) ASC', 'email ASC')
-    .limit(USERS_PER_PAGE)
-    .offset((current - 1) * USERS_PER_PAGE)
+    .orderBy(...orderBy)
+    .limit(PER_PAGE)
+    .offset((current - 1) * PER_PAGE)
     .all(items);
-  return { items: items.map(userView), page: current, perPage: USERS_PER_PAGE, totalItems, totalPages };
+  return { items: items.map(view), page: current, perPage: PER_PAGE, totalItems, totalPages };
+}
+
+/** One page of the registered users, by name; `query` filters by name or e-mail. */
+function listUsers(app, query, page) {
+  const q = cleanText(query).slice(0, 100);
+  const where = q ? containsAny(['name', 'email'], q) : $dbx.exp('1=1');
+  return paginate(app, 'users', where, ['LOWER([[name]]) ASC', 'email ASC'], page, userView);
+}
+
+// ---- RSVPs (super admins) ----
+
+// A guest may reply again (e.g. "yes" then "no"): only their latest reply,
+// by e-mail, counts. `r` is the reply being checked.
+const NEWER_REPLY_EXISTS = `EXISTS (SELECT 1 FROM rsvps n WHERE LOWER(n.email) = LOWER(r.email)
+  AND (n.created > r.created OR (n.created = r.created AND n.id > r.id)))`;
+
+function rsvpView(app) {
+  return (rsvp) => ({
+    id: rsvp.id,
+    fullName: rsvp.getString('full_name'),
+    email: rsvp.getString('email'),
+    attending: rsvp.getBool('attending'),
+    guests: rsvp.getInt('guests'),
+    dietaryNotes: rsvp.getString('dietary_notes'),
+    message: rsvp.getString('message'),
+    created: rsvp.getDateTime('created').string(),
+    // An older reply of a guest who replied again: shown, but not counted.
+    replaced:
+      app.countRecords(
+        'rsvps',
+        $dbx.exp(
+          'LOWER([[email]]) = LOWER({:email}) AND ([[created]] > {:created} OR ([[created]] = {:created} AND [[id]] > {:id}))',
+          { email: rsvp.getString('email'), created: rsvp.getString('created'), id: rsvp.id },
+        ),
+      ) > 0,
+  });
+}
+
+/** The headcount, from the latest reply of each guest. */
+function rsvpSummary(app) {
+  const result = new DynamicModel({ replies: 0, attending: 0, declined: 0, guests: 0 });
+  app
+    .db()
+    .newQuery(
+      `SELECT COUNT(*) AS replies,
+         COALESCE(SUM(CASE WHEN r.attending THEN 1 ELSE 0 END), 0) AS attending,
+         COALESCE(SUM(CASE WHEN r.attending THEN 0 ELSE 1 END), 0) AS declined,
+         COALESCE(SUM(CASE WHEN r.attending THEN r.guests ELSE 0 END), 0) AS guests
+       FROM rsvps r WHERE NOT ${NEWER_REPLY_EXISTS}`,
+    )
+    .one(result);
+  return { replies: result.replies, attending: result.attending, declined: result.declined, guests: result.guests };
+}
+
+/**
+ * One page of the replies, newest first; `query` filters by name or e-mail,
+ * `attending` ('yes' / 'no' / anything else for all) by answer. The summary
+ * is always about every guest, whatever the filter.
+ */
+function listRsvps(app, query, attending, page) {
+  const q = cleanText(query).slice(0, 100);
+  const filters = [];
+  if (q) filters.push(containsAny(['full_name', 'email'], q));
+  if (attending === 'yes') filters.push($dbx.exp('[[attending]] = TRUE'));
+  if (attending === 'no') filters.push($dbx.exp('[[attending]] = FALSE'));
+  const where = filters.length ? $dbx.and(...filters) : $dbx.exp('1=1');
+  return {
+    ...paginate(app, 'rsvps', where, ['created DESC', 'id DESC'], page, rsvpView(app)),
+    summary: rsvpSummary(app),
+  };
 }
 
 /** Sets the suits a user organises (any of the four, no duplicates). */
@@ -417,6 +490,7 @@ function setUserSuits(app, userId, suits) {
 
 module.exports = {
   listUsers,
+  listRsvps,
   setUserSuits,
   requireSuitAdmin,
   requireSuperAdmin,

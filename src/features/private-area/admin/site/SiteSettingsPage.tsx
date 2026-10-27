@@ -13,6 +13,7 @@ import { siteSettingsMessages } from '../../messages/siteSettings';
 import { useAuth } from '../../useAuth';
 import { SignupCodeForm } from '../SignupCodeForm';
 import { PhotosEditor } from './PhotosEditor';
+import { RsvpsList } from './RsvpsList';
 import { SiteSettingsForm } from './SiteSettingsForm';
 import { UsersEditor } from './UsersEditor';
 import styles from './site.module.css';
@@ -21,9 +22,8 @@ type State = { status: 'loading' } | { status: 'ready'; content: SiteContent } |
 
 /**
  * Super admin only, in tabs: the content of the public site (general data,
- * photos), who organises which suit, and the sign-up code.
- * The content of the public site Edits the latest content
- * from the server (not the copy cached in the browser); every save updates
+ * photos), who organises which suit, the RSVPs and the sign-up code.
+ * The General and Photos tabs edit the latest content from the server (not the copy cached in the browser); every save updates
  * the whole site at once (a new language re-renders everything in it).
  */
 export function SiteSettingsPage() {
@@ -111,6 +111,7 @@ export function SiteSettingsPage() {
         {tab === 'photos' &&
           contentPanel((content) => <PhotosEditor content={content} repository={repository} onChange={update} />)}
         {tab === 'organisers' && <UsersEditor />}
+        {tab === 'rsvps' && <RsvpsList />}
         {tab === 'signup-code' && <SignupCodeForm />}
       </div>
 
@@ -137,6 +138,7 @@ function SettingsTabs({ current }: { current: SettingsTab }) {
     general: t.general,
     photos: t.photos,
     organisers: t.organisers,
+    rsvps: t.rsvps,
     'signup-code': t.signupCode,
   };
 

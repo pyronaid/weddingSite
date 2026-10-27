@@ -2,7 +2,15 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { defaultContent } from '../../../../config/wedding';
-import { AdminError, type AdminRepository, type AdminUser, type AdminUsersPage } from '../../../../services/admin';
+import {
+  AdminError,
+  type AdminRepository,
+  type AdminRsvp,
+  type AdminRsvpsPage,
+  type AdminUser,
+  type AdminUsersPage,
+  type RsvpFilter,
+} from '../../../../services/admin';
 import type { Suit } from '../../../../services/game';
 import type { AuthService, AuthUser } from '../../../../services/auth';
 import type { SiteContent, SiteRepository, SiteSettings } from '../../../../services/site';
@@ -98,6 +106,76 @@ function listGuests(query: string, page: number): AdminUsersPage {
   };
 }
 
+/**
+ * 25 replies, newest first. Anna replied twice: her first reply ("2 people")
+ * is replaced by the second ("3 people") and only that one counts.
+ */
+const replies: AdminRsvp[] = [
+  {
+    id: 'r0',
+    fullName: 'Anna Verdi',
+    email: 'anna@example.com',
+    attending: true,
+    guests: 3,
+    dietaryNotes: 'Vegetarian, one child',
+    message: 'Can’t wait!',
+    created: '2027-04-02T09:30:00.000Z',
+    replaced: false,
+  },
+  {
+    id: 'r1',
+    fullName: 'Luca Neri',
+    email: 'luca@example.com',
+    attending: false,
+    guests: 0,
+    dietaryNotes: '',
+    message: 'Sorry, we are abroad.',
+    created: '2027-04-01T18:00:00.000Z',
+    replaced: false,
+  },
+  {
+    id: 'r2',
+    fullName: 'Anna Verdi',
+    email: 'anna@example.com',
+    attending: true,
+    guests: 2,
+    dietaryNotes: 'Vegetarian',
+    message: '',
+    created: '2027-03-30T10:00:00.000Z',
+    replaced: true,
+  },
+  ...Array.from({ length: 22 }, (_, i) => ({
+    id: `r${i + 3}`,
+    fullName: `Guest ${i + 1}`,
+    email: `guest${i + 1}@example.com`,
+    attending: true,
+    guests: 1,
+    dietaryNotes: '',
+    message: '',
+    created: `2027-03-${String(29 - i).padStart(2, '0')}T08:00:00.000Z`,
+    replaced: false,
+  })),
+];
+
+function listReplies(query: string, attending: RsvpFilter, page: number): AdminRsvpsPage {
+  const q = query.toLowerCase();
+  const all = replies.filter(
+    (r) =>
+      (r.fullName.toLowerCase().includes(q) || r.email.includes(q)) &&
+      (attending === 'all' || r.attending === (attending === 'yes')),
+  );
+  const totalPages = Math.max(1, Math.ceil(all.length / 20));
+  const current = Math.min(page, totalPages);
+  return {
+    items: all.slice((current - 1) * 20, current * 20),
+    page: current,
+    perPage: 20,
+    totalItems: all.length,
+    totalPages,
+    summary: { replies: 24, attending: 23, declined: 1, guests: 25 },
+  };
+}
+
 function fakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
   const fail = vi.fn().mockRejectedValue(new Error('not used here'));
   return {
@@ -119,6 +197,7 @@ function fakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
     getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
     updateSettings: vi.fn(async (settings) => settings),
     listUsers: vi.fn(async (query: string, page: number) => listGuests(query, page)),
+    listRsvps: vi.fn(async (query: string, attending: RsvpFilter, page: number) => listReplies(query, attending, page)),
     setUserSuits: vi.fn(async (userId: string, suits: Suit[]) => ({
       ...guests.find((g) => g.id === userId)!,
       adminSuits: suits,
@@ -280,7 +359,7 @@ describe('site settings (super admin)', () => {
     it('opens the general data first, with one tab per section', async () => {
       renderPage(fakeRepository());
       const tabs = screen.getAllByRole('tab');
-      expect(tabs.map((tab) => tab.textContent)).toEqual(['General', 'Photos', 'Organisers', 'Sign-up code']);
+      expect(tabs.map((tab) => tab.textContent)).toEqual(['General', 'Photos', 'Organisers', 'RSVPs', 'Sign-up code']);
       expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true');
       expect(await screen.findByLabelText('IBAN')).toBeInTheDocument();
       expect(screen.queryByRole('article', { name: 'Main photo (top of the page)' })).not.toBeInTheDocument();
@@ -473,6 +552,98 @@ describe('site settings (super admin)', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('The server cannot be reached.');
       await userEvent.setup().click(screen.getByRole('button', { name: '↻' }));
       expect(await screen.findByText('45 registered guests')).toBeInTheDocument();
+    });
+  });
+
+  describe('RSVPs', () => {
+    const openRsvps = (admin = fakeAdmin()) => {
+      renderPage(fakeRepository(), vi.fn(), '/area/site/rsvps', admin);
+      return admin;
+    };
+
+    it('shows the headcount and the replies, newest first, 20 at a time', async () => {
+      const admin = openRsvps();
+      const user = userEvent.setup();
+
+      const headcount = await screen.findByLabelText('Headcount');
+      expect(within(headcount).getByText('25 people')).toBeInTheDocument();
+      expect(within(headcount).getByText('23 replies')).toBeInTheDocument();
+      expect(within(headcount).getByText('1 reply')).toBeInTheDocument();
+      expect(screen.getByText('25 replies')).toBeInTheDocument();
+
+      const rows = screen.getAllByRole('listitem');
+      expect(rows).toHaveLength(20);
+      expect(within(rows[0]).getByText('Anna Verdi')).toBeInTheDocument();
+      expect(within(rows[0]).getByText('Coming · 3 people')).toBeInTheDocument();
+      expect(within(rows[0]).getByText('Vegetarian, one child')).toBeInTheDocument();
+      expect(within(rows[0]).getByText('Can’t wait!')).toBeInTheDocument();
+      expect(within(rows[0]).getByRole('link', { name: 'anna@example.com' })).toHaveAttribute(
+        'href',
+        'mailto:anna@example.com',
+      );
+      // In the wedding's time zone (Rome, summer time: +2).
+      expect(within(rows[0]).getByText(/Sent on 2 Apr 2027, 11:30/)).toBeInTheDocument();
+      expect(within(rows[1]).getByText('Not coming')).toBeInTheDocument();
+      expect(within(rows[2]).getByText('Replaced by a newer reply: not counted')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Next →' }));
+      expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
+      expect(screen.getAllByRole('listitem')).toHaveLength(5);
+      expect(admin.listRsvps).toHaveBeenLastCalledWith('', 'all', 2);
+    });
+
+    it('filters by answer and by name, from the first page', async () => {
+      const admin = openRsvps();
+      const user = userEvent.setup();
+      await screen.findByText('25 replies');
+      await user.click(screen.getByRole('button', { name: 'Next →' }));
+      await screen.findByText('Page 2 of 2');
+
+      await user.selectOptions(screen.getByLabelText('Show'), 'Not coming');
+      expect(await screen.findByText('1 reply', { selector: '[role=status]' })).toBeInTheDocument();
+      expect(admin.listRsvps).toHaveBeenLastCalledWith('', 'no', 1);
+      expect(screen.getByText('Luca Neri')).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText('Show'), 'Everybody');
+      await user.type(screen.getByLabelText('Search by name or e-mail'), 'anna');
+      await waitFor(() => expect(admin.listRsvps).toHaveBeenLastCalledWith('anna', 'all', 1));
+      expect(await screen.findByText('2 replies', { selector: '[role=status]' })).toBeInTheDocument();
+      // The headcount is about everybody, whatever the filter.
+      expect(within(screen.getByLabelText('Headcount')).getByText('25 people')).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText('Search by name or e-mail'), 'zzz');
+      expect(await screen.findByText('No reply matches.')).toBeInTheDocument();
+    });
+
+    it('says so when nobody has replied yet', async () => {
+      openRsvps(
+        fakeAdmin({
+          listRsvps: vi.fn(async () => ({
+            items: [],
+            page: 1,
+            perPage: 20,
+            totalItems: 0,
+            totalPages: 1,
+            summary: { replies: 0, attending: 0, declined: 0, guests: 0 },
+          })),
+        }),
+      );
+      expect(await screen.findByText('Nobody has replied yet.')).toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: 'Pages' })).not.toBeInTheDocument();
+    });
+
+    it('offers to try again when the replies cannot be loaded', async () => {
+      const listRsvps = vi
+        .fn()
+        .mockRejectedValueOnce(new AdminError('network', 'The server cannot be reached.'))
+        .mockImplementation(async (query: string, attending: RsvpFilter, page: number) =>
+          listReplies(query, attending, page),
+        );
+      openRsvps(fakeAdmin({ listRsvps }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('The server cannot be reached.');
+      await userEvent.setup().click(screen.getByRole('button', { name: '↻' }));
+      expect(await screen.findByText('25 replies')).toBeInTheDocument();
     });
   });
 });

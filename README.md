@@ -139,7 +139,7 @@ npm run dev                  # http://localhost:5173
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
 | `/area` (organisers)         | The same game home, plus an *Organisers* section: the suits they edit (+ the site settings link for super admins) | organisers of those suits |
 | `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes, diamonds quiz, spades people | organisers of that suit |
-| `/area/site/:tab?`           | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, sign-up code | super admins only |
+| `/area/site/:tab?`           | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, RSVPs, sign-up code | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -275,6 +275,7 @@ Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) �
 | **General** | `/area/site` or `/area/site/general` | language, the couple, date, places, gift (IBAN) |
 | **Photos** | `/area/site/photos` | every photo of the site |
 | **Organisers** | `/area/site/organisers` | who organises which suit |
+| **RSVPs** | `/area/site/rsvps` | the replies to the invitation and the headcount |
 | **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters) |
 
 The *General* and *Photos* tabs:
@@ -287,6 +288,8 @@ The *General* and *Photos* tabs:
 - **Photos:** every photo of the site: the big one at the top, the four around each section and the eight floating in the private area. Each can be replaced (shrunk, with EXIF/GPS data removed, before the upload), described for screen readers, or put back to the default picture.
 
 The *Organisers* tab lists the **registered guests, 20 per page**, sorted by name, with a **search by name or e-mail** (any part of it, capital letters ignored). The search starts 300 ms after the last keystroke, so typing a name sends one request, not one per letter, and only the answer to the latest search is shown. Each guest has a toggle per suit, **saved at once** (and put back, with the reason, if the server refuses); super admins edit every suit, so they have none. It goes through two super-admin-only endpoints of `pb_hooks/admin.pb.js`: `GET /api/admin/users?q=&page=` (filtering and paging happen in the database: the browser never receives the whole list) and `PATCH /api/admin/users/{id}` with `{ "adminSuits": [...] }`, which writes only `admin_suits`.
+
+The *RSVPs* tab shows the **headcount** on top (people coming, replies yes / no, total replies), then the **replies, newest first, 20 per page**: name, e-mail (click to write to them), coming with how many people or not, dietary needs, message, and when it was sent (in the wedding's time zone). It can be searched by name or e-mail and filtered by answer (everybody / coming / not coming); the headcount is always about everybody. A guest may reply more than once with the same e-mail (capital letters ignored): **only their latest reply counts**, the older ones are shown faded as "replaced". Read only: replies are not edited from the site. It uses `GET /api/admin/rsvps?q=&attending=all|yes|no&page=` (super admins only; the `rsvps` collection itself stays closed to everybody but superusers). Both lists share the same paging, search and stale-answer handling (`usePagedList`, `Pager`).
 
 How it is stored and loaded:
 

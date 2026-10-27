@@ -73,13 +73,48 @@ export interface AdminUser {
   isSuperAdmin: boolean;
 }
 
-export interface AdminUsersPage {
-  items: AdminUser[];
+/** One page of a super admin's list (20 per page, filtered and counted by the server). */
+export interface AdminPage<T> {
+  items: T[];
   /** 1-based; clamped by the server to the existing pages. */
   page: number;
   perPage: number;
   totalItems: number;
   totalPages: number;
+}
+
+export type AdminUsersPage = AdminPage<AdminUser>;
+
+/** A reply to the invitation, as the guest sent it. */
+export interface AdminRsvp {
+  id: string;
+  fullName: string;
+  email: string;
+  attending: boolean;
+  /** People coming, the guest included (0 when not attending). */
+  guests: number;
+  dietaryNotes: string;
+  message: string;
+  /** ISO date and time it was sent. */
+  created: string;
+  /** An older reply of a guest who replied again: not counted. */
+  replaced: boolean;
+}
+
+export type RsvpFilter = 'all' | 'yes' | 'no';
+
+/** The headcount, from the latest reply of each guest (by e-mail). */
+export interface RsvpSummary {
+  replies: number;
+  attending: number;
+  declined: number;
+  /** People coming in total. */
+  guests: number;
+}
+
+export interface AdminRsvpsPage extends AdminPage<AdminRsvp> {
+  /** About every reply, whatever the filter. */
+  summary: RsvpSummary;
 }
 
 export interface AdminSettings {
@@ -110,6 +145,8 @@ export interface AdminRepository {
   listUsers(query: string, page: number): Promise<AdminUsersPage>;
   /** Super admins: the suits a user organises. */
   setUserSuits(userId: string, suits: Suit[]): Promise<AdminUser>;
+  /** Super admins: one page (20) of the RSVPs, newest first, with the headcount. */
+  listRsvps(query: string, attending: RsvpFilter, page: number): Promise<AdminRsvpsPage>;
   getSettings(): Promise<AdminSettings>;
   updateSettings(settings: AdminSettings): Promise<AdminSettings>;
 }
