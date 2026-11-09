@@ -1,4 +1,5 @@
 import type { Dictionary } from '../../../i18n';
+import type { InvitationKind } from '../../../prints/invitations';
 import type { PhotoSection } from '../../../services/site/types';
 
 const en = {
@@ -7,7 +8,7 @@ const en = {
   title: 'Site settings',
   intro: 'Everything guests see on the wedding site. Changes are live for everybody as soon as you save.',
   linkTitle: 'Site settings',
-  linkText: 'Language, names, date, places and gift, the photos, who organises which suit, the RSVPs and the sign-up code.',
+  linkText: 'Language, names, date, places and gift, the photos, who organises which suit, the RSVPs, the sign-up code and the prints.',
   tabs: {
     label: 'Site settings sections',
     general: 'General',
@@ -15,6 +16,7 @@ const en = {
     organisers: 'Organisers',
     rsvps: 'RSVPs',
     signupCode: 'Sign-up code',
+    prints: 'Prints',
   },
   users: {
     title: 'Who organises which suit',
@@ -60,7 +62,68 @@ const en = {
     message: 'Message',
     sent: (date: string) => `Sent on ${date}`,
   },
-  back: '← Back to the organisers’ home',
+  prints: {
+    title: 'Prints',
+    intro:
+      'Everything to print, made from the site settings. After changing a setting, press “Regenerate”. For the print shop, use “Print / PDF” and save as PDF: the fonts are included.',
+    regenerate: '↻ Regenerate',
+    generating: 'Generating…',
+    failed: 'The files could not be made.',
+    website: 'Website address in the QR codes',
+    websiteHint: 'The address guests open: your domain once the site is live.',
+    localhost: 'This address only works on this computer: guests’ phones cannot open it. Make the final prints from the live site.',
+    svg: 'SVG',
+    png: 'PNG',
+    print: 'Print / PDF',
+    print2up: 'Print 2 per A4 sheet',
+    printAll: 'Print all / PDF (A3)',
+    downloadLabel: (format: string, item: string) => `${format}: ${item}`,
+    logo: {
+      title: 'Logo',
+      hint: 'The G and V monogram, in the script of the site or as a seal. SVG stays sharp at any size (print shop, embroidery, stamps); PNG for documents and social media.',
+      style: 'Style',
+      colours: 'Colours',
+      variants: { script: 'Script', seal: 'Seal' },
+      schemes: { color: 'Plum and pink', mono: 'One colour', light: 'For dark backgrounds' },
+      name: (variant: string, scheme: string) => `Logo, ${variant}, ${scheme}`,
+    },
+    invitations: {
+      title: 'Invitations',
+      hint: 'Two A5 cards, for one guest and for a couple: write the names on the line by hand. Date, times and places come from the General tab; the QR code opens the site, with all the details and the RSVP form.',
+      kinds: { single: 'One guest', couple: 'A couple' } as Record<InvitationKind, string>,
+      name: (kind: string) => `Invitation, ${kind}`,
+      includeCode: 'Print the sign-up code on them (guests need it to join the private area and the game)',
+      texts: {
+        guest: 'Dear',
+        heading: { single: 'You are invited', couple: 'You are both invited' } as Record<InvitationKind, string>,
+        to: 'to celebrate the wedding of',
+        ceremony: 'Ceremony',
+        reception: 'Reception',
+        at: (time: string) => `at ${time}`,
+        replyBy: (_kind: InvitationKind, date: string) => `Please reply by ${date}`,
+        website: 'Scan the code for all the details, the RSVP and the game:',
+        signupCode: (code: string) => `Code for the private area: ${code}`,
+      },
+    },
+    posters: {
+      title: 'Clubs posters',
+      hint: 'One A3 poster per club, with the card and the QR code of its riddle: hang them at the venue. Guests scan one, log in and solve the riddle to win the card. The codes are secret: don’t share these files.',
+      ready: 'All the riddles are ready ✓',
+      notReady: (count: number) =>
+        count === 1
+          ? '1 club has no riddle or solution yet: its QR page says “not available yet”.'
+          : `${count} clubs have no riddle or solution yet: their QR pages say “not available yet”.`,
+      missing: 'riddle missing',
+      name: (card: string) => `Poster of the ${card}`,
+      texts: {
+        title: 'Find the Joker',
+        steps: 'SCAN · SOLVE THE RIDDLE · COLLECT THE CARD',
+        scanToWin: (card: string) => `Scan me to win the ${card}`,
+        footer: (url: string) => `Log in to the private area first · ${url}`,
+      },
+    },
+  },
+  back: '← Back to the organisers',
   loadingFailed: 'The settings could not be loaded.',
   language: {
     legend: 'Language of the site',
@@ -147,7 +210,7 @@ export const siteSettingsMessages: Dictionary<typeof en> = {
     title: 'Impostazioni del sito',
     intro: 'Tutto quello che gli ospiti vedono sul sito del matrimonio. Le modifiche sono visibili a tutti appena salvi.',
     linkTitle: 'Impostazioni del sito',
-    linkText: 'Lingua, nomi, data, luoghi e regalo, le foto, chi organizza quale seme, le conferme e il codice di registrazione.',
+    linkText: 'Lingua, nomi, data, luoghi e regalo, le foto, chi organizza quale seme, le conferme, il codice di registrazione e le stampe.',
     tabs: {
       label: 'Sezioni delle impostazioni del sito',
       general: 'Generale',
@@ -155,6 +218,7 @@ export const siteSettingsMessages: Dictionary<typeof en> = {
       organisers: 'Organizzatori',
       rsvps: 'Conferme',
       signupCode: 'Codice di registrazione',
+      prints: 'Stampe',
     },
     users: {
       title: 'Chi organizza quale seme',
@@ -200,7 +264,68 @@ export const siteSettingsMessages: Dictionary<typeof en> = {
       message: 'Messaggio',
       sent: (date) => `Inviata il ${date}`,
     },
-    back: '← Torna alla pagina degli organizzatori',
+    prints: {
+      title: 'Stampe',
+      intro:
+        'Tutto da stampare, creato dalle impostazioni del sito. Dopo aver cambiato un’impostazione premi “Rigenera”. Per la tipografia usa “Stampa / PDF” e salva come PDF: i caratteri sono inclusi.',
+      regenerate: '↻ Rigenera',
+      generating: 'Creazione…',
+      failed: 'Non è stato possibile creare i file.',
+      website: 'Indirizzo del sito nei codici QR',
+      websiteHint: 'L’indirizzo che aprono gli ospiti: il vostro dominio, quando il sito è online.',
+      localhost: 'Questo indirizzo funziona solo su questo computer: i telefoni degli ospiti non possono aprirlo. Fate le stampe definitive dal sito online.',
+      svg: 'SVG',
+      png: 'PNG',
+      print: 'Stampa / PDF',
+      print2up: 'Stampa 2 per foglio A4',
+      printAll: 'Stampa tutti / PDF (A3)',
+      downloadLabel: (format, item) => `${format}: ${item}`,
+      logo: {
+        title: 'Logo',
+        hint: 'Il monogramma G e V, nel corsivo del sito o come sigillo. L’SVG resta nitido a ogni dimensione (tipografia, ricamo, timbri); il PNG per documenti e social.',
+        style: 'Stile',
+        colours: 'Colori',
+        variants: { script: 'Corsivo', seal: 'Sigillo' },
+        schemes: { color: 'Prugna e rosa', mono: 'Un colore', light: 'Per sfondi scuri' },
+        name: (variant, scheme) => `Logo, ${variant}, ${scheme}`,
+      },
+      invitations: {
+        title: 'Partecipazioni',
+        hint: 'Due cartoncini A5, per un ospite e per una coppia: scrivete i nomi a mano sulla riga. Data, orari e luoghi vengono dalla scheda Generale; il codice QR apre il sito, con tutti i dettagli e il modulo di conferma.',
+        kinds: { single: 'Un ospite', couple: 'Una coppia' },
+        name: (kind) => `Partecipazione, ${kind}`,
+        includeCode: 'Stampa il codice di registrazione (serve agli ospiti per l’area riservata e il gioco)',
+        texts: {
+          guest: 'Per',
+          heading: { single: 'Ti invitiamo', couple: 'Vi invitiamo' },
+          to: 'a festeggiare il matrimonio di',
+          ceremony: 'Cerimonia',
+          reception: 'Ricevimento',
+          at: (time) => `ore ${time}`,
+          replyBy: (kind, date) => (kind === 'single' ? `Rispondi entro il ${date}` : `Rispondete entro il ${date}`),
+          website: 'Inquadra il codice per tutti i dettagli, la conferma e il gioco:',
+          signupCode: (code) => `Codice per l’area riservata: ${code}`,
+        },
+      },
+      posters: {
+        title: 'Cartelli dei fiori',
+        hint: 'Un cartello A3 per ogni carta di fiori, con la carta e il codice QR del suo indovinello: da appendere al ricevimento. Gli ospiti lo inquadrano, accedono e risolvono l’indovinello per vincere la carta. I codici sono segreti: non condividete questi file.',
+        ready: 'Tutti gli indovinelli sono pronti ✓',
+        notReady: (count) =>
+          count === 1
+            ? '1 carta di fiori non ha ancora indovinello o soluzione: la sua pagina dice “non ancora disponibile”.'
+            : `${count} carte di fiori non hanno ancora indovinello o soluzione: le loro pagine dicono “non ancora disponibile”.`,
+        missing: 'manca l’indovinello',
+        name: (card) => `Cartello: ${card}`,
+        texts: {
+          title: 'Trova il Jolly',
+          steps: 'INQUADRA · RISOLVI L’INDOVINELLO · VINCI LA CARTA',
+          scanToWin: (card) => `Inquadrami e vinci: ${card}`,
+          footer: (url) => `Prima accedi all’area riservata · ${url}`,
+        },
+      },
+    },
+    back: '← Torna agli organizzatori',
     loadingFailed: 'Non è stato possibile caricare le impostazioni.',
     language: {
       legend: 'Lingua del sito',

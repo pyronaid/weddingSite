@@ -414,6 +414,22 @@ function listUsers(app, query, page) {
   return paginate(app, 'users', where, ['LOWER([[name]]) ASC', 'email ASC'], page, userView);
 }
 
+// ---- Prints (super admins) ----
+
+/**
+ * The clubs with the secret code of their QR poster (/area/riddles/<code>),
+ * and whether guests can already play them. The codes are secret: super
+ * admins only, to print the posters.
+ */
+function riddleCodes(app) {
+  return app.findRecordsByFilter('cards', 'suit = {:suit}', 'rank', 0, 0, { suit: RIDDLE_SUIT }).map((card) => ({
+    id: card.id,
+    rank: card.getInt('rank'),
+    code: card.getString('code'),
+    ready: card.getString('riddle') !== '' && card.getString('solution') !== '',
+  }));
+}
+
 // ---- RSVPs (super admins) ----
 
 // A guest may reply again (e.g. "yes" then "no"): only their latest reply,
@@ -491,6 +507,7 @@ function setUserSuits(app, userId, suits) {
 module.exports = {
   listUsers,
   listRsvps,
+  riddleCodes,
   setUserSuits,
   requireSuitAdmin,
   requireSuperAdmin,

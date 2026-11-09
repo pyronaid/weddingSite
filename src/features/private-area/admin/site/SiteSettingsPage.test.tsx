@@ -11,7 +11,7 @@ import {
   type AdminUsersPage,
   type RsvpFilter,
 } from '../../../../services/admin';
-import type { Suit } from '../../../../services/game';
+import type { Rank, Suit } from '../../../../services/game';
 import type { AuthService, AuthUser } from '../../../../services/auth';
 import type { SiteContent, SiteRepository, SiteSettings } from '../../../../services/site';
 import { SiteContentContext } from '../../../../site/SiteContentContext';
@@ -197,6 +197,14 @@ function fakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
     getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
     updateSettings: vi.fn(async (settings) => settings),
     listUsers: vi.fn(async (query: string, page: number) => listGuests(query, page)),
+    getRiddleCodes: vi.fn(async () =>
+      Array.from({ length: 13 }, (_, i) => ({
+        id: `c${i + 1}`,
+        rank: (i + 1) as Rank,
+        code: `code${i + 1}`,
+        ready: i !== 4,
+      })),
+    ),
     listRsvps: vi.fn(async (query: string, attending: RsvpFilter, page: number) => listReplies(query, attending, page)),
     setUserSuits: vi.fn(async (userId: string, suits: Suit[]) => ({
       ...guests.find((g) => g.id === userId)!,
@@ -359,7 +367,14 @@ describe('site settings (super admin)', () => {
     it('opens the general data first, with one tab per section', async () => {
       renderPage(fakeRepository());
       const tabs = screen.getAllByRole('tab');
-      expect(tabs.map((tab) => tab.textContent)).toEqual(['General', 'Photos', 'Organisers', 'RSVPs', 'Sign-up code']);
+      expect(tabs.map((tab) => tab.textContent)).toEqual([
+        'General',
+        'Photos',
+        'Organisers',
+        'RSVPs',
+        'Sign-up code',
+        'Prints',
+      ]);
       expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true');
       expect(await screen.findByLabelText('IBAN')).toBeInTheDocument();
       expect(screen.queryByRole('article', { name: 'Main photo (top of the page)' })).not.toBeInTheDocument();
@@ -392,11 +407,11 @@ describe('site settings (super admin)', () => {
       expect(screen.getByRole('tab', { name: 'Photos' })).toHaveFocus();
       expect(router.state.location.pathname).toBe('/area/site/photos');
       await user.keyboard('{End}');
-      expect(screen.getByRole('tab', { name: 'Sign-up code' })).toHaveFocus();
+      expect(screen.getByRole('tab', { name: 'Prints' })).toHaveFocus();
       await user.keyboard('{ArrowRight}');
       expect(screen.getByRole('tab', { name: 'General' })).toHaveFocus();
       await user.keyboard('{ArrowLeft}');
-      expect(router.state.location.pathname).toBe('/area/site/signup-code');
+      expect(router.state.location.pathname).toBe('/area/site/prints');
       // Only the selected tab is in the Tab order.
       expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('tabindex', '-1');
     });
@@ -644,6 +659,110 @@ describe('site settings (super admin)', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('The server cannot be reached.');
       await userEvent.setup().click(screen.getByRole('button', { name: '↻' }));
       expect(await screen.findByText('25 replies')).toBeInTheDocument();
+    });
+  });
+
+  describe('prints', () => {
+    const cardImage =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336"><rect width="240" height="336"/></svg>';
+
+    beforeEach(() => {
+      // The card images of the posters (public/cards/clubs/<rank>.svg).
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => ({ ok: true, url, text: async () => cardImage })),
+      );
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    const openPrints = (admin = fakeAdmin(), repository = fakeRepository()) => {
+      renderPage(repository, vi.fn(), '/area/site/prints', admin);
+      return { admin, repository };
+    };
+
+    it('makes both invitations from the site settings, with the QR code of the site', async () => {
+      const { admin, repository } = openPrints();
+
+      const couple = await screen.findByRole('img', { name: 'Invitation, A couple' });
+      await waitFor(() => expect(couple.innerHTML).toContain('You are both invited'));
+      const single = screen.getByRole('img', { name: 'Invitation, One guest' });
+      expect(single.innerHTML).toContain('You are invited');
+      expect(single.innerHTML).toContain('Giulia <tspan fill="#c24f78">&amp;</tspan> Marco');
+      expect(single.innerHTML).toContain('>at 16:00<');
+      expect(single.innerHTML).toContain('Code for the private area: #wedding');
+      // A real QR code, for the address the page is opened at.
+      expect(single.innerHTML).toContain('shape-rendering="crispEdges"');
+      expect(screen.getByLabelText('Website address in the QR codes')).toHaveValue(window.location.origin);
+      // The latest settings, not the ones cached by the page.
+      expect(repository.load).toHaveBeenCalled();
+      expect(admin.getSettings).toHaveBeenCalled();
+    });
+
+    it('leaves the sign-up code out on request, and regenerates', async () => {
+      const { admin } = openPrints();
+      const user = userEvent.setup();
+      const single = await screen.findByRole('img', { name: 'Invitation, One guest' });
+      await waitFor(() => expect(single.innerHTML).toContain('#wedding'));
+
+      await user.click(screen.getByRole('checkbox', { name: /Print the sign-up code/ }));
+      await waitFor(() =>
+        expect(screen.getByRole('img', { name: 'Invitation, One guest' }).innerHTML).not.toContain('#wedding'),
+      );
+
+      const calls = vi.mocked(admin.getRiddleCodes).mock.calls.length;
+      await user.click(screen.getByRole('button', { name: '↻ Regenerate' }));
+      await waitFor(() => expect(admin.getRiddleCodes).toHaveBeenCalledTimes(calls + 1));
+    });
+
+    it('makes one poster per club, and points out the riddles still missing', async () => {
+      openPrints();
+      expect(
+        await screen.findByText('1 club has no riddle or solution yet: its QR page says “not available yet”.'),
+      ).toBeInTheDocument();
+      const posters = screen.getAllByRole('img', { name: /^Poster of the / });
+      expect(posters).toHaveLength(13);
+      expect(posters[6].innerHTML).toContain(`${window.location.origin}/area/riddles/code7`);
+      expect(posters[6].innerHTML).toContain('Scan me to win the 7 of clubs');
+      expect(screen.getByRole('img', { name: 'Poster of the 5 of clubs' }).closest('li')!.className).toMatch(
+        /posterTodo/,
+      );
+      expect(screen.getByRole('button', { name: 'Print all / PDF (A3): Clubs posters' })).toBeEnabled();
+    });
+
+    it('warns when the QR codes would point to this computer', async () => {
+      openPrints();
+      const user = userEvent.setup();
+      const website = screen.getByLabelText('Website address in the QR codes');
+      await user.clear(website);
+      await user.type(website, 'http://localhost:5173');
+      expect(await screen.findByText(/only works on this computer/)).toBeInTheDocument();
+      await user.clear(website);
+      await user.type(website, 'https://gioevale.com/');
+      await waitFor(() => expect(screen.queryByText(/only works on this computer/)).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.getByRole('img', { name: 'Invitation, One guest' }).innerHTML).toContain('>gioevale.com<'),
+      );
+    });
+
+    it('downloads the logo in the chosen style and colours', async () => {
+      openPrints();
+      const user = userEvent.setup();
+      const createObjectURL = vi.fn((_blob: Blob) => 'blob:logo');
+      vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+      await user.click(screen.getByRole('radio', { name: 'Seal' }));
+      await user.click(screen.getByRole('radio', { name: 'One colour' }));
+      expect(screen.getByRole('img', { name: 'Logo, Seal, One colour' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'SVG: Logo, Seal, One colour' }));
+
+      expect(click).toHaveBeenCalled();
+      const link = click.mock.contexts[0] as HTMLAnchorElement;
+      expect(link.download).toBe('logo-gv-seal-mono.svg');
+      const svg = await (createObjectURL.mock.calls[0][0] as Blob).text();
+      expect(svg).toContain('<circle');
+      expect(svg).toContain('fill="#4a2537"');
+      click.mockRestore();
     });
   });
 });

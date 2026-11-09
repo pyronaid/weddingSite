@@ -30,6 +30,7 @@ export function createAdminRepository(): AdminRepository {
     listUsers: fail,
     setUserSuits: fail,
     listRsvps: fail,
+    getRiddleCodes: fail,
     getSettings: fail,
     updateSettings: fail,
   };

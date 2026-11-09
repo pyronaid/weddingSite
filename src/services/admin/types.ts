@@ -117,6 +117,16 @@ export interface AdminRsvpsPage extends AdminPage<AdminRsvp> {
   summary: RsvpSummary;
 }
 
+/** A club with the secret code of its QR poster. */
+export interface RiddleCode {
+  id: string;
+  rank: Rank;
+  /** The poster's QR code opens /area/riddles/<code>. */
+  code: string;
+  /** Riddle and solution set: guests can play it. */
+  ready: boolean;
+}
+
 export interface AdminSettings {
   /** Code required to create an account. */
   signupCode: string;
@@ -147,6 +157,8 @@ export interface AdminRepository {
   setUserSuits(userId: string, suits: Suit[]): Promise<AdminUser>;
   /** Super admins: one page (20) of the RSVPs, newest first, with the headcount. */
   listRsvps(query: string, attending: RsvpFilter, page: number): Promise<AdminRsvpsPage>;
+  /** Super admins: the clubs and the secret codes of their posters. */
+  getRiddleCodes(): Promise<RiddleCode[]>;
   getSettings(): Promise<AdminSettings>;
   updateSettings(settings: AdminSettings): Promise<AdminSettings>;
 }

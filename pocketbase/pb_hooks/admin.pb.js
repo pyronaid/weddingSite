@@ -24,6 +24,7 @@
  *   GET    /api/admin/users?q=&page=            registered users, 20 per page, by name or e-mail (super admins)
  *   PATCH  /api/admin/users/{userId}            {adminSuits: [suits]} (super admins)
  *   GET    /api/admin/rsvps?q=&attending=&page= RSVPs, 20 per page, newest first, + headcount (super admins)
+ *   GET    /api/admin/prints/riddles            clubs with the secret code of their poster (super admins)
  *   GET    /api/admin/settings                  {signupCode}
  *   PATCH  /api/admin/settings                  {signupCode}
  */
@@ -269,6 +270,19 @@ routerAdd(
     admin.requireSuperAdmin(e);
     const query = e.requestInfo().query;
     return e.json(200, admin.listRsvps(e.app, query.q || '', query.attending || '', query.page || '1'));
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Prints: the codes of the clubs posters ----
+
+routerAdd(
+  'GET',
+  '/api/admin/prints/riddles',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    return e.json(200, { cards: admin.riddleCodes(e.app) });
   },
   $apis.requireAuth('users'),
 );

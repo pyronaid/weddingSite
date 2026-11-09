@@ -357,19 +357,19 @@ Fill in `/opt/wedding/.env`:
    3. Log out and in again.
    - **Organisers:** the same, choosing their suits in **`admin_suits`** (e.g. only clubs). They still play the game, and edit only those suits.
 4. **Site settings** (private area → *Site settings*): **language**, names, date and time zone, RSVP deadline, ceremony/reception, gift text and **IBAN**, and all the **photos**. These texts are shown as written, so write them in the chosen language.
-5. **The game content** (the *Organisers* section of the private area home):
-   - **Sign-up code:** change it, and put the new one on the invitations.
+5. **The game content** (private area → **Organise** tab: cards with a red frame still need something, and the overview counts what is left):
    - **Letters** of every suit.
    - **Clubs:** the riddles and their **solutions**.
    - **Hearts:** the scenes.
    - **Diamonds:** replace the **"(example)" questions**.
    - **Spades:** replace the **example people** (their answers are public in the repository).
-6. **Clubs posters with the real address.** The QR codes point to `FRONTEND_URL`. Print them **after** the domain works, from your computer:
+   - **Sign-up code** (*Site settings* → *Sign-up code*): change it. It can be printed on the invitations.
+6. **The prints, from the live site.** *Site settings* → **Prints**, opened at `https://gioevale.com` (the QR codes point to the address in the tab's *Website address* field, which starts as the address the page is opened at):
+   - the **invitations** (one guest / a couple), A5 or two per A4 sheet: print them or save as PDF for the print shop;
+   - the **clubs posters** (A3), after the riddles are written. The tab marks in red the clubs whose riddle is still missing;
+   - the **logo**, as SVG (vector, for the print shop) or PNG.
 
-   ```bash
-   PB_URL=https://api.gioevale.com FRONTEND_URL=https://gioevale.com \
-   PB_ADMIN_EMAIL=… PB_ADMIN_PASSWORD=… npm run posters
-   ```
+   The posters contain the secret codes of this database: print them from production, and don't share the files.
 
 7. **A full rehearsal from a phone on mobile data:**
    - sign up, then log in;
@@ -636,7 +636,7 @@ In the DNS panel of step 2.3, set the **TTL** of the `A` and `AAAA` records (`@`
 | Confirmation e-mails don't arrive | Admin UI → Logs; check the SMTP settings in `.env`; port 587 with `PB_SMTP_TLS=false`; sender address of your authenticated domain |
 | E-mails land in spam | SPF/DKIM/DMARC missing or duplicated → mail-tester.com tells which |
 | "Too many requests" at the venue | Rate limits and shared Wi-Fi IP → section 5 |
-| A QR code opens the wrong address | Posters printed before the domain was set → reprint with `FRONTEND_URL` (step 4.5.6) |
+| A QR code opens the wrong address | Prints made before the domain was set, or from another address → open *Site settings → Prints* on the live site, check the *Website address* field, and print again (step 4.5.6) |
 | Deploy says "Deploy is off" or "Deploy settings missing" | Open the *Check the deploy settings* step of the *Deploy to the server* job: it names what to add. Usually the environment isn't named exactly `deploy`, `DEPLOY_ENABLED` was saved as a secret instead of a variable, or one of the four secrets is missing |
 | Deploy says an image "is not available" but the log shows it was pulled, the name split in two lines | The files were copied from a Windows checkout with Windows line endings. Convert them once on the server: `sed -i 's/\r$//' /opt/wedding/.env /opt/wedding/Caddyfile /opt/wedding/docker-compose.yml`. Newer versions of `deploy.sh` and the repository's `.gitattributes` prevent it |
 | Deploy says "Missing /opt/wedding/.env" | Step 4.2 not finished: `cp .env.example .env` in `/opt/wedding` and fill it in (`ls -la` shows it) |

@@ -13,6 +13,7 @@ import type {
   AdminScene,
   AdminSettings,
   NewQuestion,
+  RiddleCode,
   RsvpFilter,
   PersonFields,
 } from './types';
@@ -109,6 +110,11 @@ export class PocketBaseAdminRepository implements AdminRepository {
     const data = await this.call<AdminRsvpsPage>(`/rsvps?${params}`, 'GET');
     // PocketBase dates ("2027-06-19 10:00:00.000Z") made ISO: every browser parses them.
     return { ...data, items: data.items.map((rsvp) => ({ ...rsvp, created: rsvp.created.replace(' ', 'T') })) };
+  }
+
+  async getRiddleCodes(): Promise<RiddleCode[]> {
+    const { cards } = await this.call<{ cards: RiddleCode[] }>('/prints/riddles', 'GET');
+    return cards;
   }
 
   getSettings(): Promise<AdminSettings> {

@@ -8,12 +8,12 @@ import { useMessages } from '../../../../i18n';
 import { toAdminError } from '../../../../services/admin';
 import type { SiteContent, SiteSettings } from '../../../../services/site';
 import { useSiteContent } from '../../../../site/SiteContentContext';
-import { isSettingsTab, SETTINGS_TABS, siteSettingsPath, type SettingsTab } from '../../game/suits';
-import { AREA_HOME } from '../../guards';
+import { isSettingsTab, ORGANISE_PATH, SETTINGS_TABS, siteSettingsPath, type SettingsTab } from '../../game/suits';
 import { siteSettingsMessages } from '../../messages/siteSettings';
 import { useAuth } from '../../useAuth';
 import { SignupCodeForm } from '../SignupCodeForm';
 import { PhotosEditor } from './PhotosEditor';
+import { PrintsPanel } from './PrintsPanel';
 import { RsvpsList } from './RsvpsList';
 import { SiteSettingsForm } from './SiteSettingsForm';
 import { UsersEditor } from './UsersEditor';
@@ -23,7 +23,8 @@ type State = { status: 'loading' } | { status: 'ready'; content: SiteContent } |
 
 /**
  * Super admin only, in tabs: the content of the public site (general data,
- * photos), who organises which suit, the RSVPs and the sign-up code.
+ * photos), who organises which suit, the RSVPs, the sign-up code and the
+ * files to print (logo, invitations, clubs posters).
  * The General and Photos tabs edit the latest content from the server (not
  * the copy cached in the browser); every save updates the whole site at once
  * (a new language re-renders everything in it).
@@ -39,6 +40,7 @@ export function SiteSettingsPage() {
     organisers: t.tabs.organisers,
     rsvps: t.tabs.rsvps,
     'signup-code': t.tabs.signupCode,
+    prints: t.tabs.prints,
   };
   useDocumentTitle(t.documentTitle);
   const { repository, replace } = useSiteContent();
@@ -120,9 +122,10 @@ export function SiteSettingsPage() {
         {tab === 'organisers' && <UsersEditor />}
         {tab === 'rsvps' && <RsvpsList />}
         {tab === 'signup-code' && <SignupCodeForm />}
+        {tab === 'prints' && <PrintsPanel />}
       </RouteTabPanel>
 
-      <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
+      <Link to={ORGANISE_PATH} className={`${formStyles.secondary} ${styles.back}`}>
         {t.back}
       </Link>
     </div>
