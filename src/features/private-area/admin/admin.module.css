@@ -426,10 +426,189 @@
   color: var(--card-text);
 }
 
-/* Organisers' section of the private area home. */
-.organiser {
+/* ---- Organise tab: overview and cards ---- */
+
+.overview {
   display: grid;
-  gap: 0.9rem;
-  padding-top: 1rem;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+}
+
+.overview .panelTitle {
+  margin: 0;
+}
+
+.days {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.remaining,
+.allSet {
+  margin: 0;
+  font-weight: 700;
+}
+
+.remaining {
+  color: var(--danger);
+}
+
+.allSet {
+  color: var(--success);
+}
+
+.overviewList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.2rem;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+  color: var(--card-muted);
+}
+
+.overviewList a {
+  color: var(--card-text);
+  font-weight: 700;
+}
+
+.suitOpen a {
+  color: var(--danger);
+}
+
+.suitSection {
+  display: grid;
+  gap: 0.7rem;
+  padding-top: 0.6rem;
   border-top: 1px dashed var(--card-border);
+  scroll-margin-top: 1rem;
+}
+
+.suitSection .sectionTitle,
+.suitSection h3 {
+  margin-bottom: 0;
+}
+
+/* Like the guests' cards: 3 columns on phones, up to 7 on wide screens. */
+.cardGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: clamp(0.6rem, 2vw, 1rem);
+}
+
+.tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 5 / 7;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 8px 16px -10px rgba(0, 0, 0, 0.6);
+  transition: transform 0.15s ease;
+}
+
+.tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  user-select: none;
+}
+
+.tile:hover,
+.tile:focus-visible {
+  transform: translateY(-3px);
+}
+
+.tile:focus-visible {
+  outline: 3px solid var(--pink-400);
+  outline-offset: 3px;
+}
+
+/* Something to set: a red frame (brighter than --danger, meant for text). */
+.tileTodo {
+  outline: 3px solid #ff4f6d;
+  outline-offset: 0;
+}
+
+.tileDone {
+  outline: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.tileMark {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.45rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: #2f9e5b;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.tileTodo .tileMark {
+  background: #ff4f6d;
+}
+
+.peopleSummary {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  text-align: center;
+}
+
+/* ---- One card's editor ---- */
+
+.cardLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .cardLayout {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
+
+.cardSide {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.bigCard {
+  width: min(180px, 50vw);
+  aspect-ratio: 5 / 7;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+.cardNav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.95rem;
+}
+
+.cardNav a {
+  color: var(--card-accent);
+  font-weight: 700;
 }

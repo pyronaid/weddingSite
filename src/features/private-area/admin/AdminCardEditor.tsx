@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { toAdminError, type AdminCard, type AdminCardChanges, type AdminError } from '../../../services/admin';
 import { useMessages } from '../../../i18n';
@@ -9,11 +9,25 @@ import { QuestionsEditor } from './QuestionsEditor';
 import { ScenesEditor } from './ScenesEditor';
 import styles from './admin.module.css';
 
-/** Edits one card: letter (Ace..10), riddle and solution (clubs), scenes (numbered hearts). */
-export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
+interface AdminCardEditorProps {
+  card: AdminCard;
+  /** After every change saved on the server, with the whole updated card. */
+  onChange?: (card: AdminCard) => void;
+  /** The small image and the name; off where the page already shows them. */
+  showHeader?: boolean;
+}
+
+/** Edits one card: letter (Ace..10), riddle and solution (clubs), scenes (numbered hearts), quiz (diamonds). */
+export function AdminCardEditor({ card: initial, onChange, showHeader = true }: AdminCardEditorProps) {
   const repository = useAdminRepository();
   const uid = useId();
   const [card, setCard] = useState(initial);
+  // The latest card, also changed by the scenes and questions editors.
+  const latest = useRef(initial);
+  const change = (fields: Partial<AdminCard>) => {
+    latest.current = { ...latest.current, ...fields };
+    onChange?.(latest.current);
+  };
   const [letter, setLetter] = useState(initial.letter);
   const [riddle, setRiddle] = useState(initial.riddle ?? '');
   const [solution, setSolution] = useState(initial.solution ?? '');
@@ -44,7 +58,10 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
     setError(null);
     try {
       const updated = await repository.updateCard(card.id, changes);
-      setCard(updated);
+      // Merged into the latest card: its scenes or questions may have changed meanwhile.
+      latest.current = { ...latest.current, ...updated };
+      setCard(latest.current);
+      onChange?.(latest.current);
       setLetter(updated.letter);
       setRiddle(updated.riddle ?? '');
       setSolution(updated.solution ?? '');
@@ -65,12 +82,18 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
   };
 
   return (
-    <article className={styles.editor} aria-labelledby={`${uid}-title`}>
-      <header className={styles.editorHeader}>
-        <img src={cardImageUrl(card.suit, card.rank)} alt="" width={40} height={56} />
-        <h3 id={`${uid}-title`}>{name}</h3>
-        {hasRiddle && !card.solution && <span className={styles.badge}>{t.noSolution}</span>}
-      </header>
+    <article
+      className={styles.editor}
+      aria-labelledby={showHeader ? `${uid}-title` : undefined}
+      aria-label={showHeader ? undefined : name}
+    >
+      {showHeader && (
+        <header className={styles.editorHeader}>
+          <img src={cardImageUrl(card.suit, card.rank)} alt="" width={40} height={56} />
+          <h3 id={`${uid}-title`}>{name}</h3>
+          {hasRiddle && !card.solution && <span className={styles.badge}>{t.noSolution}</span>}
+        </header>
+      )}
 
       {editable ? (
         <form className={styles.fields} onSubmit={submit} noValidate>
@@ -145,9 +168,17 @@ export function AdminCardEditor({ card: initial }: { card: AdminCard }) {
         </p>
       )}
 
-      {card.scenes && <ScenesEditor cardId={card.id} cardName={name} scenes={card.scenes} />}
+      {card.scenes && (
+        <ScenesEditor cardId={card.id} cardName={name} scenes={card.scenes} onChange={(scenes) => change({ scenes })} />
+      )}
       {card.questions && (
-        <QuestionsEditor cardId={card.id} cardName={name} questions={card.questions} inPerson={face} />
+        <QuestionsEditor
+          cardId={card.id}
+          cardName={name}
+          questions={card.questions}
+          inPerson={face}
+          onChange={(questions) => change({ questions })}
+        />
       )}
     </article>
   );

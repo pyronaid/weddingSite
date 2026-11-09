@@ -40,5 +40,11 @@ export const isSettingsTab = (value: unknown): value is SettingsTab =>
   typeof value === 'string' && (SETTINGS_TABS as readonly string[]).includes(value);
 export const siteSettingsPath = (tab: SettingsTab) => `${SITE_SETTINGS_PATH}/${tab}`;
 
-/** Organisers' editor of a suit. */
-export const adminSuitPath = (suit: Suit) => `${AREA_HOME}/admin/suits/${suit}`;
+/** Organisers: every suit they edit, card by card, with what is still missing. */
+export const ORGANISE_PATH = `${AREA_HOME}/admin`;
+
+/** Organisers' editor of one card. */
+export const adminCardPath = (suit: Suit, rank: number) => `${ORGANISE_PATH}/cards/${suit}/${rank}`;
+
+/** Spades: the people to find of the "guess who" game. */
+export const adminSuitPath = (suit: Suit) => `${ORGANISE_PATH}/suits/${suit}`;

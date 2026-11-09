@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Link, useParams } from 'react-router';
 import formStyles from '../../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../../components/InfoCard/CardHeader';
+import { RouteTabPanel, RouteTabs } from '../../../../components/RouteTabs/RouteTabs';
 import { useDocumentTitle } from '../../../../hooks/useDocumentTitle';
 import { useMessages } from '../../../../i18n';
 import { toAdminError } from '../../../../services/admin';
@@ -23,14 +24,22 @@ type State = { status: 'loading' } | { status: 'ready'; content: SiteContent } |
 /**
  * Super admin only, in tabs: the content of the public site (general data,
  * photos), who organises which suit, the RSVPs and the sign-up code.
- * The General and Photos tabs edit the latest content from the server (not the copy cached in the browser); every save updates
- * the whole site at once (a new language re-renders everything in it).
+ * The General and Photos tabs edit the latest content from the server (not
+ * the copy cached in the browser); every save updates the whole site at once
+ * (a new language re-renders everything in it).
  */
 export function SiteSettingsPage() {
   const t = useMessages(siteSettingsMessages);
   // /area/site/<tab>; an unknown or missing tab shows the first one.
   const param = useParams().tab;
   const tab: SettingsTab = isSettingsTab(param) ? param : 'general';
+  const tabLabels: Record<SettingsTab, string> = {
+    general: t.tabs.general,
+    photos: t.tabs.photos,
+    organisers: t.tabs.organisers,
+    rsvps: t.tabs.rsvps,
+    'signup-code': t.tabs.signupCode,
+  };
   useDocumentTitle(t.documentTitle);
   const { repository, replace } = useSiteContent();
   const { auth } = useAuth();
@@ -98,95 +107,24 @@ export function SiteSettingsPage() {
       <CardHeader id="site-settings-title" eyebrow={t.eyebrow} title={t.title} />
       <p className={styles.intro}>{t.intro}</p>
 
-      <SettingsTabs current={tab} />
-      <div
-        id={PANEL_ID}
-        role="tabpanel"
-        aria-labelledby={tabId(tab)}
-        className={styles.tabPanel}
-        // The panel itself can take the focus, as the tabs pattern expects.
-        tabIndex={0}
-      >
+      <RouteTabs
+        id="site-settings"
+        label={t.tabs.label}
+        current={tab}
+        tabs={SETTINGS_TABS.map((id) => ({ id, label: tabLabels[id], to: siteSettingsPath(id) }))}
+      />
+      <RouteTabPanel id="site-settings" current={tab} className={styles.tabPanel}>
         {tab === 'general' && contentPanel((content) => <SiteSettingsForm content={content} onSave={save} />)}
         {tab === 'photos' &&
           contentPanel((content) => <PhotosEditor content={content} repository={repository} onChange={update} />)}
         {tab === 'organisers' && <UsersEditor />}
         {tab === 'rsvps' && <RsvpsList />}
         {tab === 'signup-code' && <SignupCodeForm />}
-      </div>
+      </RouteTabPanel>
 
       <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
         {t.back}
       </Link>
-    </div>
-  );
-}
-
-const PANEL_ID = 'site-settings-panel';
-const tabId = (tab: SettingsTab) => `site-settings-tab-${tab}`;
-
-/**
- * The sections of the page as tabs. Each one has its own address
- * (/area/site/photos...): it can be bookmarked and the Back button works.
- * Arrow keys, Home and End move between tabs (WAI-ARIA tabs pattern).
- */
-function SettingsTabs({ current }: { current: SettingsTab }) {
-  const t = useMessages(siteSettingsMessages).tabs;
-  const navigate = useNavigate();
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  const labels: Record<SettingsTab, string> = {
-    general: t.general,
-    photos: t.photos,
-    organisers: t.organisers,
-    rsvps: t.rsvps,
-    'signup-code': t.signupCode,
-  };
-
-  const open = (tab: SettingsTab) => navigate(siteSettingsPath(tab));
-
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const last = SETTINGS_TABS.length - 1;
-    const target =
-      event.key === 'ArrowRight'
-        ? index === last
-          ? 0
-          : index + 1
-        : event.key === 'ArrowLeft'
-          ? index === 0
-            ? last
-            : index - 1
-          : event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? last
-              : null;
-    if (target === null) return;
-    event.preventDefault();
-    buttons.current[target]?.focus();
-    open(SETTINGS_TABS[target]);
-  };
-
-  return (
-    <div role="tablist" aria-label={t.label} className={styles.tabs}>
-      {SETTINGS_TABS.map((tab, index) => (
-        <button
-          key={tab}
-          ref={(element) => {
-            buttons.current[index] = element;
-          }}
-          id={tabId(tab)}
-          type="button"
-          role="tab"
-          aria-selected={tab === current}
-          aria-controls={PANEL_ID}
-          tabIndex={tab === current ? 0 : -1}
-          className={styles.tab}
-          onClick={() => open(tab)}
-          onKeyDown={(event) => onKeyDown(event, index)}
-        >
-          {labels[tab]}
-        </button>
-      ))}
     </div>
   );
 }

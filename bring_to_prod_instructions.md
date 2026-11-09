@@ -74,13 +74,14 @@ This site is light. The work is done by **one PocketBase process** (Go + SQLite)
 
 | | Option | Examples (EU regions) | Approx. price | Fits this repo | Good | Less good |
 | --- | --- | --- | --- | --- | --- | --- |
-| **A** ⭐ | **A small virtual server (VPS) with Docker** | [Hetzner Cloud](https://www.hetzner.com/cloud) (DE/FI), [Netcup](https://www.netcup.com) (DE), [Aruba Cloud](https://www.arubacloud.com) (IT), [OVHcloud VPS](https://www.ovhcloud.com) (FR), [DigitalOcean](https://www.digitalocean.com) (DE/NL) | €5–25/month | **100%: the files above and the pipeline target exactly this** | Cheapest; full control; fixed price; one place for everything; backups by the provider | You run a Linux server: 30 minutes of setup (below), then updates run by themselves |
+| **A** ⭐ | **A small virtual server (VPS) with Docker** | [Hetzner Cloud](https://www.hetzner.com/cloud) (DE/FI), [Netcup](https://www.netcup.com) (DE), [Aruba Cloud](https://www.arubacloud.com) (IT), [OVHcloud VPS](https://www.ovhcloud.com) (FR), [IONOS VPS](https://www.ionos.it) (DE/ES), [DigitalOcean](https://www.digitalocean.com) (DE/NL) | €5–25/month | **100%: the files above and the pipeline target exactly this** | Cheapest; full control; fixed price; one place for everything; backups by the provider | You run a Linux server: 30 minutes of setup (below), then updates run by themselves |
 | B | **Container platform with a volume** | [Fly.io](https://fly.io) (one machine + volume), [Railway](https://railway.com), [Render](https://render.com) (with a paid disk) | $5–25/month | Partly: reuse the two Dockerfiles, but write the platform's config instead of `deploy/` | No server to maintain; HTTPS included | Pricing by usage; vendor-specific config; persistent disks need care (single region, one instance) |
 | C | **Managed PocketBase + static hosting** | [PocketHost](https://pockethost.io) for PocketBase + [Cloudflare Pages](https://pages.cloudflare.com) / [Netlify](https://www.netlify.com) for the site | ≈ $10/month + free | Partly: upload `pb_migrations` and `pb_hooks`, set the same settings by hand; check that hooks with `require()` work there | Almost nothing to maintain | Less control (rate limits, backups, logs); two providers; you must check the plan's limits |
 
 **Recommendation: option A on Hetzner Cloud.**
 - **Why:** best price/performance in the EU, and the repository's pipeline deploys to it as is.
-- **If Hetzner has no availability or is too expensive** (in mid-2026 it reported limited availability of some plans): pick **Netcup** or **Aruba Cloud** (Italian, data centres in Italy). Every command below works on any Ubuntu server.
+- **If Hetzner has no availability or is too expensive** (in mid-2026 it reported limited availability of some plans): pick **Netcup**, **Aruba Cloud** (Italian, data centres in Italy) or **IONOS**. Every command below works on any Ubuntu server.
+- **Already live on Hetzner and want to move?** Section 7 moves the running site to IONOS, keeping every account, RSVP and photo.
 - **Plan to pick:** a "shared vCPU" plan with 2 vCPU / 4 GB.
   - **Intel/AMD (x86):** nothing to change.
   - **ARM** (Hetzner CAX, cheaper): set `IMAGE_PLATFORMS=linux/arm64` (step 4.3).
@@ -452,6 +453,176 @@ Fill in `/opt/wedding/.env`:
 4. **Other services:**
    - **Domain:** keep it (it is cheap) or let it expire.
    - **Brevo:** can stay on the free plan, or be closed.
+
+---
+
+## 7. Moving from Hetzner to IONOS
+
+Use this when the site already runs on Hetzner (sections 1–4) and you want it on an **IONOS VPS** instead, for example because of a price rise. Nothing in the repository changes: the same images, files and pipeline run on any Ubuntu server with Docker. You move **the server**, then point **the domain** and **GitHub** at it.
+
+**What moves, and what doesn't:**
+
+| Moves to the new server | Stays where it is |
+| --- | --- |
+| The database: accounts, RSVPs, game progress, site settings, the PocketBase settings (backups, rate limits, SMTP shown in the admin UI) | The domain and its registrar |
+| Every photo and selfie (`storage/` in the same volume) | Brevo and the e-mail DNS records (SPF/DKIM/DMARC name Brevo, not the server) |
+| The HTTPS certificates (so the new server works at once) | The GitHub repository and the images in `ghcr.io` |
+| `/opt/wedding/.env` and the other files of step 4.2 | |
+
+**Downtime:** about 15–30 minutes, while the data is copied. Guests see "cannot reach the server" in that time. Pick a quiet evening, and **not** the last weeks before the wedding (section 5: freeze).
+
+**Time:** 1–2 hours, plus waiting for DNS.
+
+### 7.1 The day before: shorten the DNS cache
+
+In the DNS panel of step 2.3, set the **TTL** of the `A` and `AAAA` records (`@`, `www`, `api`) to **300 seconds** (5 minutes). Phones and providers then pick up the new address within minutes on the day, instead of hours. Wait one old TTL (often 1 hour, at most a day) before step 7.5.
+
+### 7.2 Create the IONOS server
+
+1. Create an account on IONOS (ionos.it for Italy) and order a **VPS Linux** with:
+   - **2 vCPU, 4 GB RAM, ≥ 40 GB SSD** (the same size as section 1);
+   - a data centre in the **EU** (e.g. Germany or Spain), for GDPR and latency to Italy;
+   - image **Ubuntu 24.04**.
+
+   **Check on the IONOS page before ordering:** the price after any first-months promotion, the **minimum contract term** (some VPS offers are monthly, some for 12 months or more), any setup fee, and the price of backups or snapshots. These change often, and IONOS's site could not be checked when this guide was written.
+2. In the IONOS control panel (**Server & Cloud**):
+   - **SSH key:** add your public key (`~/.ssh/id_ed25519.pub`, step 1.1) and select it for the server, if the order or the server page offers it. Otherwise log in once with the root password IONOS shows, and add the key yourself: `ssh-copy-id root@NEW_IP` from your computer.
+   - **Firewall:** the server's firewall policy must allow inbound **TCP 22, 80 and 443** (and **UDP 443** for HTTP/3, optional). Remove rules for ports this site doesn't use (e.g. Plesk ports, if listed).
+   - **IPv6:** note the server's IPv6 if it has one. Some IONOS servers need it assigned in the panel first. It is optional: skip the `AAAA` records if there is none.
+   - **Snapshots/backups:** enable them if the plan offers them. They replace Hetzner's daily backups as the last resort (step 4.6).
+3. Note the new **IPv4**. Below, `OLD` is the Hetzner IP and `NEW` the IONOS one:
+
+   ```bash
+   OLD=deploy@195.201.90.14
+   NEW=deploy@<IONOS IPv4>
+   ```
+
+### 7.3 Prepare the new server
+
+1. Run **all of step 1.2** on the new server (system updates, Docker, the `deploy` user, `/opt/wedding`, `ufw`, keys only), with the new IP.
+2. Authorise **the pipeline's key** too: the old server already trusts it. Copy the whole file, from your computer:
+
+   ```bash
+   ssh $OLD 'cat ~/.ssh/authorized_keys' | ssh $NEW 'cat >> ~/.ssh/authorized_keys'
+   ```
+
+3. Copy the site's files, **`.env` included**: same superuser, same SMTP, same domains, same rate-limit exceptions. Also the record of the working versions (for `deploy.sh rollback`):
+
+   ```bash
+   ssh $OLD 'cd /opt/wedding && tar czf - docker-compose.yml Caddyfile deploy.sh .env .good-tag .previous-good-tag 2>/dev/null' \
+     | ssh $NEW 'cd /opt/wedding && tar xzf - && chmod 600 .env && chmod +x deploy.sh && ls -la'
+   ```
+
+4. Copy **the images of the running version** from the old server to the new one. This avoids logging the new server in to `ghcr.io` by hand: the pipeline does that itself from the next deploy.
+
+   ```bash
+   ssh $OLD 'cd /opt/wedding && docker save $(docker compose config --images) | gzip' \
+     | ssh $NEW 'gunzip | docker load'
+   ```
+
+5. **Create the stack without starting it**. This makes the volumes with the names Compose expects (`wedding_pb_data`, `wedding_caddy_data`, …):
+
+   ```bash
+   ssh $NEW 'cd /opt/wedding && docker compose up --no-start'
+   ```
+
+   - **If the IONOS server is ARM** (unusual), the copied images won't run on it. Skip step 4, set the GitHub variable `IMAGE_PLATFORMS=linux/arm64` (step 4.3) and run step 7.6 first.
+   - **Docker reports another project name than `wedding`** (the folder isn't `/opt/wedding`)? Use that name in the volume names below.
+
+### 7.4 Copy the data (the downtime starts here)
+
+1. **Stop PocketBase on the old server**, so nothing changes while it is copied. The site stays up but cannot load anything:
+
+   ```bash
+   ssh $OLD 'cd /opt/wedding && docker compose stop pocketbase'
+   ```
+
+2. **Copy the database and every photo**, then **the certificates**. Both go straight from server to server through your computer, without temporary files:
+
+   ```bash
+   ssh $OLD 'docker run --rm -v wedding_pb_data:/data:ro alpine:3.20 tar czf - -C /data .' \
+     | ssh $NEW 'docker run --rm -i -v wedding_pb_data:/data alpine:3.20 tar xzf - -C /data'
+
+   ssh $OLD 'docker run --rm -v wedding_caddy_data:/data:ro alpine:3.20 tar czf - -C /data .' \
+     | ssh $NEW 'docker run --rm -i -v wedding_caddy_data:/data alpine:3.20 tar xzf - -C /data'
+   ```
+
+   With a few GB of photos this takes several minutes: the speed of your home upload is the limit. **Faster alternative:** run the same pipes from the old server itself (`ssh -A $OLD`, then `ssh deploy@<IONOS IP> …` from there), so the data goes directly between the two data centres.
+
+3. **Check that the copy is complete.** The two numbers (database size and number of files) must be equal on both servers:
+
+   ```bash
+   for S in $OLD $NEW; do ssh $S 'docker run --rm -v wedding_pb_data:/data:ro alpine:3.20 sh -c "du -s /data/data.db; find /data/storage -type f | wc -l"'; done
+   ```
+
+4. **Start the site on the new server:**
+
+   ```bash
+   ssh $NEW 'cd /opt/wedding && docker compose up -d && sleep 20 && docker compose ps'
+   ```
+
+   All three services must be `running`, with `web` and `pocketbase` `(healthy)`.
+
+### 7.5 Test the new server, then move the domain
+
+1. **Before touching the DNS, test the new server** by its IP, with the real domain names (the copied certificates make HTTPS work at once):
+
+   ```bash
+   NEW_IP=<IONOS IPv4>
+   curl -s --resolve api.gioevale.com:443:$NEW_IP https://api.gioevale.com/api/health
+   curl -sI --resolve gioevale.com:443:$NEW_IP https://gioevale.com | head -1
+   ```
+
+   The first must answer `"API is healthy."`, the second `HTTP/2 200`.
+
+   **To try it in the browser**, add `NEW_IP gioevale.com api.gioevale.com` to your computer's hosts file (`/etc/hosts`, or `C:\Windows\System32\drivers\etc\hosts`). Then log in, open the gallery and check that the photos load. **Remove the line afterwards.**
+2. **Move the domain:** in the DNS panel, change the `A` records of `@`, `www` and `api` to the IONOS IPv4, and the `AAAA` records to its IPv6 (or delete them if it has none). **An `AAAA` record left on Hetzner's IPv6 sends some guests to the old server.**
+3. Wait a few minutes (the 300 s TTL of step 7.1). `dig +short gioevale.com` and `dig +short api.gioevale.com` must show the new IP. Then open the site from a phone **on mobile data**: log in, open a card, open the gallery.
+4. Put the TTL back to its default (e.g. 3600) after a day.
+
+> The downtime ends when the DNS points to the new server. Guests whose phone still had the old address cached see "cannot reach the server" for a few more minutes, at most the TTL.
+
+### 7.6 Point the pipeline at the new server
+
+**GitHub → the repository → Settings → Environments → `deploy`:**
+
+1. Make the new `known_hosts` entry and compare its fingerprint with the server's, as in step 4.3.1:
+
+   ```bash
+   ssh-keyscan -t ed25519 <IONOS IPv4> > wedding_known_hosts
+   ssh-keygen -lf wedding_known_hosts                                  # on your computer
+   ssh $NEW 'ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub'          # must be equal
+   ```
+
+2. Update two secrets (the others don't change: same user, same key):
+
+   | Secret | New value |
+   | --- | --- |
+   | `DEPLOY_HOST` | The IONOS IPv4 |
+   | `DEPLOY_KNOWN_HOSTS` | The content of the new `wedding_known_hosts` |
+
+3. **Actions → "CI and deploy" → Run workflow** (branch `main`). The run must end with **"Deployed …"**. It also logs the new server in to `ghcr.io` for the future.
+
+### 7.7 Afterwards
+
+- **Keep the Hetzner server for a few days, switched off, as the way back:** `ssh $OLD 'cd /opt/wedding && docker compose down'`. Volumes are kept. **Never start its PocketBase again once guests use the new one:** the two databases would diverge, and RSVPs or photos sent to the old one would be lost.
+- **Way back, only if something is badly wrong in the first hours:** stop the new server (`docker compose stop`), point the DNS back to the old IPs, `docker compose up -d` on the old server, and set `DEPLOY_HOST`/`DEPLOY_KNOWN_HOSTS` back. Whatever guests did on the new server in the meantime is not on the old one.
+- **Off-site backups** (step 4.5.2) are settings in the database, so they came along. If they went to **Hetzner Object Storage**, either keep that (it works from any server) or move them: admin UI → Settings → Backups → S3 storage. Then press **"Backup now"** once and check that it succeeds.
+- **Monitoring** (section 5) checks the domain names, so nothing to change.
+- **Delete the Hetzner server**, and its backups and snapshots, once you are happy (e.g. after a week). Hetzner bills by the hour until then.
+- From now on, read **"IONOS console"** wherever this guide says "Hetzner console": firewall (step 4.4.5), resize (section 5), server backups (step 4.6).
+
+### 7.8 Troubleshooting the move
+
+| Symptom | Likely cause → fix |
+| --- | --- |
+| `ssh $NEW` asks for a password or is refused | The key isn't on the `deploy` user yet (step 1.2: copy `authorized_keys`), or you are still using root |
+| The site doesn't load on the new IP; `curl --resolve` times out | IONOS firewall policy without 80/443 (step 7.2.2), or `ufw` not set (step 1.2) |
+| `docker compose up --no-start` says an image is missing | The `docker save` step didn't copy it: check `docker images` on the new server, or run the GitHub deploy (step 7.6) first |
+| After the move, logins fail or the site looks "new" (default names, no photos) | PocketBase started with an empty volume: the volume name didn't match. On the new server, `docker volume ls`, copy into the right name (step 7.4.2), then `docker compose restart pocketbase` |
+| Some guests still reach the old server | An `AAAA` record still on Hetzner's IPv6, or their DNS cache: check `dig AAAA gioevale.com`; wait the TTL |
+| Certificate error on the new server | The `caddy_data` copy was skipped: Caddy gets new certificates by itself once the DNS points to it (minutes); check `docker compose logs caddy` |
+| The GitHub deploy fails at "SSH" after the move | `DEPLOY_KNOWN_HOSTS` still has the old server's key, or the pipeline key isn't in the new `authorized_keys` (step 7.3.2) |
 
 ---
 

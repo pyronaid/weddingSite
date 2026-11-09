@@ -1,23 +1,61 @@
 import type { Dictionary } from '../../../i18n';
+import type { CardTodo } from '../../../services/admin';
 import type { Suit } from '../../../services/game';
 
 const en = {
-  dashboard: {
+  organise: {
+    tabs: { label: 'Private area', game: 'My game', organise: 'Organise' },
     title: 'Organisers',
     /** Super admins prepare everything. */
     introAll:
-      'Prepare the game: choose a suit to edit the secret letters of its cards, the photo scenes of the hearts, the quiz of the diamonds, the people to find of the spades and the riddles of the clubs.',
-    /** The organisers of some suits only, e.g. "Clubs and Hearts". */
+      'Prepare the game: the secret letters of the cards, the photo scenes of the hearts, the quiz of the diamonds, the people to find of the spades and the riddles of the clubs.',
+    /** The organisers of some suits only, e.g. "clubs and hearts". */
     introSome: (suits: string) =>
-      `You organise ${suits}: edit their cards and challenges here. You play the game like every other guest.`,
-    and: 'and',
-    captions: {
-      hearts: 'Letters & scenes',
-      diamonds: 'Letters & quiz',
-      spades: 'Guess who',
-      clubs: 'Letters & riddles',
-    } as Record<Suit, string>,
+      `You organise ${suits}: prepare their cards here. You play the game like every other guest.`,
+    overview: 'Before the wedding',
+    daysLeft: (days: number) =>
+      days > 1
+        ? `The wedding is in ${days} days.`
+        : days === 1
+          ? 'The wedding is tomorrow!'
+          : days === 0
+            ? 'The wedding is today!'
+            : 'The wedding is over.',
+    remaining: (count: number) =>
+      count === 0
+        ? 'Everything is set ✓'
+        : count === 1
+          ? '1 thing still needs to be set.'
+          : `${count} things still need to be set.`,
+    suitTodo: (count: number, total: number) => (count === 0 ? 'all set ✓' : `${count} of ${total} cards to set`),
+    peopleTodo: (count: number) =>
+      count === 0 ? 'nobody to find yet' : count === 1 ? '1 person to find ✓' : `${count} people to find ✓`,
+    legend: 'A red border means something is missing. Tap a card to edit it.',
+    loading: 'Loading the cards…',
+    /** e.g. "5 of clubs: the letter and the riddle to set". */
+    cardLabel: (card: string, todos: string) => (todos ? `${card}: ${todos} to set` : `${card}: all set`),
+    cards: (suit: string) => `Cards of the ${suit}`,
+    editPeople: 'Edit the people to find',
   },
+  cardPage: {
+    title: (card: string) => `Edit the ${card}`,
+    missing: (todos: string) => `Still to set: ${todos}.`,
+    allSet: 'Everything is set on this card ✓',
+    others: 'Other cards of the suit',
+    previous: (card: string) => `← ${card}`,
+    next: (card: string) => `${card} →`,
+    back: '← Back to the organisers',
+    notFound: 'This card does not exist.',
+  },
+  /** What may still be missing on a card (cardTodos). */
+  todos: {
+    letter: 'the letter',
+    riddle: 'the riddle',
+    solution: 'the solution',
+    scenes: 'the scenes',
+    questions: 'the quiz questions',
+    exampleQuestions: 'the example questions (replace them)',
+  } as Record<CardTodo, string>,
   suitPage: {
     title: (suit: string) => `Edit ${suit}`,
     eyebrow: (symbol: string) => `${symbol} Organisers`,
@@ -31,7 +69,7 @@ const en = {
     } as Record<Suit, string>,
     live: 'Changes are live for the guests as soon as you save.',
     loading: 'Loading the cards…',
-    back: '← Back to the organisers\' home',
+    back: '← Back to the organisers',
   },
   common: {
     tryAgain: 'Try again',
@@ -125,19 +163,53 @@ const en = {
 export const adminMessages: Dictionary<typeof en> = {
   en,
   it: {
-    dashboard: {
+    organise: {
+      tabs: { label: 'Area riservata', game: 'Il mio gioco', organise: 'Organizza' },
       title: 'Organizzatori',
       introAll:
-        'Prepara il gioco: scegli un seme per modificare le lettere segrete delle sue carte, le scene fotografiche dei cuori, il quiz dei quadri, le persone da trovare delle picche e gli indovinelli dei fiori.',
-      introSome: (suits) =>
-        `Organizzi ${suits}: qui modifichi le loro carte e le loro sfide. Giochi come tutti gli altri ospiti.`,
-      and: 'e',
-      captions: {
-        hearts: 'Lettere e scene',
-        diamonds: 'Lettere e quiz',
-        spades: 'Indovina chi',
-        clubs: 'Lettere e indovinelli',
-      },
+        'Prepara il gioco: le lettere segrete delle carte, le scene fotografiche dei cuori, il quiz dei quadri, le persone da trovare delle picche e gli indovinelli dei fiori.',
+      introSome: (suits) => `Organizzi ${suits}: qui prepari le loro carte. Giochi come tutti gli altri ospiti.`,
+      overview: 'Prima del matrimonio',
+      daysLeft: (days) =>
+        days > 1
+          ? `Mancano ${days} giorni al matrimonio.`
+          : days === 1
+            ? 'Il matrimonio è domani!'
+            : days === 0
+              ? 'Il matrimonio è oggi!'
+              : 'Il matrimonio è passato.',
+      remaining: (count) =>
+        count === 0
+          ? 'È tutto pronto ✓'
+          : count === 1
+            ? 'Manca ancora 1 cosa da impostare.'
+            : `Mancano ancora ${count} cose da impostare.`,
+      suitTodo: (count, total) => (count === 0 ? 'tutto pronto ✓' : `${count} carte su ${total} da impostare`),
+      peopleTodo: (count) =>
+        count === 0 ? 'nessuno da trovare' : count === 1 ? '1 persona da trovare ✓' : `${count} persone da trovare ✓`,
+      legend: 'Il bordo rosso indica che manca qualcosa. Tocca una carta per modificarla.',
+      loading: 'Caricamento delle carte…',
+      cardLabel: (card, todos) => (todos ? `${card}: da impostare ${todos}` : `${card}: tutto pronto`),
+      cards: (suit) => `Carte di ${suit}`,
+      editPeople: 'Modifica le persone da trovare',
+    },
+    cardPage: {
+      title: (card) => `Modifica il ${card}`,
+      missing: (todos) => `Da impostare: ${todos}.`,
+      allSet: 'Questa carta è pronta ✓',
+      others: 'Altre carte del seme',
+      previous: (card) => `← ${card}`,
+      next: (card) => `${card} →`,
+      back: '← Torna agli organizzatori',
+      notFound: 'Questa carta non esiste.',
+    },
+    todos: {
+      letter: 'la lettera',
+      riddle: 'l\'indovinello',
+      solution: 'la soluzione',
+      scenes: 'le scene',
+      questions: 'le domande del quiz',
+      exampleQuestions: 'le domande di esempio (sostituiscile)',
     },
     suitPage: {
       title: (suit) => `Modifica ${suit}`,
@@ -154,7 +226,7 @@ export const adminMessages: Dictionary<typeof en> = {
       },
       live: 'Le modifiche sono visibili agli ospiti appena salvi.',
       loading: 'Caricamento delle carte…',
-      back: '← Torna alla home degli organizzatori',
+      back: '← Torna agli organizzatori',
     },
     common: {
       tryAgain: 'Riprova',

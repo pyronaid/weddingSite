@@ -24,9 +24,19 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        // The organisers of that suit only (admin_suits, set by a superuser), and super admins.
+        // Organisers of any suit (admin_suits, set by a super admin), and super admins: their "Organise" tab.
+        lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireOrganiser }),
+        children: [{ path: 'admin', lazy: async () => ({ Component: (await pages()).OrganisePage }) }],
+      },
+      {
+        // The organisers of that suit only, and super admins.
         lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireSuitAdmin }),
-        children: [{ path: 'admin/suits/:suit', lazy: async () => ({ Component: (await pages()).AdminSuitPage }) }],
+        children: [
+          // One card (the hearts, diamonds and clubs).
+          { path: 'admin/cards/:suit/:rank', lazy: async () => ({ Component: (await pages()).AdminCardPage }) },
+          // The people to find of the spades.
+          { path: 'admin/suits/:suit', lazy: async () => ({ Component: (await pages()).AdminSuitPage }) },
+        ],
       },
       {
         // Super admins only (users flagged is_superadmin by a superuser).
