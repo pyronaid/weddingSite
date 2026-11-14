@@ -44,6 +44,7 @@ describe('logo', () => {
       mkdirSync(BRAND_DIR, { recursive: true });
       writeFileSync(target, svg);
     }
-    expect(readFileSync(target, 'utf8')).toBe(svg);
+    // Line endings aside: a Windows checkout (core.autocrlf) may turn them into CRLF.
+    expect(readFileSync(target, 'utf8').replace(/\r\n/g, '\n')).toBe(svg);
   });
 });
