@@ -150,9 +150,11 @@ function separatorItem(design: MonogramDesign, glyphs: GlyphFont, size: number, 
 
 /**
  * The shares of the width of spaced letters (side by side or diagonal), in %.
- * Both letters get the same box, the width of the wider one, each letter
- * centred in its box: the logo is symmetric whatever the letters (a narrow
- * "I" and a wide "W"), with the separator exactly in the middle.
+ * Both letters get the same box, the width of the wider one, symmetric
+ * around the middle of the logo, where the separator is. Each letter leans
+ * towards the middle: the first against the right side of its box, the
+ * second against the left side of its own, so they always face each other
+ * across the same gap (or separator), whatever their widths.
  */
 export const SPACING = {
   /** Without a separator: 48 | 4 | 48. */
@@ -167,11 +169,11 @@ interface Layout {
   centerX?: number;
 }
 
-/** An item moved so that the middle of its outline is at x = cx (its height unchanged). */
-const centredX = (item: Item, cx: number): Item => ({
-  ...item,
-  x: cx - ((item.box[0] + item.box[2]) / 2) * item.scale,
-});
+/** An item moved so that its outline ends at x (its height unchanged). */
+const endingAt = (item: Item, x: number): Item => ({ ...item, x: x - item.box[2] * item.scale });
+
+/** An item moved so that its outline starts at x (its height unchanged). */
+const startingAt = (item: Item, x: number): Item => ({ ...item, x: x - item.box[0] * item.scale });
 
 /** The separator centred on (cx, cy), at most `size` tall and `maxWidth` wide. */
 function fittedSeparator(
@@ -217,12 +219,13 @@ function layout(design: MonogramDesign, glyphs: GlyphFont): Layout {
   if (design.arrangement === 'aligned') {
     // Box centres: the first at 0, the second one box (+ gaps and separator) further.
     const step = box + (hasSeparator ? 2 * shares.gap * unit + sepBox : shares.gap * unit);
-    const items: Item[] = [centredX(first, 0)];
+    // The first letter against the right side of its box, the second against the left side of its own.
+    const items: Item[] = [endingAt(first, box / 2)];
     if (hasSeparator) {
       const sep = fittedSeparator(design, glyphs, sepSize, sepBox, step / 2, -cap / 2);
       if (sep) items.push(sep);
     }
-    items.push(centredX(second, step));
+    items.push(startingAt(second, step - box / 2));
     return { items, centerX: step / 2 };
   }
 
@@ -231,13 +234,13 @@ function layout(design: MonogramDesign, glyphs: GlyphFont): Layout {
   const script = design.font === 'script';
   const across = box * (script ? 0.78 : 1.02) + (hasSeparator ? 2 * shares.gap * unit + sepBox : 0);
   const down = cap * (script ? 0.62 : 0.78) + (hasSeparator ? cap * 0.08 : 0);
-  const items: Item[] = [centredX(first, 0)];
+  const items: Item[] = [endingAt(first, box / 2)];
   if (hasSeparator) {
     // Script separators are slimmer: a little bigger to balance.
     const sep = fittedSeparator(design, glyphs, sepSize * (script ? 1 : 0.7), sepBox, across / 2, down / 2 - cap / 2);
     if (sep) items.push(sep);
   }
-  items.push({ ...centredX(second, across), y: down });
+  items.push({ ...startingAt(second, across - box / 2), y: down });
   return { items, centerX: across / 2 };
 }
 
