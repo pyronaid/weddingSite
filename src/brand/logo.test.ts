@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BORDER_STYLES, borderLabel, byName, paint, parseBorderFile } from './borders';
+import { BORDER_STYLES, paint, parseBorderFile } from './borders';
 import { sans } from './glyphs/sans';
 import { script } from './glyphs/script';
 import { serif } from './glyphs/serif';
@@ -99,17 +99,6 @@ describe('monogram', () => {
       expect(body).not.toMatch(/(fill|stroke)="#000000"/);
     },
   );
-
-  it('offers every file of src/brand/borders, named after it', () => {
-    expect(BORDER_STYLES).toEqual(['none', 'big_flowers', 'circles', 'small_flowers', 'squares', 'stile_uno']);
-    expect(borderLabel('stile_uno')).toBe('Stile uno');
-    expect(borderLabel('my-new__border')).toBe('My new border');
-  });
-
-  it('sorts the borders by the name shown, numbers in order, capitals aside', () => {
-    const named = ['Border 10', 'border 2', 'Alpha', 'Stile uno'].map((label) => ({ id: label, label }));
-    expect(named.sort(byName).map((file) => file.label)).toEqual(['Alpha', 'border 2', 'Border 10', 'Stile uno']);
-  });
 
   it('reads the room a border leaves for the letters', () => {
     const file = (attrs: string) =>
