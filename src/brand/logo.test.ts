@@ -1,5 +1,6 @@
 /// <reference types="node" />
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { BORDER_STYLES, borderLabel, paint, parseBorderFile } from './borders';
 import { sans } from './glyphs/sans';
@@ -21,6 +22,15 @@ const files = (Object.keys(LOGO_PRESETS) as (keyof typeof LOGO_PRESETS)[]).flatM
     svg: monogramSvg(withScheme(LOGO_PRESETS[preset], scheme), fonts, { size: 512, title: 'G V' }),
   })),
 );
+
+/**
+ * Whether a file on disk holds `expected`, line endings aside: a Windows
+ * checkout (git core.autocrlf) writes the files with CRLF, and the Docker
+ * build must still pass there.
+ */
+function isUpToDate(file: string, expected: string): boolean {
+  return readFileSync(file, 'utf8').replace(/\r\n/g, '\n') === expected;
+}
 
 describe('monogram', () => {
   it('crosses the letters, the first one cut where the second one passes, on a transparent background', () => {
@@ -181,7 +191,47 @@ describe('monogram', () => {
       mkdirSync(BRAND_DIR, { recursive: true });
       writeFileSync(target, svg);
     }
-    // Line endings aside: a Windows checkout (core.autocrlf) may turn them into CRLF.
-    expect(readFileSync(target, 'utf8').replace(/\r\n/g, '\n')).toBe(svg);
+    expect(isUpToDate(target, svg)).toBe(true);
+  });
+
+  describe('on a Windows checkout (CRLF line endings)', () => {
+    const toCrlf = (text: string) => text.replace(/\r?\n/g, '\r\n');
+    let dir: string;
+    beforeEach(() => {
+      dir = mkdtempSync(path.join(os.tmpdir(), 'brand-'));
+    });
+    afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+    it('ignores line endings when comparing, so a Windows checkout builds even with the files it already has', () => {
+      const { file, svg } = files[0];
+      const windowsCopy = path.join(dir, file);
+      writeFileSync(windowsCopy, toCrlf(svg));
+      expect(readFileSync(windowsCopy, 'utf8')).toContain('\r\n');
+      expect(isUpToDate(windowsCopy, svg)).toBe(true);
+    });
+
+    it('still notices a real change, whatever the line endings', () => {
+      const { file, svg } = files[0];
+      const changed = path.join(dir, file);
+      writeFileSync(changed, toCrlf(svg.replace('#6d3350', '#000000')));
+      expect(isUpToDate(changed, svg)).toBe(false);
+    });
+
+    it.each(BORDER_STYLES.filter((style) => style !== 'none'))(
+      'reads the border file %s the same with CRLF',
+      (style) => {
+        const source = readFileSync(path.resolve(process.cwd(), `src/brand/borders/${style}.svg`), 'utf8').replace(
+          /\r\n/g,
+          '\n',
+        );
+        const unix = parseBorderFile(style, source)!;
+        const windows = parseBorderFile(style, toCrlf(source))!;
+        expect(windows.viewBox).toBe(unix.viewBox);
+        expect(windows.room).toEqual(unix.room);
+        // The same drawing: only the line breaks differ.
+        expect(windows.content.replace(/\r\n/g, '\n')).toBe(unix.content);
+        expect(paint(windows, '#123456', 'w').replace(/\r\n/g, '\n')).toBe(paint(unix, '#123456', 'w'));
+      },
+    );
   });
 });
