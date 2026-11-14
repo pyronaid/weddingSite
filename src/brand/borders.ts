@@ -1,161 +1,138 @@
-import { arc, dot, flower, leaf, polar, rose, stem, toward, type Point } from './ornaments';
+/**
+ * The borders of the monograms: the SVG files in ./borders/. Each file is a
+ * style, named after the file ("stile_uno.svg" -> "Stile uno"): to add one,
+ * drop the file there and deploy.
+ *
+ * A border file:
+ * - is drawn in one colour (any): it is repainted with the colour chosen on
+ *   the site;
+ * - may say how much room it leaves for the letters on its <svg> element:
+ *   data-room="0.6" (the free circle's diameter, as a fraction of the width;
+ *   default 0.6) and data-room-shape="square" for a free square instead;
+ * - is scaled to the monogram, keeping its proportions (any size or units).
+ *
+ * Only drawing gets through: scripts, event handlers, external links,
+ * embedded HTML, styles and images are removed.
+ */
 
 /** The monograms are drawn on a 1000 × 1000 canvas, centred. */
 export const CANVAS = 1000;
-const C = CANVAS / 2;
 
-export type BorderStyle = 'none' | 'flowersSmall' | 'flowersBig' | 'circles' | 'squares';
-export const BORDER_STYLES: BorderStyle[] = ['none', 'flowersSmall', 'flowersBig', 'circles', 'squares'];
+/** "none", or the name of a border file without ".svg". */
+export type BorderStyle = string;
+
+export interface BorderFile {
+  id: string;
+  /** The file name, readable: "stile_uno" -> "Stile uno". */
+  label: string;
+  viewBox: string;
+  /** The drawing, cleaned (ids still to be made unique). */
+  content: string;
+  room: { shape: 'circle' | 'square'; fraction: number };
+}
 
 export interface Border {
   /** SVG elements, in the border colour. */
   svg: string;
-  /** Room left for the letters: a circle of this radius, or a square of this half side. */
+  /** Room left for the letters: a circle of this radius, or a square of this half side (canvas units). */
   room: { shape: 'circle' | 'square'; size: number };
 }
 
-const strokeGroup = (color: string, width: number, d: string) =>
-  `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
-const fillGroup = (color: string, d: string) => `<path d="${d}" fill="${color}"/>`;
+const DEFAULT_ROOM = 0.6;
 
-/** Wreath of small leaves and berries all around (like a laurel crown). */
-function flowersSmall(color: string): Border {
-  const r = 385;
-  const leaves: string[] = [];
-  const berries: string[] = [];
-  const twigs: string[] = [];
-  for (let i = 0; i < 30; i++) {
-    const deg = i * 12;
-    const base = polar(C, C, r, deg);
-    // Leaves pointing along the wreath (clockwise), one outside and one inside, alternating sizes.
-    const along = deg + 90;
-    const size = i % 2 ? 62 : 72;
-    leaves.push(
-      leaf(base, along - 42, size, size * 0.3),
-      leaf(polar(C, C, r, deg + 5), along + 42, size * 0.85, size * 0.28),
-    );
-    if (i % 3 === 1) {
-      // A little twig of berries, outwards.
-      const twigEnd = polar(C, C, r + 58, deg + 4);
-      twigs.push(stem(base, twigEnd, 8));
-      berries.push(dot(twigEnd, 12), dot(toward(twigEnd, deg - 75, 24), 9), dot(toward(twigEnd, deg + 75, 24), 9));
-    }
-  }
+/** "stile_uno" -> "Stile uno". */
+export const borderLabel = (id: string) => {
+  const words = id.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return words.charAt(0).toLocaleUpperCase() + words.slice(1);
+};
+
+/** Removes everything that is not drawing (the files are inlined into the page). */
+function clean(svg: string): string {
+  return (
+    svg
+      .replace(/<\?xml[\s\S]*?\?>/g, '')
+      .replace(/<!DOCTYPE[\s\S]*?>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      // Elements that are not drawing, with their content.
+      .replace(/<(script|style|foreignObject|image|iframe|a|metadata|title|desc)\b[\s\S]*?<\/\1\s*>/gi, '')
+      .replace(/<(script|style|foreignObject|image|iframe|a|metadata|title|desc)\b[^>]*\/>/gi, '')
+      // Event handlers, styles, and links that are not to this file's own ids.
+      .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s+style\s*=\s*("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s+(xlink:)?href\s*=\s*("(?!#)[^"]*"|'(?!#)[^']*')/gi, '')
+      .replace(/url\(\s*(?!['"]?#)[^)]*\)/gi, 'none')
+  );
+}
+
+const attribute = (tag: string, name: string) => new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, 'i').exec(tag)?.[1];
+
+/** Reads a border file; null when it is not a usable SVG. */
+export function parseBorderFile(id: string, source: string): BorderFile | null {
+  const cleaned = clean(source);
+  const open = /<svg\b[^>]*>/i.exec(cleaned);
+  const end = cleaned.lastIndexOf('</svg>');
+  if (!open || end < open.index) return null;
+  const tag = open[0];
+  const width = parseFloat(attribute(tag, 'width') ?? '');
+  const height = parseFloat(attribute(tag, 'height') ?? '');
+  const viewBox = attribute(tag, 'viewBox') ?? (width > 0 && height > 0 ? `0 0 ${width} ${height}` : null);
+  if (!viewBox || !/^[-\d.\s,e]+$/i.test(viewBox)) return null;
+  const fraction = parseFloat(attribute(tag, 'data-room') ?? '');
   return {
-    svg:
-      strokeGroup(color, 9, arc(C, C, r, 0, 359.9)) +
-      strokeGroup(color, 6, twigs.join('')) +
-      fillGroup(color, leaves.join('') + berries.join('')),
-    room: { shape: 'circle', size: 300 },
+    id,
+    label: borderLabel(id),
+    viewBox: viewBox.trim(),
+    content: cleaned.slice(open.index + tag.length, end).trim(),
+    room: {
+      shape: attribute(tag, 'data-room-shape') === 'square' ? 'square' : 'circle',
+      fraction: fraction > 0.1 && fraction <= 1 ? fraction : DEFAULT_ROOM,
+    },
   };
 }
 
-/** A thin circle with two big flowering sprigs, top left and bottom right. */
-function flowersBig(color: string): Border {
-  const r = 400;
-  const strokes: string[] = [];
-  const fills: string[] = [];
-  // The circle stops where the sprigs take over.
-  strokes.push(arc(C, C, r, 252, 378), arc(C, C, r, 72, 198));
-  for (const start of [200, 20]) {
-    // Stem along the circle, then a flower beyond its end.
-    const end = start + 52;
-    strokes.push(arc(C, C, r, start, end));
-    for (let k = 0; k < 6; k++) {
-      const deg = start + 5 + k * 8;
-      const base = polar(C, C, r, deg);
-      const outside = k % 2 === 0;
-      fills.push(leaf(base, deg + 90 + (outside ? -42 : 42), 92 - k * 5, 25));
-    }
-    const tip = polar(C, C, r, end);
-    const head = toward(tip, end + 115, 56);
-    strokes.push(stem(tip, head, 10));
-    const bloom = flower(head, 60, end);
-    strokes.push(bloom.petals);
-    fills.push(bloom.heart);
-    // A bud near the start.
-    const budBase = polar(C, C, r, start + 3);
-    const bud = toward(budBase, start - 60, 60);
-    strokes.push(stem(budBase, bud, -8));
-    fills.push(leaf(bud, start - 70, 36, 13));
-  }
-  return {
-    svg: strokeGroup(color, 8, strokes.join('')) + fillGroup(color, fills.join('')),
-    room: { shape: 'circle', size: 320 },
-  };
+// Every SVG of the folder, read at build time (a new file needs a deploy).
+const sources = import.meta.glob<string>('./borders/*.svg', { query: '?raw', import: 'default', eager: true });
+
+const files = new Map<string, BorderFile>();
+for (const [path, source] of Object.entries(sources)) {
+  const id = path.replace(/^.*\//, '').replace(/\.svg$/i, '');
+  const file = parseBorderFile(id, source);
+  if (file) files.set(id, file);
 }
 
-/** Two circles with roses, each between two leaves. */
-function circles(color: string): Border {
-  const r = 395;
-  const roseAngles = [-90, -18, 54, 126, 198];
-  const gap = 8;
-  const strokes: string[] = [];
-  const fills: string[] = [];
-  roseAngles.forEach((deg, i) => {
-    const next = roseAngles[(i + 1) % roseAngles.length] + (i === roseAngles.length - 1 ? 360 : 0);
-    // The outer circle breaks around each rose.
-    strokes.push(arc(C, C, r, deg + gap, next - gap));
-    strokes.push(rose(polar(C, C, r, deg), 44, deg));
-    // Two leaves fanning out of the rose, outside the circle.
-    for (const side of [-1, 1]) {
-      const base = polar(C, C, r + 22, deg + side * 5);
-      fills.push(leaf(base, deg + side * 55, 66, 20));
-    }
-  });
-  return {
-    svg:
-      strokeGroup(color, 8, strokes.join('')) +
-      strokeGroup(color, 3.5, arc(C, C, r - 26, 0, 359.9)) +
-      fillGroup(color, fills.join('')),
-    room: { shape: 'circle', size: 305 },
-  };
+/** "none" first, then the files in alphabetical order. */
+export const BORDER_STYLES: BorderStyle[] = ['none', ...[...files.keys()].sort((a, b) => a.localeCompare(b))];
+
+export const isBorderStyle = (value: unknown): value is BorderStyle =>
+  typeof value === 'string' && (value === 'none' || files.has(value));
+
+/** The border names of earlier versions (drawn by code), now files. */
+export const LEGACY_BORDERS: Record<string, BorderStyle> = {
+  flowersSmall: 'small_flowers',
+  flowersBig: 'big_flowers',
+  circles: 'circles',
+  squares: 'squares',
+};
+
+/** The drawing of a file, repainted in `color`, its ids made unique with `idPrefix`. */
+export function paint(file: BorderFile, color: string, idPrefix: string): string {
+  const prefix = `${idPrefix}-${file.id}`;
+  const content = file.content
+    // Ids and the references to them: unique on the page.
+    .replace(/\sid\s*=\s*(["'])([^"']+)\1/g, ` id="${prefix}-$2"`)
+    .replace(/url\(\s*['"]?#([^)'"]+)['"]?\s*\)/g, `url(#${prefix}-$1)`)
+    .replace(/(\s(?:xlink:)?href\s*=\s*["'])#/g, `$1#${prefix}-`)
+    // One colour: every fill and stroke that is not "none".
+    .replace(/\s(fill|stroke|stop-color|color)\s*=\s*(["'])(?!none\2)[^"']*\2/gi, ` $1="${color}"`);
+  // Shapes without a fill of their own are black in SVG: the colour instead.
+  return `<g fill="${color}" color="${color}">${content}</g>`;
 }
 
-/** A rounded square, doubled, with leafy sprigs across two corners. */
-function squares(color: string): Border {
-  const outer = 128;
-  const inner = outer + 22;
-  const square = (inset: number, radius: number) =>
-    `M${inset + radius} ${inset}H${CANVAS - inset - radius}Q${CANVAS - inset} ${inset} ${CANVAS - inset} ${inset + radius}` +
-    `V${CANVAS - inset - radius}Q${CANVAS - inset} ${CANVAS - inset} ${CANVAS - inset - radius} ${CANVAS - inset}` +
-    `H${inset + radius}Q${inset} ${CANVAS - inset} ${inset} ${CANVAS - inset - radius}V${inset + radius}Q${inset} ${inset} ${inset + radius} ${inset}Z`;
-  const strokes = [square(outer, 70), square(inner, 52)];
-  const fills: string[] = [];
-  const sprig = (corner: Point, deg: number) => {
-    // From inside the frame, out across the corner.
-    const from = toward(corner, deg + 180, 170);
-    const to = toward(corner, deg, 90);
-    strokes.push(stem(from, to, 22));
-    for (let k = 0; k < 7; k++) {
-      const base = toward(from, deg, 24 + k * 36);
-      fills.push(leaf(base, deg + (k % 2 ? 48 : -48), 78 - k * 4, 21));
-    }
-    fills.push(dot(to, 14), dot(toward(to, deg - 60, 30), 10), dot(toward(to, deg + 60, 30), 10));
-  };
-  sprig({ x: CANVAS - outer, y: outer }, -45);
-  sprig({ x: outer, y: CANVAS - outer }, 135);
+export function border(style: BorderStyle, color: string, idPrefix = 'border'): Border {
+  const file = style === 'none' ? undefined : files.get(style);
+  if (!file) return { svg: '', room: { shape: 'square', size: 390 } };
   return {
-    svg:
-      strokeGroup(color, 8, strokes[0]) +
-      strokeGroup(color, 3.5, strokes[1]) +
-      strokeGroup(color, 6, strokes.slice(2).join('')) +
-      fillGroup(color, fills.join('')),
-    room: { shape: 'square', size: 290 },
+    svg: `<svg x="0" y="0" width="${CANVAS}" height="${CANVAS}" viewBox="${file.viewBox}" preserveAspectRatio="xMidYMid meet">${paint(file, color, idPrefix)}</svg>`,
+    room: { shape: file.room.shape, size: (file.room.fraction * CANVAS) / 2 },
   };
-}
-
-export function border(style: BorderStyle, color: string): Border {
-  switch (style) {
-    case 'flowersSmall':
-      return flowersSmall(color);
-    case 'flowersBig':
-      return flowersBig(color);
-    case 'circles':
-      return circles(color);
-    case 'squares':
-      return squares(color);
-    default:
-      return { svg: '', room: { shape: 'square', size: 390 } };
-  }
 }

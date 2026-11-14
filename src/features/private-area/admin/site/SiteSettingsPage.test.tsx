@@ -791,7 +791,7 @@ describe('site settings (super admin)', () => {
         expect(await screen.findByText(/Saved ✓/)).toBeInTheDocument();
         expect(designs.logo).toMatchObject({
           letters: ['G', 'M'],
-          border: 'flowersBig',
+          border: 'big_flowers',
           colors: ['#2f3e5c', '#c24f78'],
         });
 

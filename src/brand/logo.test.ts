@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { BORDER_STYLES, borderLabel, paint, parseBorderFile } from './borders';
 import { sans } from './glyphs/sans';
 import { script } from './glyphs/script';
 import { serif } from './glyphs/serif';
@@ -70,13 +71,63 @@ describe('monogram', () => {
     expect(accent).toContain('&lt;');
   });
 
-  it.each(['flowersSmall', 'flowersBig', 'circles', 'squares'] as const)(
-    'draws the %s border in its colour',
-    (border) => {
-      const { body } = monogramParts(design({ border, borderColor: '#123456' }), fonts);
-      expect(body).toMatch(/(stroke|fill)="#123456"/);
+  it.each(BORDER_STYLES.filter((style) => style !== 'none'))(
+    'draws the border file %s in the chosen colour',
+    (style) => {
+      const { body } = monogramParts(design({ border: style, borderColor: '#123456' }), fonts);
+      expect(body).toContain('<svg x="0" y="0" width="1000" height="1000"');
+      expect(body).toContain('fill="#123456"');
+      // Every colour of the file replaced.
+      expect(body).not.toMatch(/(fill|stroke)="#000000"/);
     },
   );
+
+  it('offers every file of src/brand/borders, named after it', () => {
+    expect(BORDER_STYLES).toEqual(['none', 'big_flowers', 'circles', 'small_flowers', 'squares', 'stile_uno']);
+    expect(borderLabel('stile_uno')).toBe('Stile uno');
+    expect(borderLabel('my-new__border')).toBe('My new border');
+  });
+
+  it('reads the room a border leaves for the letters', () => {
+    const file = (attrs: string) =>
+      parseBorderFile(
+        'x',
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" ${attrs}><path d="M0 0"/></svg>`,
+      )!;
+    expect(file('').room).toEqual({ shape: 'circle', fraction: 0.6 });
+    expect(file('data-room="0.5" data-room-shape="square"').room).toEqual({ shape: 'square', fraction: 0.5 });
+    expect(file('data-room="7"').room.fraction).toBe(0.6);
+    // Units and sizes of any kind: only the viewBox matters, or width and height without one.
+    expect(parseBorderFile('y', '<svg width="240pt" height="120pt"><path d="M0 0"/></svg>')!.viewBox).toBe(
+      '0 0 240 120',
+    );
+    expect(parseBorderFile('z', '<p>not an svg</p>')).toBeNull();
+  });
+
+  it('keeps only the drawing of a border file, and makes its ids unique', () => {
+    const file = parseBorderFile(
+      'evil',
+      `<?xml version="1.0"?><!DOCTYPE svg><svg viewBox="0 0 10 10" onload="alert(1)">
+        <script>alert(2)</script><style>path{fill:url(https://x)}</style>
+        <foreignObject><div>hi</div></foreignObject><image href="https://x/y.png"/>
+        <defs><linearGradient id="g"><stop stop-color="#ff0000"/></linearGradient></defs>
+        <a href="javascript:alert(3)"><path d="M1 1"/></a>
+        <path d="M0 0" fill="url(#g)" style="fill:red" onclick="alert(4)"/><use href="#g"/><use href="https://x#a"/>
+      </svg>`,
+    )!;
+    expect(file.content).not.toMatch(/script|alert|style|foreignObject|image|javascript|https/);
+    const painted = paint(file, '#123456', 'p');
+    expect(painted).toContain('id="p-evil-g"');
+    expect(painted).toContain('href="#p-evil-g"');
+    expect(painted).toContain('stop-color="#123456"');
+    expect(painted).toMatch(/^<g fill="#123456"/);
+  });
+
+  it('turns the border names of earlier versions into their files, and a missing file into none', () => {
+    expect(sanitizeMonogram({ border: 'flowersBig' }).border).toBe('big_flowers');
+    expect(sanitizeMonogram({ border: 'circles' }).border).toBe('circles');
+    expect(sanitizeMonogram({ border: 'deleted_file' }).border).toBe('none');
+  });
 
   it('keeps the letters inside the canvas, whatever the arrangement', () => {
     for (const arrangement of ['crossed', 'aligned', 'diagonal'] as const) {

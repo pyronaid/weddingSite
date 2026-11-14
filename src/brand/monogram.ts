@@ -1,4 +1,4 @@
-import { border, BORDER_STYLES, CANVAS, type BorderStyle } from './borders';
+import { border, CANVAS, isBorderStyle, LEGACY_BORDERS, type BorderStyle } from './borders';
 import type { Glyph, GlyphFont } from './glyphs/types';
 import { HEART_PATH } from './ornaments';
 
@@ -220,7 +220,7 @@ function renderItem(item: Item & { parts?: Item[] }, design: MonogramDesign, mas
 
 /** viewBox and drawing of a monogram, to place inside another SVG (e.g. an invitation). */
 export function monogramParts(design: MonogramDesign, fonts: GlyphFonts, idPrefix = 'monogram') {
-  const frame = border(design.border, design.borderColor);
+  const frame = border(design.border, design.borderColor, idPrefix);
   const items = layout(design, fonts[design.font]);
   const maskId = `${idPrefix}-gap`;
 
@@ -299,7 +299,12 @@ export function sanitizeMonogram(raw: unknown): MonogramDesign {
     customSeparator: typeof r.customSeparator === 'string' ? r.customSeparator.slice(0, 3) : d.customSeparator,
     separatorColor: sanitizeColor(r.separatorColor, d.separatorColor),
     font: oneOf(r.font, MONOGRAM_FONTS, d.font),
-    border: oneOf(r.border, BORDER_STYLES, d.border),
+    // A border file renamed or deleted: no border. Older names: their file.
+    border: isBorderStyle(r.border)
+      ? r.border
+      : typeof r.border === 'string' && isBorderStyle(LEGACY_BORDERS[r.border])
+        ? LEGACY_BORDERS[r.border]
+        : d.border,
     borderColor: sanitizeColor(r.borderColor, d.borderColor),
   };
 }
