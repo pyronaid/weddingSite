@@ -218,20 +218,24 @@ describe('monogram', () => {
     });
 
     it.each(BORDER_STYLES.filter((style) => style !== 'none'))(
-      'reads the border file %s the same with CRLF',
+      'reads the border file %s exactly the same with CRLF',
       (style) => {
-        const source = readFileSync(path.resolve(process.cwd(), `src/brand/borders/${style}.svg`), 'utf8').replace(
-          /\r\n/g,
-          '\n',
-        );
-        const unix = parseBorderFile(style, source)!;
+        const source = readFileSync(path.resolve(process.cwd(), `src/brand/borders/${style}.svg`), 'utf8');
+        const unix = parseBorderFile(style, source.replace(/\r\n/g, '\n'))!;
         const windows = parseBorderFile(style, toCrlf(source))!;
-        expect(windows.viewBox).toBe(unix.viewBox);
-        expect(windows.room).toEqual(unix.room);
-        // The same drawing: only the line breaks differ.
-        expect(windows.content.replace(/\r\n/g, '\n')).toBe(unix.content);
-        expect(paint(windows, '#123456', 'w').replace(/\r\n/g, '\n')).toBe(paint(unix, '#123456', 'w'));
+        // Exactly: not "the same once the line endings are fixed".
+        expect(windows).toEqual(unix);
+        expect(paint(windows, '#123456', 'w')).toBe(paint(unix, '#123456', 'w'));
       },
     );
+
+    it('makes the very same seal logo from border files with CRLF', () => {
+      const source = readFileSync(path.resolve(process.cwd(), 'src/brand/borders/circles.svg'), 'utf8');
+      const fromWindows = parseBorderFile('circles', toCrlf(source))!;
+      const seal = files.find(({ file }) => file === 'gv-seal.svg')!;
+      // The ready-made seal (made from circles.svg) has no CR, so a Windows copy of the border changes nothing in it.
+      expect(seal.svg).not.toContain('\r');
+      expect(fromWindows.content).not.toContain('\r');
+    });
   });
 });
