@@ -1,6 +1,5 @@
 import type { Dictionary } from '../../../i18n';
 import type { Arrangement, MonogramFont, Separator } from '../../../brand/monogram';
-import type { BorderStyle } from '../../../brand/borders';
 import type { Decoration, InvitationSize, NameLines } from '../../../prints/invitations';
 
 /** The palette offered by the colour pickers (any other colour can be chosen too). */
@@ -94,13 +93,8 @@ const en = {
     font: 'Font',
     fonts: { script: 'Script', sans: 'Sans serif', serif: 'Times New Roman' } as Record<MonogramFont, string>,
     border: 'Border',
-    borders: {
-      none: 'None',
-      flowersSmall: 'Small flowers',
-      flowersBig: 'Big flowers',
-      circles: 'Circles',
-      squares: 'Squares',
-    } as Record<BorderStyle, string>,
+    /** The other borders are named after their files (src/brand/borders/). */
+    noBorder: 'None',
     borderColour: 'Colour of the border',
     background: 'Preview on',
     backgrounds: { light: 'light', dark: 'dark' },
@@ -242,13 +236,7 @@ export const printMessages: Dictionary<typeof en> = {
       font: 'Carattere',
       fonts: { script: 'Corsivo', sans: 'Senza grazie', serif: 'Times New Roman' },
       border: 'Cornice',
-      borders: {
-        none: 'Nessuna',
-        flowersSmall: 'Fiori piccoli',
-        flowersBig: 'Fiori grandi',
-        circles: 'Cerchi',
-        squares: 'Quadrati',
-      },
+      noBorder: 'Nessuna',
       borderColour: 'Colore della cornice',
       background: 'Anteprima su',
       backgrounds: { light: 'chiaro', dark: 'scuro' },

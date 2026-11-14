@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import formStyles from '../../../../../components/Form/Form.module.css';
-import { BORDER_STYLES } from '../../../../../brand/borders';
+import { BORDER_STYLES, borderLabel } from '../../../../../brand/borders';
 import { loadGlyphFonts } from '../../../../../brand/glyphs';
 import {
   ARRANGEMENTS,
@@ -278,7 +278,7 @@ export function LogoDesigner() {
             options={BORDER_STYLES}
             value={design.border}
             onChange={(border) => change({ border })}
-            labels={l.borders}
+            labels={Object.fromEntries(BORDER_STYLES.map((id) => [id, id === 'none' ? l.noBorder : borderLabel(id)]))}
             preview={(border) => <Monogram design={{ ...design, border }} fonts={fonts} id={`${id}-b-${border}`} />}
           />
           {design.border !== 'none' && (
