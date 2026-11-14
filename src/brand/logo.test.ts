@@ -186,11 +186,11 @@ describe('monogram', () => {
     const heart: [number, number, number, number] = [-575, -475, 575, 425];
     const box = Math.max(I[2] - I[0], W[2] - W[0]);
 
-    it('side by side: 48% each, the first against the right of its share, the second against the left of its own', () => {
+    it('side by side: 46% each, the first against the right of its share, the second against the left of its own', () => {
       const { edges, canvas } = measure({ arrangement: 'aligned', letters: ['I', 'W'] }, [I, W]);
       const [first, second] = edges;
       const unit = canvas(box) / SPACING.plain.letter;
-      // Facing each other across the 4% gap, centred on the middle of the logo.
+      // Facing each other across the 8% gap, centred on the middle of the logo.
       expect(second.left - first.right).toBeCloseTo(SPACING.plain.gap * unit, 0);
       expect((first.right + second.left) / 2).toBeCloseTo(500, 0);
       // The wide W fills its share; the narrow I leans on the gap, not centred in its share.

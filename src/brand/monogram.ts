@@ -157,8 +157,8 @@ function separatorItem(design: MonogramDesign, glyphs: GlyphFont, size: number, 
  * across the same gap (or separator), whatever their widths.
  */
 export const SPACING = {
-  /** Without a separator: 48 | 4 | 48. */
-  plain: { letter: 48, gap: 4 },
+  /** Without a separator: 46 | 8 | 46. */
+  plain: { letter: 46, gap: 8 },
   /** With one: 40 | 2.5 | 15 | 2.5 | 40. */
   separated: { letter: 40, gap: 2.5, separator: 15 },
 };
