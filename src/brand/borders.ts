@@ -68,7 +68,9 @@ const attribute = (tag: string, name: string) => new RegExp(`\\s${name}\\s*=\\s*
 
 /** Reads a border file; null when it is not a usable SVG. */
 export function parseBorderFile(id: string, source: string): BorderFile | null {
-  const cleaned = clean(source);
+  // Line endings as in the repository, whatever the checkout (Windows: CRLF), so
+  // the drawing (and the ready-made logos made with it) never depends on them.
+  const cleaned = clean(source.replace(/\r\n?/g, '\n'));
   const open = /<svg\b[^>]*>/i.exec(cleaned);
   const end = cleaned.lastIndexOf('</svg>');
   if (!open || end < open.index) return null;
