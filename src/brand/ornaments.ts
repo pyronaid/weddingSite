@@ -1,6 +1,6 @@
 /**
- * Botanical line art for the borders and the invitations: leaves, berries,
- * flowers, roses and hearts, as SVG path strings. Angles in degrees,
+ * Botanical line art for the invitations' decorations: leaves, berries,
+ * flowers and hearts, as SVG path strings (and the heart separator of the logos). Angles in degrees,
  * 0 = pointing right, growing clockwise (SVG y points down).
  */
 
@@ -11,11 +11,6 @@ export interface Point {
   x: number;
   y: number;
 }
-
-export const polar = (cx: number, cy: number, r: number, deg: number): Point => ({
-  x: cx + r * Math.cos(rad(deg)),
-  y: cy + r * Math.sin(rad(deg)),
-});
 
 /** A point `distance` away from `from`, towards `deg`. */
 export const toward = (from: Point, deg: number, distance: number): Point => ({
@@ -35,15 +30,6 @@ export function leaf(base: Point, deg: number, length: number, width: number): s
 /** A dot (berry, bud). */
 export function dot(at: Point, r: number): string {
   return `M${n(at.x - r)} ${n(at.y)}a${n(r)} ${n(r)} 0 1 0 ${n(2 * r)} 0a${n(r)} ${n(r)} 0 1 0 ${n(-2 * r)} 0Z`;
-}
-
-/** A circular arc (stroke). */
-export function arc(cx: number, cy: number, r: number, from: number, to: number): string {
-  const a = polar(cx, cy, r, from);
-  const b = polar(cx, cy, r, to);
-  const large = Math.abs(to - from) > 180 ? 1 : 0;
-  const sweep = to > from ? 1 : 0;
-  return `M${n(a.x)} ${n(a.y)}A${n(r)} ${n(r)} 0 ${large} ${sweep} ${n(b.x)} ${n(b.y)}`;
 }
 
 /** A gently curved stem from `a` to `b`, bending by `bend` (perpendicular offset). */
@@ -69,34 +55,6 @@ export function flower(at: Point, r: number, rotation = 0, petals = 5): { petals
     );
   }
   return { petals: parts.join(''), heart: dot(at, r * 0.2) };
-}
-
-/** A rose seen from above: a spiral of petals inside a scalloped outline (stroke). */
-export function rose(at: Point, r: number, rotation = 0): string {
-  const parts: string[] = [];
-  // Outer scallops.
-  const scallops = 6;
-  let d = '';
-  for (let i = 0; i <= scallops; i++) {
-    const deg = rotation + (360 / scallops) * i;
-    const p = polar(at.x, at.y, r, deg);
-    if (i === 0) d += `M${n(p.x)} ${n(p.y)}`;
-    else {
-      const c = polar(at.x, at.y, r * 1.22, deg - 180 / scallops);
-      d += `Q${n(c.x)} ${n(c.y)} ${n(p.x)} ${n(p.y)}`;
-    }
-  }
-  parts.push(d + 'Z');
-  // Inner spiral.
-  let spiral = '';
-  for (let i = 0; i <= 22; i++) {
-    const deg = rotation + i * 33;
-    const radius = r * 0.78 * (1 - i / 26);
-    const p = polar(at.x, at.y, radius, deg);
-    spiral += i === 0 ? `M${n(p.x)} ${n(p.y)}` : `L${n(p.x)} ${n(p.y)}`;
-  }
-  parts.push(spiral);
-  return parts.join('');
 }
 
 /** A heart, centred on `at`, `size` wide (filled). */

@@ -39,28 +39,41 @@ interface SiteContentProviderProps {
  * first-time visitors see a short loading screen, never the wrong names.
  */
 export function SiteContentProvider({ repository, children }: SiteContentProviderProps) {
-  const [content, setContent] = useState<SiteContent | null>(readCache);
-
+  // The cached content, in its language from the very first render. (The
+  // provider is the root of the app: nothing else listens to the language yet.)
+  const [content, setContent] = useState<SiteContent | null>(() => {
+    const cached = readCache();
+    if (cached) setLanguage(cached.language);
+    return cached;
+  });
+  /**
+   * Shows new content. The language is switched first, in the same go: the
+   * page renders straight away in it. (Switching after the render, the parts
+   * of the page that just appeared would show the old language for a moment.)
+   */
   const replace = useCallback((next: SiteContent) => {
     writeCache(next);
+    setLanguage(next.language);
     setContent(next);
   }, []);
 
   useEffect(() => {
     let active = true;
-    const fallback = setTimeout(() => active && setContent((current) => current ?? defaultContent), FALLBACK_AFTER_MS);
-    repository.load().then(
-      (loaded) => active && replace(loaded),
-      // Unreachable: keep what we have (cache), or the defaults.
-      () => active && setContent((current) => current ?? defaultContent),
-    ).finally(() => clearTimeout(fallback));
+    // Keep what we have (the cache), or the defaults (nothing shown yet: the
+    // language is still the first one, set again by the safety net below).
+    const keepOrDefault = () => active && setContent((current) => current ?? defaultContent);
+    const fallback = setTimeout(keepOrDefault, FALLBACK_AFTER_MS);
+    repository
+      .load()
+      .then((loaded) => active && replace(loaded), keepOrDefault)
+      .finally(() => clearTimeout(fallback));
     return () => {
       active = false;
       clearTimeout(fallback);
     };
   }, [repository, replace]);
 
-  // Before the browser paints: the page never shows in the wrong language.
+  // Safety net (content set another way): before the browser paints.
   useLayoutEffect(() => {
     if (content) setLanguage(content.language);
   }, [content]);
