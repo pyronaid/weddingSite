@@ -57,6 +57,8 @@ const FONT_FAMILIES: Record<MonogramFont, string> = {
 const escapeXml = (text: string) =>
   text.replace(/[<>&"']/g, (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[char]!);
 const n = (value: number) => Math.round(value * 100) / 100;
+/** Scale factors (often below 1) need more digits than positions, or the drawing shifts. */
+const ns = (value: number) => Math.round(value * 10000) / 10000;
 
 /** One drawn element, in "em units" (1000 per em) before the final fit. */
 interface Item {
@@ -146,70 +148,101 @@ function separatorItem(design: MonogramDesign, glyphs: GlyphFont, size: number, 
   return centreAt(item, cx, cy);
 }
 
+/**
+ * The shares of the width of spaced letters (side by side or diagonal), in %.
+ * Both letters get the same box, the width of the wider one, each letter
+ * centred in its box: the logo is symmetric whatever the letters (a narrow
+ * "I" and a wide "W"), with the separator exactly in the middle.
+ */
+export const SPACING = {
+  /** Without a separator: 48 | 4 | 48. */
+  plain: { letter: 48, gap: 4 },
+  /** With one: 40 | 2.5 | 15 | 2.5 | 40. */
+  separated: { letter: 40, gap: 2.5, separator: 15 },
+};
+
+/** The items, and the horizontal centre of their boxes (the logo is centred on it). */
+interface Layout {
+  items: Item[];
+  centerX?: number;
+}
+
+/** An item moved so that the middle of its outline is at x = cx (its height unchanged). */
+const centredX = (item: Item, cx: number): Item => ({
+  ...item,
+  x: cx - ((item.box[0] + item.box[2]) / 2) * item.scale,
+});
+
+/** The separator centred on (cx, cy), at most `size` tall and `maxWidth` wide. */
+function fittedSeparator(
+  design: MonogramDesign,
+  glyphs: GlyphFont,
+  size: number,
+  maxWidth: number,
+  cx: number,
+  cy: number,
+) {
+  const probe = separatorItem(design, glyphs, size, cx, cy);
+  if (!probe) return null;
+  const w = width(probe);
+  return w > maxWidth ? separatorItem(design, glyphs, (size * maxWidth) / w, cx, cy) : probe;
+}
+
 /** Places the letters (and separator) in em units, before fitting them into the canvas. */
-function layout(design: MonogramDesign, glyphs: GlyphFont): Item[] {
+function layout(design: MonogramDesign, glyphs: GlyphFont): Layout {
   const [one, two] = design.letters.map((letter) => letter.trim().slice(0, 1));
   const first = one ? character(design.font, glyphs, one, design.colors[0]) : null;
   const second = two ? character(design.font, glyphs, two, design.colors[1]) : null;
-  if (!first || !second) return [first, second].filter((item): item is Item => item !== null);
+  if (!first || !second) return { items: [first, second].filter((item): item is Item => item !== null) };
 
   // Height of a capital in this font (the first letter's top to the baseline).
   const cap = Math.max(-first.box[1], -second.box[1], 500);
-  const a = { ...first, x: -first.box[0] };
 
   if (design.arrangement === 'crossed') {
     // The second letter over the right part of the first, a little lower.
+    const a = { ...first, x: -first.box[0] };
     const overlap = 0.42 * Math.min(width(first), width(second));
     const b = { ...second, x: bounds(a).right - overlap - second.box[0], y: cap * 0.1 };
-    return [{ ...a, masked: true }, b];
+    return { items: [{ ...a, masked: true }, b] };
   }
 
-  const gap = cap * (design.font === 'script' ? 0.05 : 0.14);
   const hasSeparator = design.separator !== 'none';
+  const shares = hasSeparator ? SPACING.separated : SPACING.plain;
+  // One box per letter, as wide as the wider letter: unit = 1% of the whole width.
+  const box = Math.max(width(first), width(second));
+  const unit = box / shares.letter;
+  const sepBox = hasSeparator ? SPACING.separated.separator * unit : 0;
   const sepSize = cap * 0.9;
 
   if (design.arrangement === 'aligned') {
-    const middle = -cap / 2;
-    let cursor = bounds(a).right + gap;
-    const items: Item[] = [a];
+    // Box centres: the first at 0, the second one box (+ gaps and separator) further.
+    const step = box + (hasSeparator ? 2 * shares.gap * unit + sepBox : shares.gap * unit);
+    const items: Item[] = [centredX(first, 0)];
     if (hasSeparator) {
-      const probe = separatorItem(design, glyphs, sepSize, 0, middle);
-      if (probe) {
-        const w = width(probe);
-        const sep = separatorItem(design, glyphs, sepSize, cursor + gap + w / 2, middle)!;
-        items.push(sep);
-        cursor += w + 3 * gap;
-      }
+      const sep = fittedSeparator(design, glyphs, sepSize, sepBox, step / 2, -cap / 2);
+      if (sep) items.push(sep);
     }
-    items.push({ ...second, x: cursor - second.box[0] });
-    return items;
+    items.push(centredX(second, step));
+    return { items, centerX: step / 2 };
   }
 
-  // Diagonal: the second letter down and to the right. Script letters may touch
-  // (their swashes interlace); the others stay apart, the separator in between.
+  // Diagonal: the second box down and to the right. Script letters may come
+  // closer (their swashes interlace); the separator midway between the boxes.
   const script = design.font === 'script';
-  const items: Item[] = [a];
-  let dx = bounds(a).right - (script ? 0.22 : -0.02) * width(second) - second.box[0];
-  let dy = cap * (script ? 0.62 : 0.78);
+  const across = box * (script ? 0.78 : 1.02) + (hasSeparator ? 2 * shares.gap * unit + sepBox : 0);
+  const down = cap * (script ? 0.62 : 0.78) + (hasSeparator ? cap * 0.08 : 0);
+  const items: Item[] = [centredX(first, 0)];
   if (hasSeparator) {
     // Script separators are slimmer: a little bigger to balance.
-    const size = sepSize * (script ? 1 : 0.7);
-    const probe = separatorItem(design, glyphs, size, 0, 0);
-    if (probe) {
-      const w = width(probe);
-      // Between the bottom right of the first letter and the top left of the second one.
-      const sep = separatorItem(design, glyphs, size, bounds(a).right + gap + w / 2, cap * 0.1)!;
-      items.push(sep);
-      dx += w + 2 * gap;
-      dy += cap * 0.08;
-    }
+    const sep = fittedSeparator(design, glyphs, sepSize * (script ? 1 : 0.7), sepBox, across / 2, down / 2 - cap / 2);
+    if (sep) items.push(sep);
   }
-  items.push({ ...second, x: dx, y: dy });
-  return items;
+  items.push({ ...centredX(second, across), y: down });
+  return { items, centerX: across / 2 };
 }
 
 function renderItem(item: Item & { parts?: Item[] }, design: MonogramDesign, maskId: string): string {
-  const transform = `translate(${n(item.x)} ${n(item.y)}) scale(${n(item.scale)})`;
+  const transform = `translate(${n(item.x)} ${n(item.y)}) scale(${ns(item.scale)})`;
   if (item.parts) {
     return `<g transform="${transform}">${item.parts.map((part) => renderItem(part, design, maskId)).join('')}</g>`;
   }
@@ -221,17 +254,24 @@ function renderItem(item: Item & { parts?: Item[] }, design: MonogramDesign, mas
 /** viewBox and drawing of a monogram, to place inside another SVG (e.g. an invitation). */
 export function monogramParts(design: MonogramDesign, fonts: GlyphFonts, idPrefix = 'monogram') {
   const frame = border(design.border, design.borderColor, idPrefix);
-  const items = layout(design, fonts[design.font]);
+  const { items, centerX } = layout(design, fonts[design.font]);
   const maskId = `${idPrefix}-gap`;
 
   let body = frame.svg;
   if (items.length > 0) {
     // Fit everything into the room the border leaves, centred.
     const all = items.map(bounds);
-    const left = Math.min(...all.map((b) => b.left));
-    const right = Math.max(...all.map((b) => b.right));
+    let left = Math.min(...all.map((b) => b.left));
+    let right = Math.max(...all.map((b) => b.right));
     const top = Math.min(...all.map((b) => b.top));
     const bottom = Math.max(...all.map((b) => b.bottom));
+    if (centerX !== undefined) {
+      // Spaced letters: centred on their boxes, not on the ink (symmetric logo,
+      // separator in the middle), wide enough for whatever sticks out.
+      const half = Math.max(centerX - left, right - centerX);
+      left = centerX - half;
+      right = centerX + half;
+    }
     const w = right - left;
     const h = bottom - top;
     const { shape, size } = frame.room;
@@ -246,11 +286,11 @@ export function monogramParts(design: MonogramDesign, fonts: GlyphFonts, idPrefi
       ? `<defs><mask id="${maskId}" maskUnits="userSpaceOnUse" x="-${CANVAS}" y="-${CANVAS}" width="${4 * CANVAS}" height="${4 * CANVAS}">` +
         `<rect x="-${CANVAS}" y="-${CANVAS}" width="${4 * CANVAS}" height="${4 * CANVAS}" fill="#fff"/>` +
         // The second letter, in the first one's own coordinates (the mask applies to it).
-        `<path transform="translate(${n((items[1].x - items[0].x) / items[0].scale)} ${n((items[1].y - items[0].y) / items[0].scale)}) scale(${n(items[1].scale / items[0].scale)})" d="${items[1].d}" stroke="#000" stroke-width="${n((2 * GAP) / (scale * items[1].scale))}" stroke-linejoin="round"/>` +
+        `<path transform="translate(${n((items[1].x - items[0].x) / items[0].scale)} ${n((items[1].y - items[0].y) / items[0].scale)}) scale(${ns(items[1].scale / items[0].scale)})" d="${items[1].d}" stroke="#000" stroke-width="${n((2 * GAP) / (scale * items[1].scale))}" stroke-linejoin="round"/>` +
         `</mask></defs>`
       : '';
     const content = items.map((item) => renderItem(item, design, maskId)).join('');
-    body += `<g transform="translate(${n(tx)} ${n(ty)}) scale(${n(scale)})">${defs}${content}</g>`;
+    body += `<g transform="translate(${n(tx)} ${n(ty)}) scale(${ns(scale)})">${defs}${content}</g>`;
   }
   return { viewBox: `0 0 ${CANVAS} ${CANVAS}`, body };
 }
