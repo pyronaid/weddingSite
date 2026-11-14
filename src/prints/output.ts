@@ -1,29 +1,20 @@
 import { PRINT_FONTS_CSS } from './svg';
 
-/** Page formats of the print documents. `A4-2up`: two A5 cards side by side on an A4 sheet, to cut in half. */
-export type PrintFormat = 'A3' | 'A5' | 'A4-2up';
-
-const PAGE_CSS: Record<PrintFormat, string> = {
-  A3: '@page { size: A3 portrait; margin: 0; } .sheet { width: 297mm; height: 420mm; }',
-  A5: '@page { size: A5 portrait; margin: 0; } .sheet { width: 148mm; height: 210mm; }',
-  'A4-2up':
-    '@page { size: A4 landscape; margin: 0; } .sheet { width: 297mm; height: 210mm; display: flex; } ' +
-    '.sheet > svg { width: 148mm !important; height: 210mm !important; } ' +
-    '.sheet > svg + svg { border-left: 0.2mm dashed #bbb; }',
-};
+/** A page size in millimetres (A3 posters, square or A4 invitations...). */
+export interface PageSize {
+  width: number;
+  height: number;
+}
 
 const stripXmlHeader = (svg: string) => svg.replace(/^<\?xml[^>]*>\s*/, '');
 
 /**
- * An HTML document with one page per sheet, to print or save as PDF (the
- * browser embeds the fonts in the PDF). The SVGs are inlined, not linked,
- * so they use the web fonts the page loads.
+ * An HTML document with one page per SVG, to print or save as PDF (the
+ * browser embeds the fonts in the PDF, and takes the page size from it).
+ * The SVGs are inlined, not linked, so they use the web fonts the page loads.
  */
-export function printDocument(pages: string[], format: PrintFormat, title: string): string {
-  const sheets =
-    format === 'A4-2up'
-      ? Array.from({ length: Math.ceil(pages.length / 2) }, (_, i) => pages.slice(2 * i, 2 * i + 2))
-      : pages.map((page) => [page]);
+export function printDocument(pages: string[], size: PageSize, title: string): string {
+  const { width, height } = size;
   return `<!doctype html>
 <html>
 <head>
@@ -31,16 +22,16 @@ export function printDocument(pages: string[], format: PrintFormat, title: strin
 <title>${title.replace(/</g, '&lt;')}</title>
 <link rel="stylesheet" href="${PRINT_FONTS_CSS}">
 <style>
+  @page { size: ${width}mm ${height}mm; margin: 0; }
   html, body { margin: 0; }
-  ${PAGE_CSS[format]}
-  .sheet { break-after: page; page-break-after: always; overflow: hidden; }
+  .sheet { width: ${width}mm; height: ${height}mm; break-after: page; page-break-after: always; overflow: hidden; }
   .sheet:last-child { break-after: auto; page-break-after: auto; }
   .sheet > svg { display: block; width: 100%; height: 100%; }
   @media screen { body { background: #888; } .sheet { margin: 10mm auto; background: #fff; box-shadow: 0 2mm 6mm #0006; } }
 </style>
 </head>
 <body>
-${sheets.map((sheet) => `<div class="sheet">${sheet.map(stripXmlHeader).join('')}</div>`).join('\n')}
+${pages.map((page) => `<div class="sheet">${stripXmlHeader(page)}</div>`).join('\n')}
 </body>
 </html>`;
 }

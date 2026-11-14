@@ -6,7 +6,7 @@ import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { useMessages } from '../../../i18n';
 import { cardTodos, type AdminCard, type AdminRepository } from '../../../services/admin';
 import { cardImageUrl, cardName, isSuit, type Suit } from '../../../services/game';
-import { adminCardPath, adminSuitPath, ORGANISE_PATH, SUIT_META } from '../game/suits';
+import { adminCardPath, ORGANISE_PATH, organisePath, SUIT_META } from '../game/suits';
 import { adminMessages } from '../messages/admin';
 import { AdminCardEditor } from './AdminCardEditor';
 import styles from './admin.module.css';
@@ -19,7 +19,7 @@ export function AdminCardPage() {
   const number = Number(rank);
   if (!isSuit(suit)) return <Navigate to={ORGANISE_PATH} replace />;
   // Spades have nothing to set per card: their people to find instead.
-  if (suit === 'spades') return <Navigate to={adminSuitPath('spades')} replace />;
+  if (suit === 'spades') return <Navigate to={organisePath('spades')} replace />;
   if (!Number.isInteger(number) || number < 1 || number > 13) return <Navigate to={ORGANISE_PATH} replace />;
   // Keyed by suit only: moving to another card of the suit keeps the loaded cards.
   return <SuitCards key={suit} suit={suit} rank={number} />;
@@ -108,7 +108,7 @@ function CardView({ card, previous, next, onChange }: CardViewProps) {
         {next ? <Link to={adminCardPath(next.suit, next.rank)}>{t.next(navName(next))}</Link> : <span />}
       </nav>
 
-      <Link to={`${ORGANISE_PATH}#suit-${card.suit}`} className={`${formStyles.secondary} ${styles.back}`}>
+      <Link to={organisePath(card.suit)} className={`${formStyles.secondary} ${styles.back}`}>
         {t.back}
       </Link>
     </div>

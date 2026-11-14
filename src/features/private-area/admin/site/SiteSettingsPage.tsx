@@ -13,7 +13,7 @@ import { siteSettingsMessages } from '../../messages/siteSettings';
 import { useAuth } from '../../useAuth';
 import { SignupCodeForm } from '../SignupCodeForm';
 import { PhotosEditor } from './PhotosEditor';
-import { PrintsPanel } from './PrintsPanel';
+import { PrintsPanel } from './prints/PrintsPanel';
 import { RsvpsList } from './RsvpsList';
 import { SiteSettingsForm } from './SiteSettingsForm';
 import { UsersEditor } from './UsersEditor';

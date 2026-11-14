@@ -365,9 +365,9 @@ Fill in `/opt/wedding/.env`:
    - **Spades:** replace the **example people** (their answers are public in the repository).
    - **Sign-up code** (*Site settings* → *Sign-up code*): change it. It can be printed on the invitations.
 6. **The prints, from the live site.** *Site settings* → **Prints**, opened at `https://gioevale.com` (the QR codes point to the address in the tab's *Website address* field, which starts as the address the page is opened at):
-   - the **invitations** (one guest / a couple), A5 or two per A4 sheet: print them or save as PDF for the print shop;
-   - the **clubs posters** (A3), after the riddles are written. The tab marks in red the clubs whose riddle is still missing;
-   - the **logo**, as SVG (vector, for the print shop) or PNG.
+   - **Logo:** design the monogram, then download it as SVG (vector, for the print shop) or PNG;
+   - **Invitations:** design the card (square or A4, decorations, texts, the logo), then print it or save it as PDF for the print shop;
+   - **Clubs posters** (A3), after the riddles are written. The tab marks in red the clubs whose riddle is still missing.
 
    The posters contain the secret codes of this database: print them from production, and don't share the files.
 

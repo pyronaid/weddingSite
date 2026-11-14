@@ -292,7 +292,7 @@ function renderArea(
               { path: 'gallery', element: <GalleryPage /> },
             ],
           },
-          { element: <RequireOrganiser />, children: [{ path: 'admin', element: <OrganisePage /> }] },
+          { element: <RequireOrganiser />, children: [{ path: 'admin/:suit?', element: <OrganisePage /> }] },
           {
             element: <RequireSuitAdmin />,
             children: [
@@ -1040,24 +1040,32 @@ describe('private area', () => {
       // The suits to edit are not repeated under the game any more.
       expect(screen.queryByRole('heading', { name: '♣︎ Clubs' })).not.toBeInTheDocument();
 
-      await userEvent.setup().click(screen.getByRole('tab', { name: /Organise/ }));
-      expect(router.state.location.pathname).toBe('/area/admin');
-      expect(await screen.findByRole('heading', { name: '♣︎ Clubs' })).toBeInTheDocument();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('tab', { name: /Organise/ }));
+      // One sub-tab per suit, the first one open.
+      expect(await screen.findByRole('heading', { name: '♥︎ Hearts' })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area/admin/hearts');
       expect(screen.getByRole('tab', { name: /Organise/ })).toHaveAttribute('aria-selected', 'true');
+      const suits = within(screen.getByRole('tablist', { name: 'Suits' })).getAllByRole('tab');
+      // With the number of things left in each.
+      expect(suits.map((tab) => tab.textContent)).toEqual(['♥︎ Hearts10', '♦︎ Diamonds10', '♠︎ Spades', '♣︎ Clubs12']);
       expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([
         'Before the wedding',
         '♥︎ Hearts',
-        '♦︎ Diamonds',
-        '♠︎ Spades',
-        '♣︎ Clubs',
       ]);
+      await user.click(screen.getByRole('tab', { name: /Clubs/ }));
+      expect(router.state.location.pathname).toBe('/area/admin/clubs');
+      expect(await screen.findByRole('heading', { name: '♣︎ Clubs' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: '♥︎ Hearts' })).not.toBeInTheDocument();
       // The sign-up code and the site settings are for super admins.
       expect(screen.queryByLabelText(/code guests need/i)).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Site settings/ })).not.toBeInTheDocument();
     });
 
     it('frames in red the cards with something missing, and counts what is left', async () => {
-      renderArea(await loggedInAdmin(), '/area/admin');
+      const admin = createFakeAdmin();
+      const router = renderArea(await loggedInAdmin(), '/area/admin/clubs', createFakeGame(), admin);
+      const user = userEvent.setup();
 
       const overview = await screen.findByRole('region', { name: 'Before the wedding' });
       // 12 clubs without solution, 10 hearts and 10 diamonds without letter; spades have people.
@@ -1073,21 +1081,35 @@ describe('private area', () => {
       expect(two.className).toMatch(/tileTodo/);
       const seven = within(clubs).getByRole('link', { name: '7 of clubs: all set' });
       expect(seven.className).toMatch(/tileDone/);
-      expect(screen.getByRole('link', { name: 'Ace of diamonds: the letter to set' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'King of hearts: all set' })).toBeInTheDocument();
-      // Spades have nothing per card: their people to find.
-      expect(screen.getByRole('link', { name: 'Edit the people to find' })).toHaveAttribute('href', '/area/admin/suits/spades');
+
+      await user.click(screen.getByRole('tab', { name: /Diamonds/ }));
+      expect(await screen.findByRole('link', { name: 'Ace of diamonds: the letter to set' })).toBeInTheDocument();
+      await user.click(within(overview).getByRole('link', { name: '♥︎ Hearts' }));
+      expect(await screen.findByRole('link', { name: 'King of hearts: all set' })).toBeInTheDocument();
+
+      // Spades have nothing per card: their people to find, edited in their sub-tab.
+      await act(() => router.navigate('/area/admin/spades'));
+      const people = await screen.findByRole('region', { name: 'Guess who: the people to find' });
+      const mario = (await within(people).findByText('Mario Rossi')).closest('details')!;
+      await user.click(within(mario).getByText('Mario Rossi'));
+      await user.click(within(mario).getByRole('button', { name: 'Delete' }));
+      await user.click(within(mario).getByRole('button', { name: 'Confirm delete' }));
+      expect(admin.deletePerson).toHaveBeenCalledWith('p2');
+      // The overview follows at once.
+      await waitFor(() => expect(overview).toHaveTextContent('Spades: 1 person to find ✓'));
     });
 
     it('gives the organiser of some suits only those suits, and the game', async () => {
       const auth = createFakeAuth();
       await auth.login('clubshearts@example.com', 'x');
-      renderArea(auth, '/area/admin');
+      const router = renderArea(auth, '/area/admin/diamonds');
 
       expect(await screen.findByText('You organise clubs and hearts: prepare their cards here. You play the game like every other guest.')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: '♣︎ Clubs' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: '♥︎ Hearts' })).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: '♦︎ Diamonds' })).not.toBeInTheDocument();
+      // Not one of theirs: the first of their suits instead.
+      expect(await screen.findByRole('heading', { name: '♣︎ Clubs' })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/area/admin/clubs');
+      const suits = within(screen.getByRole('tablist', { name: 'Suits' })).getAllByRole('tab');
+      expect(suits.map((tab) => tab.textContent?.replace(/\d+$/, ''))).toEqual(['♣︎ Clubs', '♥︎ Hearts']);
     });
 
     it('opens only the cards of the suits the organiser has', async () => {
@@ -1104,12 +1126,12 @@ describe('private area', () => {
     it('sends old links to a suit page to its cards, and keeps a nonsense card out', async () => {
       const router = renderArea(await loggedInAdmin(), '/area/admin/suits/clubs');
       expect(await screen.findByRole('heading', { name: '♣︎ Clubs' })).toBeInTheDocument();
-      expect(router.state.location).toMatchObject({ pathname: '/area/admin', hash: '#suit-clubs' });
+      expect(router.state.location.pathname).toBe('/area/admin/clubs');
 
       await act(() => router.navigate('/area/admin/cards/clubs/14'));
-      await waitFor(() => expect(router.state.location.pathname).toBe('/area/admin'));
+      await waitFor(() => expect(router.state.location.pathname).toBe('/area/admin/hearts'));
       await act(() => router.navigate('/area/admin/cards/spades/3'));
-      await waitFor(() => expect(router.state.location.pathname).toBe('/area/admin/suits/spades'));
+      await waitFor(() => expect(router.state.location.pathname).toBe('/area/admin/spades'));
     });
 
     it('nobody else gets the organisers tab', async () => {
@@ -1178,7 +1200,7 @@ describe('private area', () => {
       expect(within(king).queryByLabelText('Secret letter')).not.toBeInTheDocument();
       expect(within(king).getByLabelText('Riddle')).toHaveValue('Riddle 13');
       expect(screen.queryByRole('link', { name: /→/ })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '← Back to the organisers' })).toHaveAttribute('href', '/area/admin#suit-clubs');
+      expect(screen.getByRole('link', { name: '← Back to the organisers' })).toHaveAttribute('href', '/area/admin/clubs');
     });
 
     it('shows the server errors next to the field', async () => {
@@ -1280,7 +1302,7 @@ describe('private area', () => {
 
     it('reorders the hints of a person with the arrow keys or by dragging', async () => {
       const admin = createFakeAdmin();
-      renderArea(await loggedInAdmin(), '/area/admin/suits/spades', createFakeGame(), admin);
+      renderArea(await loggedInAdmin(), '/area/admin/spades', createFakeGame(), admin);
       const user = userEvent.setup();
       const section = await screen.findByRole('region', { name: 'Guess who: the people to find' });
       const giulia = (await within(section).findByText('Giulia Bianchi')).closest('details')!;
@@ -1322,13 +1344,12 @@ describe('private area', () => {
 
     it('edits the people of the spades guess who, with their 13 hints', async () => {
       const admin = createFakeAdmin();
-      renderArea(await loggedInAdmin(), '/area/admin/suits/spades', createFakeGame(), admin);
+      renderArea(await loggedInAdmin(), '/area/admin/spades', createFakeGame(), admin);
       const user = userEvent.setup();
 
       const section = await screen.findByRole('region', { name: 'Guess who: the people to find' });
       // Spades have no letters: no card panels, only the people.
       expect(screen.queryByRole('article')).not.toBeInTheDocument();
-      expect(admin.getSuit).not.toHaveBeenCalled();
       expect(await within(section).findByText('Giulia Bianchi')).toBeInTheDocument();
       expect(within(section).getByText(/given to 2 guests, found by 1/)).toBeInTheDocument();
 
@@ -1415,7 +1436,7 @@ describe('private area', () => {
       expect(await screen.findByRole('tab', { name: /Organise/ })).toBeInTheDocument();
       expect(router.state.location.pathname).toBe('/area');
       await act(() => router.navigate('/area/admin'));
-      expect(await screen.findByRole('heading', { name: '♣︎ Clubs' })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: '♥︎ Hearts' })).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Site settings/ })).not.toBeInTheDocument();
     });
   });

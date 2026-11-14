@@ -36,6 +36,8 @@ const en = {
     cardLabel: (card: string, todos: string) => (todos ? `${card}: ${todos} to set` : `${card}: all set`),
     cards: (suit: string) => `Cards of the ${suit}`,
     editPeople: 'Edit the people to find',
+    suitsLabel: 'Suits',
+    toSet: (count: number) => (count === 1 ? '1 thing to set' : `${count} things to set`),
   },
   cardPage: {
     title: (card: string) => `Edit the ${card}`,
@@ -192,6 +194,8 @@ export const adminMessages: Dictionary<typeof en> = {
       cardLabel: (card, todos) => (todos ? `${card}: da impostare ${todos}` : `${card}: tutto pronto`),
       cards: (suit) => `Carte di ${suit}`,
       editPeople: 'Modifica le persone da trovare',
+      suitsLabel: 'Semi',
+      toSet: (count) => (count === 1 ? '1 cosa da impostare' : `${count} cose da impostare`),
     },
     cardPage: {
       title: (card) => `Modifica il ${card}`,

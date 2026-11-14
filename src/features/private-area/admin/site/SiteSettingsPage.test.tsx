@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { defaultContent } from '../../../../config/wedding';
@@ -218,7 +218,7 @@ function renderPage(repository: SiteRepository, replace = vi.fn(), path = '/area
   const router = createMemoryRouter(
     [
       {
-        path: '/area/site/:tab?',
+        path: '/area/site/:tab?/:sub?',
         element: (
           <AuthProvider service={auth}>
             <SiteContentContext.Provider value={{ content: defaultContent, repository, replace }}>
@@ -665,57 +665,219 @@ describe('site settings (super admin)', () => {
   describe('prints', () => {
     const cardImage =
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 336"><rect width="240" height="336"/></svg>';
+    let createObjectURL: ReturnType<typeof vi.fn>;
+    let click: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
+      window.localStorage.clear();
       // The card images of the posters (public/cards/clubs/<rank>.svg).
       vi.stubGlobal(
         'fetch',
         vi.fn(async (url: string) => ({ ok: true, url, text: async () => cardImage })),
       );
+      // Downloads: the file is handed to a link that is clicked.
+      createObjectURL = vi.fn((_blob: Blob) => 'blob:file');
+      vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+      click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     });
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      click.mockRestore();
+    });
 
-    const openPrints = (admin = fakeAdmin(), repository = fakeRepository()) => {
-      renderPage(repository, vi.fn(), '/area/site/prints', admin);
-      return { admin, repository };
+    const downloaded = async () => ({
+      name: (click.mock.contexts.at(-1) as HTMLAnchorElement).download,
+      content: await (createObjectURL.mock.calls.at(-1)![0] as Blob).text(),
+    });
+
+    const cleanupAndOpen = (sub: string) => {
+      cleanup();
+      return open(sub);
+    };
+    const open = (sub: string, admin = fakeAdmin(), repository = fakeRepository()) => {
+      const { router } = renderPage(repository, vi.fn(), `/area/site/prints${sub}`, admin);
+      return { admin, repository, router };
     };
 
-    it('makes both invitations from the site settings, with the QR code of the site', async () => {
-      const { admin, repository } = openPrints();
+    it('has one sub-tab each for the logo, the invitations and the posters', async () => {
+      const { router } = open('');
+      const tabs = within(screen.getByRole('tablist', { name: 'Prints' })).getAllByRole('tab');
+      expect(tabs.map((tab) => tab.textContent)).toEqual(['Logo', 'Invitations', 'Clubs posters']);
+      expect(screen.getByRole('tab', { name: 'Logo' })).toHaveAttribute('aria-selected', 'true');
+      expect(await screen.findByRole('img', { name: 'Logo G V' })).toBeInTheDocument();
 
-      const couple = await screen.findByRole('img', { name: 'Invitation, A couple' });
-      await waitFor(() => expect(couple.innerHTML).toContain('You are both invited'));
-      const single = screen.getByRole('img', { name: 'Invitation, One guest' });
-      expect(single.innerHTML).toContain('You are invited');
-      expect(single.innerHTML).toContain('Giulia <tspan fill="#c24f78">&amp;</tspan> Marco');
-      expect(single.innerHTML).toContain('>at 16:00<');
-      expect(single.innerHTML).toContain('Code for the private area: #wedding');
-      // A real QR code, for the address the page is opened at.
-      expect(single.innerHTML).toContain('shape-rendering="crispEdges"');
-      expect(screen.getByLabelText('Website address in the QR codes')).toHaveValue(window.location.origin);
-      // The latest settings, not the ones cached by the page.
-      expect(repository.load).toHaveBeenCalled();
-      expect(admin.getSettings).toHaveBeenCalled();
+      await userEvent.setup().click(screen.getByRole('tab', { name: 'Invitations' }));
+      expect(router.state.location.pathname).toBe('/area/site/prints/invitations');
+      expect(await screen.findByLabelText('Website address in the QR codes')).toBeInTheDocument();
     });
 
-    it('leaves the sign-up code out on request, and regenerates', async () => {
-      const { admin } = openPrints();
-      const user = userEvent.setup();
-      const single = await screen.findByRole('img', { name: 'Invitation, One guest' });
-      await waitFor(() => expect(single.innerHTML).toContain('#wedding'));
+    describe('logo', () => {
+      it('follows every choice in the preview, and downloads it', async () => {
+        open('/logo');
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
 
-      await user.click(screen.getByRole('checkbox', { name: /Print the sign-up code/ }));
-      await waitFor(() =>
-        expect(screen.getByRole('img', { name: 'Invitation, One guest' }).innerHTML).not.toContain('#wedding'),
-      );
+        await user.clear(screen.getByLabelText('First letter'));
+        await user.type(screen.getByLabelText('First letter'), 'd');
+        await user.clear(screen.getByLabelText('Second letter'));
+        await user.type(screen.getByLabelText('Second letter'), 's');
+        // Crossed letters have no separator.
+        expect(screen.getByText(/Crossed letters have no separator/)).toBeInTheDocument();
+        await user.click(screen.getByRole('radio', { name: 'Side by side' }));
+        await user.click(screen.getByRole('radio', { name: 'heart' }));
+        await user.click(
+          within(screen.getByRole('group', { name: 'Colour of the separator' })).getByRole('radio', { name: 'Gold' }),
+        );
+        await user.click(screen.getByRole('radio', { name: 'Times New Roman' }));
+        await user.click(screen.getByRole('radio', { name: 'Circles' }));
+        await user.click(
+          within(screen.getByRole('group', { name: 'Colour of the border' })).getByRole('radio', { name: 'Sage' }),
+        );
 
-      const calls = vi.mocked(admin.getRiddleCodes).mock.calls.length;
-      await user.click(screen.getByRole('button', { name: '↻ Regenerate' }));
-      await waitFor(() => expect(admin.getRiddleCodes).toHaveBeenCalledTimes(calls + 1));
+        const preview = screen.getByRole('img', { name: 'Logo D S' });
+        const { serif } = await import('../../../../brand/glyphs/serif');
+        expect(preview.innerHTML).toContain(serif.glyphs.D.d);
+        expect(preview.innerHTML).toContain('fill="#b08d48"');
+        expect(preview.innerHTML).toContain('stroke="#7d9a6a"');
+
+        await user.click(screen.getByRole('button', { name: 'SVG: Logo D S' }));
+        const file = await downloaded();
+        expect(file.name).toBe('logo-ds.svg');
+        expect(file.content).toContain(serif.glyphs.S.d);
+        expect(file.content).toContain('<title>Logo D S</title>');
+      });
+
+      it('takes a separator of its own, in any colour', async () => {
+        open('/logo');
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
+        await user.click(screen.getByRole('radio', { name: 'Diagonal' }));
+        await user.click(screen.getByRole('radio', { name: 'other' }));
+        await user.type(screen.getByLabelText('Your separator'), '+');
+        fireEvent.change(
+          within(screen.getByRole('group', { name: 'Colour of the separator' })).getByLabelText('Other colour'),
+          {
+            target: { value: '#00aa11' },
+          },
+        );
+        const { script } = await import('../../../../brand/glyphs/script');
+        const preview = screen.getByRole('img', { name: 'Logo G V' });
+        expect(preview.innerHTML).toContain(script.glyphs['+'].d);
+        expect(preview.innerHTML).toContain('fill="#00aa11"');
+      });
+
+      it('remembers the design in this browser', async () => {
+        open('/logo');
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
+        await user.click(screen.getByRole('radio', { name: 'Big flowers' }));
+        await user.clear(screen.getByLabelText('Second letter'));
+        await user.type(screen.getByLabelText('Second letter'), 'm');
+        cleanupAndOpen('/logo');
+        expect(await screen.findByRole('img', { name: 'Logo G M' })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'Big flowers' })).toBeChecked();
+
+        await user.click(screen.getByRole('button', { name: 'Start again' }));
+        expect(screen.getByRole('img', { name: 'Logo G V' })).toBeInTheDocument();
+      });
+    });
+
+    describe('invitations', () => {
+      const card = () => screen.getByRole('img', { name: 'Invitation' }).innerHTML;
+      const ready = async () => waitFor(() => expect(card()).toContain('<svg'));
+
+      it('makes the invitation from the site settings, with the QR code of the site', async () => {
+        const { admin, repository } = open('/invitations');
+        await ready();
+        expect(card()).toContain('width="210mm" height="297mm"');
+        expect(card()).toContain('You are invited');
+        expect(card()).toContain('Giulia <tspan fill="#c24f78">&amp;</tspan> Marco');
+        expect(card()).toContain('>at 16:00<');
+        expect(card()).toContain('Code for the private area: #wedding');
+        // A real QR code, for the address the page is opened at.
+        expect(card()).toContain('shape-rendering="crispEdges"');
+        expect(screen.getByLabelText('Website address in the QR codes')).toHaveValue(window.location.origin);
+        // The latest settings, not the ones cached by the page.
+        expect(repository.load).toHaveBeenCalled();
+        expect(admin.getSettings).toHaveBeenCalled();
+      });
+
+      it('follows the choices: size, names, texts, language, QR code, background, decorations', async () => {
+        open('/invitations');
+        const user = userEvent.setup();
+        await ready();
+
+        await user.click(screen.getByRole('radio', { name: /Square/ }));
+        expect(card()).toContain('width="150mm" height="150mm"');
+        await user.click(screen.getByRole('radio', { name: 'A couple' }));
+        expect(card()).toContain('You are both invited');
+
+        await user.clear(screen.getByLabelText('Title', { exact: true }));
+        await user.type(screen.getByLabelText('Title', { exact: true }), 'Save the date');
+        await user.clear(screen.getByLabelText('Subtitle'));
+        expect(card()).toContain('Save the date');
+        expect(card()).not.toContain('to celebrate');
+        await user.click(screen.getAllByRole('button', { name: 'Default text' })[0]);
+        expect(card()).toContain('You are both invited');
+
+        await user.selectOptions(screen.getByLabelText('Language of the invitation'), 'Italiano');
+        expect(card()).toContain('Vi invitiamo');
+        expect(card()).toMatch(/Sabato,? 19 giugno 2027/);
+
+        await user.click(screen.getByRole('checkbox', { name: /Show the QR code/ }));
+        expect(card()).not.toContain('Rispondete entro');
+        expect(screen.queryByLabelText('Text next to the QR code')).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('radio', { name: 'Colour shading' }));
+        await user.click(
+          within(screen.getByRole('group', { name: 'Colour of the shading' })).getByRole('radio', { name: 'Sage' }),
+        );
+        expect(card()).toContain('stop-color="#d9e4cf"');
+
+        await user.click(screen.getByRole('radio', { name: 'Hearts' }));
+        await user.click(
+          within(screen.getByRole('group', { name: 'Colour of the decorations' })).getByRole('radio', { name: 'Pink' }),
+        );
+        expect(card()).toContain('fill="#c24f78" fill-opacity="0.85"');
+        await user.click(
+          within(screen.getByRole('group', { name: 'Side decorations' })).getByRole('radio', { name: 'None' }),
+        );
+        expect(card()).not.toContain('rotate(180)');
+      });
+
+      it('shows the logo designed in the Logo tab, or none', async () => {
+        window.localStorage.setItem('wedding.prints.logo.v1', JSON.stringify({ letters: ['A', 'B'], font: 'sans' }));
+        open('/invitations');
+        const user = userEvent.setup();
+        await ready();
+        const { sans } = await import('../../../../brand/glyphs/sans');
+        expect(card()).toContain(sans.glyphs.A.d);
+        await user.click(screen.getByRole('checkbox', { name: /Show the logo/ }));
+        expect(card()).not.toContain(sans.glyphs.A.d);
+      });
+
+      it('downloads the card, and warns when the QR code would point to this computer', async () => {
+        open('/invitations');
+        const user = userEvent.setup();
+        await ready();
+        await user.click(screen.getByRole('button', { name: 'SVG: Invitation' }));
+        const file = await downloaded();
+        expect(file.name).toBe('invitation-a4-portrait.svg');
+        expect(file.content).toMatch(/^<\?xml/);
+
+        const website = screen.getByLabelText('Website address in the QR codes');
+        await user.clear(website);
+        await user.type(website, 'http://localhost:5173');
+        expect(await screen.findByText(/only works on this computer/)).toBeInTheDocument();
+        await user.clear(website);
+        await user.type(website, 'https://gioevale.com/');
+        await waitFor(() => expect(card()).toContain('>gioevale.com<'));
+        expect(screen.queryByText(/only works on this computer/)).not.toBeInTheDocument();
+      });
     });
 
     it('makes one poster per club, and points out the riddles still missing', async () => {
-      openPrints();
+      const { admin } = open('/posters');
       expect(
         await screen.findByText('1 club has no riddle or solution yet: its QR page says “not available yet”.'),
       ).toBeInTheDocument();
@@ -727,42 +889,10 @@ describe('site settings (super admin)', () => {
         /posterTodo/,
       );
       expect(screen.getByRole('button', { name: 'Print all / PDF (A3): Clubs posters' })).toBeEnabled();
-    });
 
-    it('warns when the QR codes would point to this computer', async () => {
-      openPrints();
-      const user = userEvent.setup();
-      const website = screen.getByLabelText('Website address in the QR codes');
-      await user.clear(website);
-      await user.type(website, 'http://localhost:5173');
-      expect(await screen.findByText(/only works on this computer/)).toBeInTheDocument();
-      await user.clear(website);
-      await user.type(website, 'https://gioevale.com/');
-      await waitFor(() => expect(screen.queryByText(/only works on this computer/)).not.toBeInTheDocument());
-      await waitFor(() =>
-        expect(screen.getByRole('img', { name: 'Invitation, One guest' }).innerHTML).toContain('>gioevale.com<'),
-      );
-    });
-
-    it('downloads the logo in the chosen style and colours', async () => {
-      openPrints();
-      const user = userEvent.setup();
-      const createObjectURL = vi.fn((_blob: Blob) => 'blob:logo');
-      vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
-      const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-
-      await user.click(screen.getByRole('radio', { name: 'Seal' }));
-      await user.click(screen.getByRole('radio', { name: 'One colour' }));
-      expect(screen.getByRole('img', { name: 'Logo, Seal, One colour' })).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'SVG: Logo, Seal, One colour' }));
-
-      expect(click).toHaveBeenCalled();
-      const link = click.mock.contexts[0] as HTMLAnchorElement;
-      expect(link.download).toBe('logo-gv-seal-mono.svg');
-      const svg = await (createObjectURL.mock.calls[0][0] as Blob).text();
-      expect(svg).toContain('<circle');
-      expect(svg).toContain('fill="#4a2537"');
-      click.mockRestore();
+      const calls = vi.mocked(admin.getRiddleCodes).mock.calls.length;
+      await userEvent.setup().click(screen.getByRole('button', { name: '↻ Regenerate' }));
+      await waitFor(() => expect(admin.getRiddleCodes).toHaveBeenCalledTimes(calls + 1));
     });
   });
 });

@@ -612,3 +612,18 @@
   color: var(--card-accent);
   font-weight: 700;
 }
+
+/* Things left in a suit, on its sub-tab. */
+.tabCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #ff4f6d;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}

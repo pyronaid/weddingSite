@@ -1,6 +1,7 @@
-import { useCallback, useEffect } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useCallback, useState } from 'react';
+import { Link, Navigate, useParams } from 'react-router';
 import formStyles from '../../../components/Form/Form.module.css';
+import { RouteTabPanel, RouteTabs } from '../../../components/RouteTabs/RouteTabs';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { LOCALES, useLanguage, useMessages } from '../../../i18n';
 import {
@@ -8,20 +9,22 @@ import {
   openItems,
   suitProgress,
   type AdminCard,
+  type AdminPerson,
   type AdminRepository,
   type SuitProgress,
 } from '../../../services/admin';
 import { editableSuits } from '../../../services/auth';
-import { cardImageUrl, cardName, isSuit, type Suit } from '../../../services/game';
+import { cardImageUrl, cardName, isSuit } from '../../../services/game';
 import { daysUntil } from '../../../services/site';
 import { useSiteContent } from '../../../site/SiteContentContext';
-import { adminCardPath, adminSuitPath, SITE_SETTINGS_PATH, SUIT_META } from '../game/suits';
+import { adminCardPath, organisePath, SITE_SETTINGS_PATH, SUIT_META } from '../game/suits';
 import { adminMessages } from '../messages/admin';
 import { siteSettingsMessages } from '../messages/siteSettings';
 import { AreaLayout } from '../pages/AreaLayout';
 import pageStyles from '../pages/pages.module.css';
 import { useAuth } from '../useAuth';
 import styles from './admin.module.css';
+import { PeopleEditor } from './PeopleEditor';
 import { useAdminQuery } from './useAdminQuery';
 import { useTodoText } from './useTodoText';
 
@@ -29,8 +32,6 @@ interface SuitData {
   cards: AdminCard[];
   progress: SuitProgress;
 }
-
-const suitAnchor = (suit: Suit) => `suit-${suit}`;
 
 /** The cards of each suit ("clubs,hearts"), and the people to find for the spades. */
 function loadSuits(repository: AdminRepository, suitsKey: string): Promise<SuitData[]> {
@@ -61,24 +62,33 @@ export function OrganisePage() {
   const { user } = useAuth();
   const site = useMessages(siteSettingsMessages);
   const language = useLanguage();
-  const location = useLocation();
-
   // A string, so the loader stays the same between renders.
   const suitsKey = editableSuits(user).join(',');
   const load = useCallback((repository: AdminRepository) => loadSuits(repository, suitsKey), [suitsKey]);
   const query = useAdminQuery(load);
+  // The people of the spades, once edited here (the overview counts them).
+  const [people, setPeople] = useState<AdminPerson[] | null>(null);
+  const param = useParams().suit;
 
-  // /area/admin#suit-clubs (e.g. back from a card): scroll to that suit once it is there.
-  const loaded = query.status === 'success';
-  useEffect(() => {
-    if (loaded && location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView?.();
-  }, [loaded, location.hash]);
+  // /area/admin/<suit>: one suit per sub-tab; none or another one shows the first.
+  const editable = suitsKey.split(',').filter(isSuit);
+  const suit = editable.find((item) => item === param) ?? editable[0];
 
-  const names = suitsKey
-    .split(',')
-    .filter(isSuit)
-    .map((suit) => SUIT_META[suit].label.toLowerCase());
+  const names = editable.map((item) => SUIT_META[item].label.toLowerCase());
   const list = new Intl.ListFormat(LOCALES[language], { type: 'conjunction' }).format(names);
+
+  if (!suit) return null;
+  if (param !== suit) return <Navigate to={organisePath(suit)} replace />;
+
+  const suits =
+    query.status === 'success'
+      ? query.data.map((data) =>
+          data.progress.suit === 'spades' && people
+            ? { ...data, progress: suitProgress('spades', data.cards, people) }
+            : data,
+        )
+      : [];
+  const selected = suits.find((data) => data.progress.suit === suit);
 
   return (
     <AreaLayout current="organise">
@@ -107,11 +117,29 @@ export function OrganisePage() {
       )}
       {query.status === 'success' && (
         <>
-          <Overview suits={query.data.map((data) => data.progress)} />
-          <p className={styles.help}>{t.legend}</p>
-          {query.data.map((data) => (
-            <SuitSection key={data.progress.suit} {...data} />
-          ))}
+          <Overview suits={suits.map((data) => data.progress)} />
+          <RouteTabs
+            id="organise-suits"
+            label={t.suitsLabel}
+            current={suit}
+            tabs={suits.map(({ progress }) => ({
+              id: progress.suit,
+              label: (
+                <>
+                  {SUIT_META[progress.suit].symbol} {SUIT_META[progress.suit].label}
+                  {openItems(progress) > 0 && (
+                    <span className={styles.tabCount} aria-label={t.toSet(openItems(progress))}>
+                      {openItems(progress)}
+                    </span>
+                  )}
+                </>
+              ),
+              to: organisePath(progress.suit),
+            }))}
+          />
+          <RouteTabPanel id="organise-suits" current={suit} className={styles.suitSection}>
+            {selected && <SuitSection {...selected} onPeopleChange={setPeople} />}
+          </RouteTabPanel>
         </>
       )}
     </AreaLayout>
@@ -135,9 +163,9 @@ function Overview({ suits }: { suits: SuitProgress[] }) {
       <ul className={styles.overviewList}>
         {suits.map((progress) => (
           <li key={progress.suit} className={openItems(progress) > 0 ? styles.suitOpen : undefined}>
-            <a href={`#${suitAnchor(progress.suit)}`}>
+            <Link to={organisePath(progress.suit)}>
               {SUIT_META[progress.suit].symbol} {SUIT_META[progress.suit].label}
-            </a>
+            </Link>
             {': '}
             {progress.suit === 'spades'
               ? t.peopleTodo(progress.people ?? 0)
@@ -149,39 +177,39 @@ function Overview({ suits }: { suits: SuitProgress[] }) {
   );
 }
 
-function SuitSection({ cards, progress }: SuitData) {
+function SuitSection({
+  cards,
+  progress,
+  onPeopleChange,
+}: SuitData & { onPeopleChange: (people: AdminPerson[]) => void }) {
   const messages = useMessages(adminMessages);
   const t = messages.organise;
   const { suit } = progress;
   const { label, symbol } = SUIT_META[suit];
-  const titleId = `${suitAnchor(suit)}-title`;
 
   return (
-    <section id={suitAnchor(suit)} className={styles.suitSection} aria-labelledby={titleId}>
-      <h3 id={titleId} className={pageStyles.sectionTitle}>
+    <>
+      <h3 className={pageStyles.sectionTitle}>
         {symbol} {label}
       </h3>
       <p className={styles.help}>{messages.suitPage.help[suit]}</p>
 
+      {/* Spades have nothing to set per card: their people to find, edited right here. */}
       {suit === 'spades' ? (
-        <div className={styles.peopleSummary}>
-          <p className={openItems(progress) > 0 ? styles.remaining : styles.allSet}>
-            {t.peopleTodo(progress.people ?? 0)}
-          </p>
-          <Link to={adminSuitPath('spades')} className={formStyles.secondary}>
-            {t.editPeople}
-          </Link>
-        </div>
+        <PeopleEditor onChange={onPeopleChange} />
       ) : (
-        <ul className={styles.cardGrid} aria-label={t.cards(label.toLowerCase())}>
-          {cards.map((card) => (
-            <li key={card.id}>
-              <AdminCardTile card={card} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className={styles.help}>{t.legend}</p>
+          <ul className={styles.cardGrid} aria-label={t.cards(label.toLowerCase())}>
+            {cards.map((card) => (
+              <li key={card.id}>
+                <AdminCardTile card={card} />
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-    </section>
+    </>
   );
 }
 

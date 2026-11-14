@@ -138,10 +138,9 @@ npm run dev                  # http://localhost:5173
 | `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase (not spades) | logged-in only  |
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
 | `/area` (organisers)         | The same game home, as the *My game* tab next to *Organise* | organisers |
-| `/area/admin`                | *Organise* tab: days left, things still to set, every suit they edit as cards (red frame = something missing) (+ the site settings link for super admins) | organisers |
+| `/area/admin/:suit?`         | *Organise* tab: days left, things still to set, then one sub-tab per suit they edit: its cards (red frame = something missing), or the people to find for the spades (+ the site settings link for super admins) | organisers |
 | `/area/admin/cards/:suit/:rank` | One card: letter, clubs riddle/solution, hearts scenes, diamonds quiz; what is still missing; previous/next card | organisers of that suit |
-| `/area/admin/suits/spades`   | The people to find of the spades ("guess who") | organisers of the spades |
-| `/area/site/:tab?`           | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, RSVPs, sign-up code, prints | super admins only |
+| `/area/site/:tab?/:sub?`     | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, RSVPs, sign-up code, prints (sub-tabs: logo, invitations, posters) | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -200,34 +199,35 @@ The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number
 
 ### Printing: logo, invitations and clubs posters
 
-Everything to print is made **in the browser, from the current data**, by a super admin: *Site settings* → **Prints** (`/area/site/prints`). Nothing is stored: **↻ Regenerate** makes the files again after a change (e.g. a new reception time, or a riddle just written). For a print shop use **Print / PDF** and *Save as PDF*: the fonts are embedded and the page size is set (A5, A4 or A3), so leave the margins at *None*.
+Everything to print is made **in the browser, from the current data**, by a super admin: *Site settings* → **Prints**, one sub-tab each. Nothing is stored on the server; the designs being worked on are **kept in this browser** (localStorage), so they survive a reload. For a print shop use **Print / PDF** and *Save as PDF*: the fonts are embedded and the page size is set, so leave the margins at *None*.
 
-| What | Size | Made from | Files |
+| Sub-tab | Address | What you choose | Files |
 | --- | --- | --- | --- |
-| **Logo**: a G and a V overlapped, in the script of the site (*Script*) or as a seal in a double ring (*Seal*) | any | `src/brand/logo.ts` | SVG (vector: print shop, embroidery, stamps) and PNG (2048 px). Also ready-made in [`public/brand/`](public/brand/): `gv-script.svg`, `gv-seal.svg`, and `-mono` (one colour) / `-light` (for dark backgrounds) versions |
-| **Invitations**: one for a single guest ("You are invited", one line to write the name), one for a couple ("You are both invited", two lines) | A5 (148 × 210 mm) | *General* tab: names, date, ceremony and reception with their times and addresses, RSVP deadline, hashtag; optionally the sign-up code | Print / PDF on A5, or **2 per A4 sheet** (cut in half) for a home printer; SVG; PNG at 300 dpi |
-| **Clubs posters**: the card and a QR code to its riddle, to hang at the venue | A3 | The clubs' secret codes (`/api/admin/prints/riddles`, super admins only) | Print all / PDF (13 A3 pages), or one poster: SVG, Print / PDF |
+| **Logo** | `/area/site/prints/logo` | The **two letters** and the colour of each; the **style**: crossed, side by side, or diagonal; a **separator** between spaced letters (&, \|, ♥ or your own text) and its colour; the **font**: script, sans serif or Times New Roman; a **border**: none, small flowers (wreath), big flowers, circles (with roses), squares; and its colour. Colours from the site palette, or any other. | SVG (vector: print shop, embroidery, stamps) and PNG (2048 px, transparent) |
+| **Invitations** | `/area/site/prints/invitations` | The **size**: square (15 × 15 cm), A4 portrait or landscape; the **language** of the card (dates, times and texts, also different from the site's); a **line for the names** to write by hand (none, one guest, a couple); the **title** and **subtitle**; the **logo** from the Logo sub-tab; the **QR code** section and its text; the **sign-up code**; a white or **shaded background**; **side decorations**: plants, flowers, hearts or roots, and their colour. Date, times, places, RSVP deadline and hashtag come from the *General* tab. | Print / PDF at the card's size, SVG, PNG at 300 dpi |
+| **Clubs posters** | `/area/site/prints/posters` | Nothing: one A3 poster per club, the card and the QR code of its riddle. The secret codes come from `/api/admin/prints/riddles` (super admins only). | Print all / PDF (13 A3 pages), or one poster: SVG, Print / PDF |
 
-- **The QR codes** point to the **website address** field of the tab: by default the address the page was opened at, so **make the final prints from the live site**. The tab warns if it is a `localhost` address, which guests' phones cannot open. Codes use 25% error correction (level Q): they scan with glare or a fold. On the posters they are 11 cm wide, readable from a couple of metres.
-- **The invitations' QR code** opens the site (all the details and the RSVP form). The texts follow the site language. The Italian wording is gender-neutral ("Ti invitiamo" / "Vi invitiamo", "Per ____"), so one card fits every guest.
-- **The posters' QR codes** open `/area/riddles/<code>`. The codes are secret and differ between databases, so print them from the production site, and **don't share the files**. Clubs without a riddle or solution yet are framed in red: their page tells guests "not available yet".
-- **To try a poster with a real phone** on your local setup, open the site on your computer's LAN address (e.g. `npm run dev -- --host`, then `http://192.168.1.20:5173`, and add it to `PB_ORIGINS`), and put that address in the website field. Phone and computer must be on the same Wi-Fi.
-- **The logo** is drawn from the outlines of the site fonts (Great Vibes and Cormorant Garamond, both under the SIL Open Font License, free for logos), so it looks the same everywhere, with or without the fonts installed. Where the letters cross, the G stops short of the V with a transparent gap, so it works on any background. After changing `src/brand/logo.ts`, run `npm run brand` to rewrite the files in `public/brand/` (a test fails while they differ).
+- **The QR codes** point to the **website address** field (Invitations and Clubs posters): by default the address the page was opened at, so **make the final prints from the live site**. A `localhost` address gets a warning: guests' phones cannot open it. Codes use 25% error correction (level Q): they scan with glare or a fold.
+- **The posters' codes** are secret and differ between databases: print them from production, and **don't share the files**. Clubs without a riddle or solution yet are framed in red; their page tells guests "not available yet". **↻ Regenerate** makes the files again from the latest data (it never changes the codes: printed posters keep working).
+- **To try a QR code with a real phone** on your local setup, open the site on your computer's LAN address (e.g. `npm run dev -- --host`, then `http://192.168.1.20:5173`, and add it to `PB_ORIGINS`), and put that address in the website field.
+- **How the logo is drawn** ([`src/brand/`](src/brand/)): letters are **outlines** of the fonts, not text, so the logo looks the same in any program, with or without the fonts installed. Crossed letters: the first one stops short of the second with a transparent gap, so it works on any background. The borders and the invitations' decorations are line art drawn from a few shapes (leaf, berry, flower, rose, heart). Fonts: Great Vibes and Lato (SIL Open Font License) and Tinos, the free metric-compatible Times New Roman (Apache 2.0), all free for logos.
+  - The outlines (A–Z and `& | / + - ~ * . :`) are in `src/brand/glyphs/*.ts`, loaded only by the Prints pages. Another character (e.g. "é" as a separator) is written as text in the same font instead. To add characters or fonts, edit `CHARS` in [`scripts/brand/extract-glyphs.py`](scripts/brand/extract-glyphs.py) and run it on the fonts' WOFF files (`npm pack @fontsource/<family>`; the command is at the top of the script).
+  - Ready-made logos in [`public/brand/`](public/brand/): `gv-script.svg` (G and V crossed, script) and `gv-seal.svg` (serif, circles border), each also `-mono` (one colour) and `-light` (for dark backgrounds). They are made by the same code (`src/brand/presets.ts`); `npm run brand` rewrites them, and a test fails while they differ.
 
 ### Organisers (admin view)
 
 Organisers are normal guests who also edit **some suits**: the list **`admin_suits`** of their user (hearts, diamonds, spades, clubs, any combination). A **super admin** sets it from the site: *Site settings* → **Organisers** (see [below](#super-admin-site-settings)); a superuser can also do it from the admin UI (`/_/` → `users` → `admin_suits`). The change applies the next time the user opens the private area. Users can never set it themselves (sign-up and profile rules forbid it).
 
 - A **clubs** organiser edits only the clubs; with **clubs and hearts**, both. Everybody else gets "forbidden", on the site and on the server.
-- Organisers **play the game like every guest**: their home has two tabs, **My game** (`/area`, the usual collection) and **Organise** (`/area/admin`). (They know their suits' answers: keep it in mind for the prize.)
+- Organisers **play the game like every guest**: their home has two tabs, **My game** (`/area`, the usual collection) and **Organise** (`/area/admin/<suit>`). (They know their suits' answers: keep it in mind for the prize.)
 - **Organise** shows:
   - **Before the wedding:** the days left (calendar days in the wedding's time zone), how many things are still to set, and how each suit stands;
-  - **each suit they edit, as its cards**, like the guests see them. A card with something missing has a **red frame** and the number of things missing; a finished card has a green check. "Missing" is: the letter (Ace–10 of hearts, diamonds, clubs), the riddle or the solution (clubs), at least one scene (hearts Ace–10), quiz questions, or quiz questions still marked "(example)" (diamonds). The rules are in [`services/admin/todo.ts`](src/services/admin/todo.ts);
-  - the spades as "N people to find", with a link to their editor (spades have nothing to set card by card).
+  - **one sub-tab per suit they edit** (with the number of things left), showing its cards like the guests see them. A card with something missing has a **red frame** and the number of things missing; a finished card has a green check. "Missing" is: the letter (Ace–10 of hearts, diamonds, clubs), the riddle or the solution (clubs), at least one scene (hearts Ace–10), quiz questions, or quiz questions still marked "(example)" (diamonds). The rules are in [`services/admin/todo.ts`](src/services/admin/todo.ts);
+  - the spades' sub-tab: the people to find, edited right there (spades have nothing to set card by card). The overview follows each change.
 - **A card opens its own page** (`/area/admin/cards/clubs/5`): the card, what is still to set (updated as soon as a change is saved), its editor, and the previous/next card of the suit.
 - The **sign-up secret code** is the same for every guest, so it is for **super admins** only (*Site settings* → **Sign-up code**).
 
-What can be set (on each card's page; the spades on their people page, `/area/admin/suits/spades`):
+What can be set (on each card's page; the spades in their sub-tab):
   - **secret letter** of Ace to 10 (hearts, diamonds and clubs; Jack, Queen and King have none, the spades have none at all);
   - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
   - **diamonds**: the **quiz questions** of every card: add, edit and delete questions and answers, and pick the correct answer (a question always keeps at least two answers and exactly one correct);
@@ -247,7 +247,7 @@ Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) �
 | **Organisers** | `/area/site/organisers` | who organises which suit |
 | **RSVPs** | `/area/site/rsvps` | the replies to the invitation and the headcount |
 | **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters) |
-| **Prints** | `/area/site/prints` | logo, invitations and clubs posters to download and print ([below](#printing-logo-invitations-and-clubs-posters)) |
+| **Prints** | `/area/site/prints/<sub>` | sub-tabs: logo designer, invitation designer, clubs posters ([below](#printing-logo-invitations-and-clubs-posters)) |
 
 The *General* and *Photos* tabs:
 
@@ -372,7 +372,7 @@ In short:
 | `npm run test:watch` | Tests in watch mode                |
 | `npm run typecheck`  | TypeScript project check           |
 | `npm run lint`       | Lint with oxlint                   |
-| `npm run brand`      | Rewrite the logo files in `public/brand/` from `src/brand/logo.ts` |
+| `npm run brand`      | Rewrite the ready-made logos in `public/brand/` (from `src/brand/presets.ts`) |
 
 ## Architecture notes
 

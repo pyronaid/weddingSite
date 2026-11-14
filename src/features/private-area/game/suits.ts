@@ -40,8 +40,18 @@ export const isSettingsTab = (value: unknown): value is SettingsTab =>
   typeof value === 'string' && (SETTINGS_TABS as readonly string[]).includes(value);
 export const siteSettingsPath = (tab: SettingsTab) => `${SITE_SETTINGS_PATH}/${tab}`;
 
+/** The sub-tabs of the Prints tab, each at /area/site/prints/<sub>. */
+export const PRINT_TABS = ['logo', 'invitations', 'posters'] as const;
+export type PrintTab = (typeof PRINT_TABS)[number];
+export const isPrintTab = (value: unknown): value is PrintTab =>
+  typeof value === 'string' && (PRINT_TABS as readonly string[]).includes(value);
+export const printsPath = (tab: PrintTab) => `${SITE_SETTINGS_PATH}/prints/${tab}`;
+
 /** Organisers: every suit they edit, card by card, with what is still missing. */
 export const ORGANISE_PATH = `${AREA_HOME}/admin`;
+
+/** The Organise tab, on one of the suits (its sub-tab). */
+export const organisePath = (suit: Suit) => `${ORGANISE_PATH}/${suit}`;
 
 /** Organisers' editor of one card. */
 export const adminCardPath = (suit: Suit, rank: number) => `${ORGANISE_PATH}/cards/${suit}/${rank}`;
