@@ -19,7 +19,7 @@ const fullName = (person: PersonFields) => `${person.firstName} ${person.lastNam
  * The people of the "guess who" game (spades): each player is given one of
  * them at random, and each card reveals one of its 13 hints.
  */
-export function PeopleEditor() {
+export function PeopleEditor({ onChange }: { onChange?: (people: AdminPerson[]) => void } = {}) {
   const query = useAdminQuery(loadPeople);
   const repository = useAdminRepository();
   // Local changes on top of the loaded list.
@@ -29,7 +29,12 @@ export function PeopleEditor() {
   const messages = useMessages(adminMessages);
   const t = messages.people;
 
-  const replace = (updated: AdminPerson) => setPeople(list.map((item) => (item.id === updated.id ? updated : item)));
+  // Every saved change, also told to the page (e.g. the organisers' overview counts the people).
+  const update = (next: AdminPerson[]) => {
+    setPeople(next);
+    onChange?.(next);
+  };
+  const replace = (updated: AdminPerson) => update(list.map((item) => (item.id === updated.id ? updated : item)));
 
   return (
     <section className={styles.people} aria-labelledby="people-title">
@@ -71,7 +76,7 @@ export function PeopleEditor() {
                   person.assigned === 0
                     ? async () => {
                         await repository.deletePerson(person.id);
-                        setPeople(list.filter((item) => item.id !== person.id));
+                        update(list.filter((item) => item.id !== person.id));
                       }
                     : undefined
                 }
@@ -90,7 +95,7 @@ export function PeopleEditor() {
               submitLabel={t.addPerson}
               onSubmit={async (fields) => {
                 const created = await repository.addPerson(fields);
-                setPeople([...list, created]);
+                update([...list, created]);
                 setAdding((n) => n + 1);
               }}
             />

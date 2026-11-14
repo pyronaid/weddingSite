@@ -57,3 +57,15 @@ export function isTimeZone(value: string): boolean {
     return false;
   }
 }
+
+/**
+ * Whole days from `now` to the day of `iso`, both as calendar days in the
+ * wedding's time zone (0 on the day itself, negative afterwards). Counting
+ * calendar days, not 24-hour blocks, the number changes at midnight there.
+ */
+export function daysUntil(iso: string, timeZone: string, now: Date = new Date()): number | null {
+  const instant = new Date(iso);
+  if (Number.isNaN(instant.getTime()) || !isTimeZone(timeZone)) return null;
+  const day = (date: Date) => Date.parse(`${wallClockParts(date, timeZone).slice(0, 10)}T00:00:00Z`);
+  return Math.round((day(instant) - day(now)) / 86_400_000);
+}

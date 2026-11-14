@@ -4,7 +4,7 @@
  * Admin endpoints used by the organisers' view of the site. Every handler
  * first checks that the user organises the suit concerned (`admin_suits`,
  * or a super admin); the sign-up code is for super admins only. Each one
- * writes only the fields it is meant to.
+ * writes only the fields it is meant to; the RSVPs are read only.
  *
  *   GET    /api/admin/suits/{suit}              cards with letter, riddle/solution (clubs), scenes (hearts)
  *   PATCH  /api/admin/cards/{cardId}            {letter?, riddle?, solution?}
@@ -21,6 +21,12 @@
  *   POST   /api/admin/guess/people              {firstName, lastName, hints: [13 texts]}
  *   PATCH  /api/admin/guess/people/{personId}   {firstName, lastName, hints: [13 texts]}
  *   DELETE /api/admin/guess/people/{personId}   (refused once given to a player)
+ *   GET    /api/admin/users?q=&page=            registered users, 20 per page, by name or e-mail (super admins)
+ *   PATCH  /api/admin/users/{userId}            {adminSuits: [suits]} (super admins)
+ *   GET    /api/admin/rsvps?q=&attending=&page= RSVPs, 20 per page, newest first, + headcount (super admins)
+ *   GET    /api/admin/prints/riddles            clubs with the secret code of their poster (super admins)
+ *   GET    /api/admin/prints/designs/{kind}     saved choices of a designer: logo, invitation, website (super admins)
+ *   PUT    /api/admin/prints/designs/{kind}     {design}: saves them, last save wins (super admins)
  *   GET    /api/admin/settings                  {signupCode}
  *   PATCH  /api/admin/settings                  {signupCode}
  */
@@ -227,6 +233,83 @@ routerAdd(
     admin.requireSuitAdmin(e, 'spades');
     admin.deletePerson(e.app, e.request.pathValue('personId'));
     return e.noContent(204);
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Registered users: the super admins assign the suits ----
+
+routerAdd(
+  'GET',
+  '/api/admin/users',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    const query = e.requestInfo().query;
+    return e.json(200, admin.listUsers(e.app, query.q || '', query.page || '1'));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'PATCH',
+  '/api/admin/users/{userId}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    return e.json(200, admin.setUserSuits(e.app, e.request.pathValue('userId'), e.requestInfo().body.adminSuits));
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- RSVPs: the super admins read the replies ----
+
+routerAdd(
+  'GET',
+  '/api/admin/rsvps',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    const query = e.requestInfo().query;
+    return e.json(200, admin.listRsvps(e.app, query.q || '', query.attending || '', query.page || '1'));
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Prints: the codes of the clubs posters ----
+
+routerAdd(
+  'GET',
+  '/api/admin/prints/riddles',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    return e.json(200, { cards: admin.riddleCodes(e.app) });
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Prints: the designers' choices, saved as the super admins edit them ----
+
+routerAdd(
+  'GET',
+  '/api/admin/prints/designs/{kind}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    return e.json(200, admin.getPrintDesign(e.app, e.request.pathValue('kind')));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'PUT',
+  '/api/admin/prints/designs/{kind}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    const body = e.requestInfo().body;
+    return e.json(200, admin.savePrintDesign(e.app, e.request.pathValue('kind'), body.design, e.auth.id));
   },
   $apis.requireAuth('users'),
 );

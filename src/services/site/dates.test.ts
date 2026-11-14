@@ -1,4 +1,4 @@
-import { isTimeZone, isoToLocalInput, localInputToIso } from './dates';
+import { daysUntil, isTimeZone, isoToLocalInput, localInputToIso } from './dates';
 
 describe('wedding time zone dates', () => {
   it('stores a wall-clock time with the right offset, summer or winter', () => {
@@ -28,5 +28,23 @@ describe('wedding time zone dates', () => {
     expect(isTimeZone('Europe/Rome')).toBe(true);
     expect(isTimeZone('Europe/Atlantis')).toBe(false);
     expect(isTimeZone('')).toBe(false);
+  });
+});
+
+describe('daysUntil', () => {
+  const wedding = '2027-06-19T16:00:00+02:00';
+
+  it('counts calendar days in the wedding time zone', () => {
+    expect(daysUntil(wedding, 'Europe/Rome', new Date('2027-06-18T23:30:00+02:00'))).toBe(1);
+    // Ten minutes later it is the 19th in Rome: the day itself.
+    expect(daysUntil(wedding, 'Europe/Rome', new Date('2027-06-19T00:10:00+02:00'))).toBe(0);
+    expect(daysUntil(wedding, 'Europe/Rome', new Date('2027-06-20T09:00:00+02:00'))).toBe(-1);
+    // Across the change to summer time.
+    expect(daysUntil(wedding, 'Europe/Rome', new Date('2027-03-01T12:00:00+01:00'))).toBe(110);
+  });
+
+  it('gives up on a broken date or time zone', () => {
+    expect(daysUntil('soon', 'Europe/Rome')).toBeNull();
+    expect(daysUntil(wedding, 'Europe/Atlantis')).toBeNull();
   });
 });

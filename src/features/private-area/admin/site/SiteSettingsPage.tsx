@@ -1,28 +1,47 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Link, useParams } from 'react-router';
 import formStyles from '../../../../components/Form/Form.module.css';
 import { CardHeader } from '../../../../components/InfoCard/CardHeader';
+import { RouteTabPanel, RouteTabs } from '../../../../components/RouteTabs/RouteTabs';
 import { useDocumentTitle } from '../../../../hooks/useDocumentTitle';
 import { useMessages } from '../../../../i18n';
 import { toAdminError } from '../../../../services/admin';
 import type { SiteContent, SiteSettings } from '../../../../services/site';
 import { useSiteContent } from '../../../../site/SiteContentContext';
-import { AREA_HOME } from '../../guards';
+import { isSettingsTab, ORGANISE_PATH, SETTINGS_TABS, siteSettingsPath, type SettingsTab } from '../../game/suits';
 import { siteSettingsMessages } from '../../messages/siteSettings';
 import { useAuth } from '../../useAuth';
+import { SignupCodeForm } from '../SignupCodeForm';
 import { PhotosEditor } from './PhotosEditor';
+import { PrintsPanel } from './prints/PrintsPanel';
+import { RsvpsList } from './RsvpsList';
 import { SiteSettingsForm } from './SiteSettingsForm';
+import { UsersEditor } from './UsersEditor';
 import styles from './site.module.css';
 
 type State = { status: 'loading' } | { status: 'ready'; content: SiteContent } | { status: 'error'; message: string };
 
 /**
- * Super admin only: the content of the public site. Edits the latest content
- * from the server (not the copy cached in the browser); every save updates
- * the whole site at once (a new language re-renders everything in it).
+ * Super admin only, in tabs: the content of the public site (general data,
+ * photos), who organises which suit, the RSVPs, the sign-up code and the
+ * files to print (logo, invitations, clubs posters).
+ * The General and Photos tabs edit the latest content from the server (not
+ * the copy cached in the browser); every save updates the whole site at once
+ * (a new language re-renders everything in it).
  */
 export function SiteSettingsPage() {
   const t = useMessages(siteSettingsMessages);
+  // /area/site/<tab>; an unknown or missing tab shows the first one.
+  const param = useParams().tab;
+  const tab: SettingsTab = isSettingsTab(param) ? param : 'general';
+  const tabLabels: Record<SettingsTab, string> = {
+    general: t.tabs.general,
+    photos: t.tabs.photos,
+    organisers: t.tabs.organisers,
+    rsvps: t.tabs.rsvps,
+    'signup-code': t.tabs.signupCode,
+    prints: t.tabs.prints,
+  };
   useDocumentTitle(t.documentTitle);
   const { repository, replace } = useSiteContent();
   const { auth } = useAuth();
@@ -59,12 +78,13 @@ export function SiteSettingsPage() {
     return saved;
   };
 
-  return (
-    <div className={styles.page} data-layout="wide">
-      <CardHeader id="site-settings-title" eyebrow={t.eyebrow} title={t.title} />
-      <p className={styles.intro}>{t.intro}</p>
-
-      {state.status === 'loading' && <p className={styles.intro} role="status">…</p>}
+  const contentPanel = (render: (content: SiteContent) => ReactNode) => (
+    <>
+      {state.status === 'loading' && (
+        <p className={styles.intro} role="status">
+          …
+        </p>
+      )}
       {state.status === 'error' && (
         <div role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
           {t.loadingFailed} {state.message}{' '}
@@ -80,14 +100,32 @@ export function SiteSettingsPage() {
           </button>
         </div>
       )}
-      {state.status === 'ready' && (
-        <>
-          <SiteSettingsForm content={state.content} onSave={save} />
-          <PhotosEditor content={state.content} repository={repository} onChange={update} />
-        </>
-      )}
+      {state.status === 'ready' && render(state.content)}
+    </>
+  );
 
-      <Link to={AREA_HOME} className={`${formStyles.secondary} ${styles.back}`}>
+  return (
+    <div className={styles.page} data-layout="wide">
+      <CardHeader id="site-settings-title" eyebrow={t.eyebrow} title={t.title} />
+      <p className={styles.intro}>{t.intro}</p>
+
+      <RouteTabs
+        id="site-settings"
+        label={t.tabs.label}
+        current={tab}
+        tabs={SETTINGS_TABS.map((id) => ({ id, label: tabLabels[id], to: siteSettingsPath(id) }))}
+      />
+      <RouteTabPanel id="site-settings" current={tab} className={styles.tabPanel}>
+        {tab === 'general' && contentPanel((content) => <SiteSettingsForm content={content} onSave={save} />)}
+        {tab === 'photos' &&
+          contentPanel((content) => <PhotosEditor content={content} repository={repository} onChange={update} />)}
+        {tab === 'organisers' && <UsersEditor />}
+        {tab === 'rsvps' && <RsvpsList />}
+        {tab === 'signup-code' && <SignupCodeForm />}
+        {tab === 'prints' && <PrintsPanel />}
+      </RouteTabPanel>
+
+      <Link to={ORGANISE_PATH} className={`${formStyles.secondary} ${styles.back}`}>
         {t.back}
       </Link>
     </div>

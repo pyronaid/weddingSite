@@ -5,11 +5,18 @@ import type {
   AdminCard,
   AdminCardChanges,
   AdminPerson,
+  AdminRsvpsPage,
+  AdminUser,
+  AdminUsersPage,
   AdminQuestion,
   AdminRepository,
   AdminScene,
   AdminSettings,
   NewQuestion,
+  PrintDesignKind,
+  RiddleCode,
+  SavedPrintDesign,
+  RsvpFilter,
   PersonFields,
 } from './types';
 
@@ -89,6 +96,35 @@ export class PocketBaseAdminRepository implements AdminRepository {
 
   async deletePerson(personId: string): Promise<void> {
     await this.call(`/guess/people/${encodeURIComponent(personId)}`, 'DELETE');
+  }
+
+  listUsers(query: string, page: number): Promise<AdminUsersPage> {
+    const params = new URLSearchParams({ q: query, page: String(page) });
+    return this.call(`/users?${params}`, 'GET');
+  }
+
+  setUserSuits(userId: string, suits: Suit[]): Promise<AdminUser> {
+    return this.call(`/users/${encodeURIComponent(userId)}`, 'PATCH', { adminSuits: suits });
+  }
+
+  async listRsvps(query: string, attending: RsvpFilter, page: number): Promise<AdminRsvpsPage> {
+    const params = new URLSearchParams({ q: query, attending, page: String(page) });
+    const data = await this.call<AdminRsvpsPage>(`/rsvps?${params}`, 'GET');
+    // PocketBase dates ("2027-06-19 10:00:00.000Z") made ISO: every browser parses them.
+    return { ...data, items: data.items.map((rsvp) => ({ ...rsvp, created: rsvp.created.replace(' ', 'T') })) };
+  }
+
+  async getRiddleCodes(): Promise<RiddleCode[]> {
+    const { cards } = await this.call<{ cards: RiddleCode[] }>('/prints/riddles', 'GET');
+    return cards;
+  }
+
+  getPrintDesign(kind: PrintDesignKind): Promise<SavedPrintDesign> {
+    return this.call(`/prints/designs/${encodeURIComponent(kind)}`, 'GET');
+  }
+
+  savePrintDesign(kind: PrintDesignKind, design: object): Promise<SavedPrintDesign> {
+    return this.call(`/prints/designs/${encodeURIComponent(kind)}`, 'PUT', { design });
   }
 
   getSettings(): Promise<AdminSettings> {

@@ -137,9 +137,10 @@ npm run dev                  # http://localhost:5173
 | `/area`                      | Game intro + collected cards per suit   | logged-in only  |
 | `/area/suits/:suit`          | Suit page (`hearts`, `diamonds`, `spades`, `clubs`): flip cards + secret phrase (not spades) | logged-in only  |
 | `/area/riddles/:code`        | Riddle opened from a poster's QR code: solve it to collect the card | logged-in only  |
-| `/area` (organisers)         | The same game home, plus an *Organisers* section: the suits they edit (+ site settings and sign-up code for super admins) | organisers of those suits |
-| `/area/admin/suits/:suit`    | Edit letters, clubs riddles/solutions, hearts scenes, diamonds quiz, spades people | organisers of that suit |
-| `/area/site`                 | Site settings: language, names, date, places, gift, photos | super admins only |
+| `/area` (organisers)         | The same game home, as the *My game* tab next to *Organise* | organisers |
+| `/area/admin/:suit?`         | *Organise* tab: days left, things still to set, then one sub-tab per suit they edit: its cards (red frame = something missing), or the people to find for the spades (+ the site settings link for super admins) | organisers |
+| `/area/admin/cards/:suit/:rank` | One card: letter, clubs riddle/solution, hearts scenes, diamonds quiz; what is still missing; previous/next card | organisers of that suit |
+| `/area/site/:tab?/:sub?`     | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, RSVPs, sign-up code, prints (sub-tabs: logo, invitations, posters) | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -149,7 +150,7 @@ npm run dev                  # http://localhost:5173
 
 Flows and security choices:
 
-- **Sign up** requires the **secret code** given to the guests (default `#wedding`; capital letters and surrounding spaces do not matter). It is checked by the server (`pb_hooks/signup.pb.js`), never stored with the user, and organisers can change it from their home page.
+- **Sign up** requires the **secret code** given to the guests (default `#wedding`; capital letters and surrounding spaces do not matter). It is checked by the server (`pb_hooks/signup.pb.js`), never stored with the user, and super admins can change it in *Site settings* → *Sign-up code*.
 - **Sign up** creates the user and sends a confirmation e-mail. **Only verified users can log in**: this is enforced by the server (`authRule = "verified = true"`), not just by the UI.
 - Logging in **before confirming** shows "please confirm your e-mail", with a **resend** button (60 s cooldown).
 - **Forgot password** always shows the same message, whether or not the account exists, so nobody can find out which e-mails are registered.
@@ -196,80 +197,60 @@ The dashboard shows four cards (hearts, diamonds, spades, clubs) with the number
 - **Moderation**: in the admin UI, open `photo_submissions` and remove the photo (or delete the row). To also take the card back, delete the matching `collected_cards` row.
 - To **give a card to a guest by hand**: admin UI → `collected_cards` → New record → pick the user and the card. Guests cannot do this themselves.
 
-### Printing the card posters
+### Printing: logo, invitations and clubs posters
 
-```bash
-# .env must point to the PRODUCTION PocketBase and site
-#   VITE_POCKETBASE_URL (or PB_URL), PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD, FRONTEND_URL=https://your-site
-npm run posters                    # clubs (default)
-npm run posters -- --suit hearts
-npm run posters -- --pdf           # also a PDF (needs Playwright installed)
-```
+Everything to print is made **in the browser, from the current data**, by a super admin: *Site settings* → **Prints**, one sub-tab each. Every choice of the designers (letters, colours, style, size, texts, decorations…) and the website address of the QR codes are **saved automatically on the super admins' account** a moment after each change ("Saved ✓" under the preview), so the work goes on from any browser or computer, and the form always matches the picture, which is drawn again from those choices. The files themselves are never stored: they are made when downloaded or printed. For a print shop use **Print / PDF** and *Save as PDF*: the fonts are embedded and the page size is set, so leave the margins at *None*.
 
-The script reads each card's secret code from PocketBase (as superuser) and writes to `posters/` (git-ignored):
+| Sub-tab | Address | What you choose | Files |
+| --- | --- | --- | --- |
+| **Logo** | `/area/site/prints/logo` | The **two letters** and the colour of each; the **style**: crossed, side by side, or diagonal; a **separator** between spaced letters (&, \|, ♥ or your own text) and its colour; the **font**: script, sans serif or Times New Roman; a **border**: none, small flowers (wreath), big flowers, circles (with roses), squares; and its colour. Colours from the site palette, or any other. | SVG (vector: print shop, embroidery, stamps) and PNG (2048 px, transparent) |
+| **Invitations** | `/area/site/prints/invitations` | The **size**: square (15 × 15 cm), A4 portrait or landscape; the **language** of the card (dates, times and texts, also different from the site's); a **line for the names** to write by hand (none, one guest, a couple); the **title** and **subtitle**; the **logo** from the Logo sub-tab; the **QR code** section and its text; the **sign-up code**; a white or **shaded background**; **side decorations**: plants, flowers, hearts or roots, and their colour. Date, times, places, RSVP deadline and hashtag come from the *General* tab. | Print / PDF at the card's size, SVG, PNG at 300 dpi |
+| **Clubs posters** | `/area/site/prints/posters` | Nothing: one A3 poster per club, the card and the QR code of its riddle. The secret codes come from `/api/admin/prints/riddles` (super admins only). | Print all / PDF (13 A3 pages), or one poster: SVG, Print / PDF |
 
-- one **A3 vector SVG** per card (`clubs-07-7.svg`): the card, a QR code and a short caption. Vector means it prints sharp at A3 or any other size.
-- `clubs-posters.html`: all posters, one A3 page each. Open it in Chrome → Print → *Save as PDF*, paper **A3**, margins **None**.
-
-The QR codes use 25% error correction (level Q) and are 11 cm wide, so they scan from a couple of metres even with some glare. The script refuses a `localhost` `FRONTEND_URL` (phones at the venue could not open it). **The files contain the secret codes: don't commit or share them.** Generate the posters only after the final deploy, as codes differ between databases.
-
-Options (with `npm run`, put them after `--`; they can be combined):
-
-| Option              | Default    | Description                                                                 |
-| ------------------- | ---------- | --------------------------------------------------------------------------- |
-| `--suit <suit>`     | `clubs`    | `hearts`, `diamonds`, `spades` or `clubs`                                   |
-| `--pdf`             | off        | Also writes `<suit>-posters.pdf` (needs Playwright)                         |
-| `--out <dir>`       | `posters/` | Output folder                                                               |
-| `--allow-localhost` | off        | Accepts a `localhost` / `127.x` / `0.0.0.0` `FRONTEND_URL`: **local tests only** |
-
-#### Testing the posters locally
-
-By default the script stops with *"FRONTEND_URL is http://localhost:…: guests' phones cannot open it"*. That protects you from printing posters that only work on your computer. For a local test, pass `--allow-localhost`:
-
-```bash
-# Full stack with Docker (`docker compose up`): the values in .env already match
-#   VITE_POCKETBASE_URL=http://localhost:8090  FRONTEND_URL=http://localhost:8080
-npm run posters -- --allow-localhost
-
-# Frontend with `npm run dev` (port 5173): override FRONTEND_URL for this run only
-FRONTEND_URL=http://localhost:5173 npm run posters -- --allow-localhost --suit hearts
-```
-
-Then open `posters/clubs-posters.html` to check the layout. To try a riddle, open the URL printed under the QR code in your browser: the QR itself points to `localhost`, which a phone resolves to *itself*, not to your computer.
-
-**To scan the QR with a real phone**, use your computer's LAN IP instead of `localhost` (e.g. `192.168.1.20`; find it with `ipconfig` / `ip addr`). A LAN IP does not need `--allow-localhost`. Phone and computer must be on the same Wi-Fi:
-
-```bash
-# .env: the browser on the phone must reach PocketBase too
-#   VITE_POCKETBASE_URL=http://192.168.1.20:8090
-#   PB_ORIGINS=...,http://192.168.1.20:5173     (then restart PocketBase)
-npm run dev -- --host                            # serves the site on the LAN
-FRONTEND_URL=http://192.168.1.20:5173 npm run posters
-```
-
-> ⚠️ Posters made this way only work with your **local** database and URL. Delete them (`rm -rf posters`) when you are done, and for the real print run the script again against production **without** `--allow-localhost`.
+- **The QR codes** point to the **website address** field (Invitations and Clubs posters): by default the address the page was opened at (*Use this site's address* goes back to it), so **make the final prints from the live site**. A `localhost` address gets a warning: guests' phones cannot open it. Codes use 25% error correction (level Q): they scan with glare or a fold.
+- **The posters' codes** are secret and differ between databases: print them from production, and **don't share the files**. Clubs without a riddle or solution yet are framed in red; their page tells guests "not available yet". **↻ Regenerate** makes the files again from the latest data (it never changes the codes: printed posters keep working).
+- **To try a QR code with a real phone** on your local setup, open the site on your computer's LAN address (e.g. `npm run dev -- --host`, then `http://192.168.1.20:5173`, and add it to `PB_ORIGINS`), and put that address in the website field.
+- **How the designs are saved:** in the `print_designs` collection, one record per designer (`logo`, `invitation`, `website`), through `GET`/`PUT /api/admin/prints/designs/{kind}` (super admins only; objects up to 16 kB; no API rules on the collection). The last save wins: if both super admins edit at once, the later change stays; a tab that comes back into view reloads the latest choices. Saved choices are checked field by field before use (unknown values fall back to the defaults, colours must be `#rrggbb`). A design made in a browser before saving existed is moved to the account the first time.
+- **How the logo is drawn** ([`src/brand/`](src/brand/)): letters are **outlines** of the fonts, not text, so the logo looks the same in any program, with or without the fonts installed. Crossed letters: the first one stops short of the second with a transparent gap, so it works on any background. The borders and the invitations' decorations are line art drawn from a few shapes (leaf, berry, flower, rose, heart). Fonts: Great Vibes and Lato (SIL Open Font License) and Tinos, the free metric-compatible Times New Roman (Apache 2.0), all free for logos.
+  - The outlines (A–Z and `& | / + - ~ * . :`) are in `src/brand/glyphs/*.ts`, loaded only by the Prints pages. Another character (e.g. "é" as a separator) is written as text in the same font instead. To add characters or fonts, edit `CHARS` in [`scripts/brand/extract-glyphs.py`](scripts/brand/extract-glyphs.py) and run it on the fonts' WOFF files (`npm pack @fontsource/<family>`; the command is at the top of the script).
+  - Ready-made logos in [`public/brand/`](public/brand/): `gv-script.svg` (G and V crossed, script) and `gv-seal.svg` (serif, circles border), each also `-mono` (one colour) and `-light` (for dark backgrounds). They are made by the same code (`src/brand/presets.ts`); `npm run brand` rewrites them, and a test fails while they differ.
 
 ### Organisers (admin view)
 
-Organisers are normal guests who also edit **some suits**: the list **`admin_suits`** of their user (hearts, diamonds, spades, clubs, any combination). Only a superuser can set it: admin UI (`/_/`) → `users` → open the user → pick the suits in `admin_suits` → Save, then the user logs out and in again. Users can never set it themselves (sign-up and profile rules forbid it).
+Organisers are normal guests who also edit **some suits**: the list **`admin_suits`** of their user (hearts, diamonds, spades, clubs, any combination). A **super admin** sets it from the site: *Site settings* → **Organisers** (see [below](#super-admin-site-settings)); a superuser can also do it from the admin UI (`/_/` → `users` → `admin_suits`). The change applies the next time the user opens the private area. Users can never set it themselves (sign-up and profile rules forbid it).
 
 - A **clubs** organiser edits only the clubs; with **clubs and hearts**, both. Everybody else gets "forbidden", on the site and on the server.
-- Organisers **play the game like every guest**: their `/area` is the usual home with their collection, plus an **Organisers** section with one card per suit they edit. (They know their suits' answers: keep it in mind for the prize.)
-- The **sign-up secret code** is the same for every guest, so it is for **super admins** only.
+- Organisers **play the game like every guest**: their home has two tabs, **My game** (`/area`, the usual collection) and **Organise** (`/area/admin/<suit>`). (They know their suits' answers: keep it in mind for the prize.)
+- **Organise** shows:
+  - **Before the wedding:** the days left (calendar days in the wedding's time zone), how many things are still to set, and how each suit stands;
+  - **one sub-tab per suit they edit** (with the number of things left), showing its cards like the guests see them. A card with something missing has a **red frame** and the number of things missing; a finished card has a green check. "Missing" is: the letter (Ace–10 of hearts, diamonds, clubs), the riddle or the solution (clubs), at least one scene (hearts Ace–10), quiz questions, or quiz questions still marked "(example)" (diamonds). The rules are in [`services/admin/todo.ts`](src/services/admin/todo.ts);
+  - the spades' sub-tab: the people to find, edited right there (spades have nothing to set card by card). The overview follows each change.
+- **A card opens its own page** (`/area/admin/cards/clubs/5`): the card, what is still to set (updated as soon as a change is saved), its editor, and the previous/next card of the suit.
+- The **sign-up secret code** is the same for every guest, so it is for **super admins** only (*Site settings* → **Sign-up code**).
 
-The editor of each suit (one panel per card, except the spades):
+What can be set (on each card's page; the spades in their sub-tab):
   - **secret letter** of Ace to 10 (hearts, diamonds and clubs; Jack, Queen and King have none, the spades have none at all);
   - **clubs**: the **riddle** and its **solution** (letters and digits; stored uppercase without spaces; a "no solution yet" badge shows the riddles guests cannot play yet);
   - **diamonds**: the **quiz questions** of every card: add, edit and delete questions and answers, and pick the correct answer (a question always keeps at least two answers and exactly one correct);
   - **spades**: only the **people to find** of the "guess who" game: name, surname and the 13 hints (Ace to King), all required. Drag a hint by its ⠿ handle (mouse or finger; or focus the handle and use the arrow keys) to give it to another card without retyping: the cards stay, the texts move, and nothing changes until Save. Each person shows how many guests were given it and how many found it; a person already given to a guest can be edited (live for those guests too) but not deleted;
-  - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text);
-- and, for super admins, the **sign-up secret code** (3–50 characters).
+  - **hearts**: the **scenes** of Ace to 10 (add, edit, delete; photos already uploaded keep their own copy of the scene text).
 
 Changes are live for the guests as soon as they are saved. Everything goes through `pb_hooks/admin.pb.js` (`/api/admin/*`): every request checks that the user organises the suit of the card, scene, question, answer or person it touches (`admin_suits`, or a super admin), and each endpoint writes only the fields it is meant to, so guests still never see letters, riddles or solutions they have not earned.
 
 ### Super admin (site settings)
 
-Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) → `users` → open the user → tick `is_superadmin` → Save, then log out and in again. Like `admin_suits`, users can never set it themselves. A super admin organises **every** suit, and their *Organisers* section also has the sign-up code and a **Site settings** link (`/area/site`):
+Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) → `users` → open the user → tick `is_superadmin` → Save, then log out and in again. Like `admin_suits`, users can never set it themselves. A super admin organises **every** suit, and their *Organise* tab also has a **Site settings** link. The settings are split in **tabs**, each with its own address (bookmarkable; the arrow keys move between tabs):
+
+| Tab | Address | What |
+| --- | --- | --- |
+| **General** | `/area/site` or `/area/site/general` | language, the couple, date, places, gift (IBAN) |
+| **Photos** | `/area/site/photos` | every photo of the site |
+| **Organisers** | `/area/site/organisers` | who organises which suit |
+| **RSVPs** | `/area/site/rsvps` | the replies to the invitation and the headcount |
+| **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters) |
+| **Prints** | `/area/site/prints/<sub>` | sub-tabs: logo designer, invitation designer, clubs posters ([below](#printing-logo-invitations-and-clubs-posters)) |
+
+The *General* and *Photos* tabs:
 
 - **Language** of the whole site: English or Italian. Every guest sees the public page, the private area, the game, the organisers' screens, the server's messages and the confirmation/reset e-mails in it.
 - **The couple:** the two first names, the line above them ("We are getting married") and the hashtag.
@@ -277,6 +258,10 @@ Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) �
 - **Ceremony** and optional **reception:** name, address, time, and an optional search text for the map (the address otherwise).
 - **Gift:** message, account holder, **IBAN** (checked with its checksum, in the browser and on the server, and stored without spaces), BIC, bank, payment reason. Optional details are hidden when empty.
 - **Photos:** every photo of the site: the big one at the top, the four around each section and the eight floating in the private area. Each can be replaced (shrunk, with EXIF/GPS data removed, before the upload), described for screen readers, or put back to the default picture.
+
+The *Organisers* tab lists the **registered guests, 20 per page**, sorted by name, with a **search by name or e-mail** (any part of it, capital letters ignored). The search starts 300 ms after the last keystroke, so typing a name sends one request, not one per letter, and only the answer to the latest search is shown. Each guest has a toggle per suit, **saved at once** (and put back, with the reason, if the server refuses); super admins edit every suit, so they have none. It goes through two super-admin-only endpoints of `pb_hooks/admin.pb.js`: `GET /api/admin/users?q=&page=` (filtering and paging happen in the database: the browser never receives the whole list) and `PATCH /api/admin/users/{id}` with `{ "adminSuits": [...] }`, which writes only `admin_suits`.
+
+The *RSVPs* tab shows the **headcount** on top (people coming, replies yes / no, total replies), then the **replies, newest first, 20 per page**: name, e-mail (click to write to them), coming with how many people or not, dietary needs, message, and when it was sent (in the wedding's time zone). It can be searched by name or e-mail and filtered by answer (everybody / coming / not coming); the headcount is always about everybody. A guest may reply more than once with the same e-mail (capital letters ignored): **only their latest reply counts**, the older ones are shown faded as "replaced". Read only: replies are not edited from the site. It uses `GET /api/admin/rsvps?q=&attending=all|yes|no&page=` (super admins only; the `rsvps` collection itself stays closed to everybody but superusers). Both lists share the same paging, search and stale-answer handling (`usePagedList`, `Pager`).
 
 How it is stored and loaded:
 
@@ -304,6 +289,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `users.admin_suits`: the suits a user organises (set by a superuser only; it replaced the yes/no `is_admin`, whose organisers got every suit). `users.is_superadmin`: super admins (set by a superuser only).
   - `site_content` (one record) and `site_photos`: the content of the public site, edited by the super admins (see above).
   - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
+  - `print_designs`: the super admins' choices in the Prints designers (logo, invitation, QR website address), saved as they edit (never readable through the API: `pb_hooks/admin.pb.js` only).
   - `quiz_questions`, `quiz_answers`: the diamonds quiz (organisers only; seeded with two example questions per card). `quiz_attempts`: per user and card, the current question, the questions already faced and the wrong answers (server only).
   - `guess_people`, `guess_hints`: the people of the spades "guess who" and their 13 hints (organisers only; seeded with two example people). `guess_assignments`: the person drawn for each user, its attempts and `found` (server only). `guess_selfies`: one per (user, card), a protected photo or `same_as` the earlier selfie confirmed; created only by the hook, visible to the owner and the organisers.
   - `photo_scenes`: the scenes of each hearts card (admin only; seeded with examples).
@@ -316,7 +302,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `photos.pb.js` draws the photo challenge scenes (`POST /api/game/photos/{cardId}/draw`) and collects the card when a photo is uploaded.
   - `quiz.pb.js` serves the diamonds quiz: current question, answers, lives and penalties.
   - `guess.pb.js` serves the spades "guess who": the hints of a card (`POST /api/game/guess/{cardId}`), the selfie upload and the "same person as before" confirmation, the status and the final guess.
-  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code), each endpoint for the organisers of its suit only (the secret code for super admins).
+  - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code, who organises which suit), each endpoint for the organisers of its suit only (the secret code and the users for super admins).
   - `signup.pb.js` checks the sign-up secret code.
   - `site.pb.js` validates the site content (IBAN checksum, BIC, date with its offset, time zone, a reception with its address and time) and the photo slots, and re-applies the e-mails in the chosen language.
   - `lib/i18n.js` holds the messages the hooks send to the guests, in English and Italian.
@@ -388,6 +374,7 @@ In short:
 | `npm run test:watch` | Tests in watch mode                |
 | `npm run typecheck`  | TypeScript project check           |
 | `npm run lint`       | Lint with oxlint                   |
+| `npm run brand`      | Rewrite the ready-made logos in `public/brand/` (from `src/brand/presets.ts`) |
 
 ## Architecture notes
 

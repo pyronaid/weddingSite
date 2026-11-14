@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { useMessages } from '../../../i18n';
 import { toAdminError, type AdminScene } from '../../../services/admin';
@@ -10,15 +10,24 @@ interface ScenesEditorProps {
   cardId: string;
   cardName: string;
   scenes: AdminScene[];
+  /** After every change saved on the server, with the whole new list. */
+  onChange?: (scenes: AdminScene[]) => void;
 }
 
 /** The bucket of photo scenes of a numbered hearts card: add, edit, delete. */
-export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditorProps) {
+export function ScenesEditor({ cardId, cardName, scenes: initial, onChange }: ScenesEditorProps) {
   const repository = useAdminRepository();
   const messages = useMessages(adminMessages);
   const t = messages.scenes;
   const newId = useId();
   const [scenes, setScenes] = useState(initial);
+  // The latest list, for the handlers: each change starts from the previous one.
+  const latest = useRef(initial);
+  const commit = (change: (list: AdminScene[]) => AdminScene[]) => {
+    latest.current = change(latest.current);
+    setScenes(latest.current);
+    onChange?.(latest.current);
+  };
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [newText, setNewText] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -41,14 +50,14 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
   const save = (scene: AdminScene) =>
     run(scene.id, async () => {
       const updated = await repository.updateScene(scene.id, drafts[scene.id].trim());
-      setScenes((list) => list.map((item) => (item.id === scene.id ? updated : item)));
+      commit((list) => list.map((item) => (item.id === scene.id ? updated : item)));
       setDrafts(({ [scene.id]: _saved, ...rest }) => rest);
     });
 
   const remove = (scene: AdminScene) =>
     run(scene.id, async () => {
       await repository.deleteScene(scene.id);
-      setScenes((list) => list.filter((item) => item.id !== scene.id));
+      commit((list) => list.filter((item) => item.id !== scene.id));
       setConfirming(null);
     });
 
@@ -57,7 +66,7 @@ export function ScenesEditor({ cardId, cardName, scenes: initial }: ScenesEditor
     if (!newText.trim()) return;
     void run('new', async () => {
       const created = await repository.addScene(cardId, newText.trim());
-      setScenes((list) => [...list, created]);
+      commit((list) => [...list, created]);
       setNewText('');
     });
   };

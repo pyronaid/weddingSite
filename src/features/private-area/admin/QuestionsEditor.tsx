@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import formStyles from '../../../components/Form/Form.module.css';
 import { toAdminError, type AdminQuestion } from '../../../services/admin';
 import { useMessages } from '../../../i18n';
@@ -12,6 +12,8 @@ interface QuestionsEditorProps {
   questions: AdminQuestion[];
   /** Jack, Queen, King: asked in person, guests only see the number and A, B, C... */
   inPerson?: boolean;
+  /** After every change saved on the server, with the whole new list. */
+  onChange?: (questions: AdminQuestion[]) => void;
 }
 
 const LETTERS = 'ABCDEFGHIJ';
@@ -19,10 +21,23 @@ const LETTERS = 'ABCDEFGHIJ';
 const emptyDraft = () => ({ text: '', answers: ['', '', ''], correct: 0 });
 
 /** The quiz questions of a diamonds card: questions, answers and the correct one. */
-export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson = false }: QuestionsEditorProps) {
+export function QuestionsEditor({
+  cardId,
+  cardName,
+  questions: initial,
+  inPerson = false,
+  onChange,
+}: QuestionsEditorProps) {
   const repository = useAdminRepository();
   const t = useMessages(adminMessages).quiz;
   const [questions, setQuestions] = useState(initial);
+  // The latest list, for the handlers: each change starts from the previous one.
+  const latest = useRef(initial);
+  const commit = (change: (list: AdminQuestion[]) => AdminQuestion[]) => {
+    latest.current = change(latest.current);
+    setQuestions(latest.current);
+    onChange?.(latest.current);
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +58,7 @@ export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson
   };
 
   const replace = (updated: AdminQuestion) =>
-    setQuestions((list) => list.map((question) => (question.id === updated.id ? updated : question)));
+    commit((list) => list.map((question) => (question.id === updated.id ? updated : question)));
 
   return (
     <div className={styles.scenes}>
@@ -68,7 +83,7 @@ export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson
           onDelete={() =>
             run(async () => {
               await repository.deleteQuestion(question.id);
-              setQuestions((list) => list.filter((item) => item.id !== question.id));
+              commit((list) => list.filter((item) => item.id !== question.id));
             })
           }
           onMarkCorrect={(answerId) => run(async () => replace(await repository.updateAnswer(answerId, { correct: true })))}
@@ -84,7 +99,7 @@ export function QuestionsEditor({ cardId, cardName, questions: initial, inPerson
         onAdd={(draft) =>
           run(async () => {
             const created = await repository.addQuestion(cardId, draft);
-            setQuestions((list) => [...list, created]);
+            commit((list) => [...list, created]);
           })
         }
       />

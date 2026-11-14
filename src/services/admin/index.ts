@@ -5,6 +5,7 @@ import type { AdminRepository } from './types';
 
 export * from './types';
 export { toAdminError } from './errors';
+export { cardTodos, openItems, suitProgress, type CardTodo, type SuitProgress } from './todo';
 
 export function createAdminRepository(): AdminRepository {
   const pb = getPocketBase();
@@ -26,6 +27,12 @@ export function createAdminRepository(): AdminRepository {
     addPerson: fail,
     updatePerson: fail,
     deletePerson: fail,
+    listUsers: fail,
+    setUserSuits: fail,
+    listRsvps: fail,
+    getRiddleCodes: fail,
+    getPrintDesign: fail,
+    savePrintDesign: fail,
     getSettings: fail,
     updateSettings: fail,
   };

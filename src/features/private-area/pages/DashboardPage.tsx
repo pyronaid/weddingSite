@@ -1,34 +1,26 @@
-import { Link } from 'react-router';
 import formStyles from '../../../components/Form/Form.module.css';
-import { CardHeader } from '../../../components/InfoCard/CardHeader';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { SUITS } from '../../../services/game';
 import { SuitCard } from '../components/SuitCard/SuitCard';
 import { useGameProgress } from '../game/useGameProgress';
-import { OrganiserPanel } from '../admin/OrganiserPanel';
 import { useMessages } from '../../../i18n';
 import { authMessages } from '../messages/auth';
-import { useAuth } from '../useAuth';
+import { AreaLayout } from './AreaLayout';
 import styles from './pages.module.css';
 
 /**
  * Landing page of the private area: game intro and progress per suit, for
- * everybody. Organisers play too: their suits to edit come below.
+ * everybody. Organisers play too: this is their "My game" tab.
  */
 export function DashboardPage() {
   const t = useMessages(authMessages);
   useDocumentTitle(t.privateArea);
-  const { user, auth } = useAuth();
-  const firstName = user?.name.split(' ')[0] || t.dashboard.friend;
   const game = useGameProgress();
   const progress = game.status === 'success' ? game.data : undefined;
 
   return (
-    <div className={styles.stack}>
-      <CardHeader id="dashboard-title" eyebrow={t.privateArea} title={t.dashboard.hello(firstName)} />
-      <p className={styles.center}>
-        {t.dashboard.intro}
-      </p>
+    <AreaLayout current="game">
+      <p className={styles.center}>{t.dashboard.intro}</p>
 
       <section aria-labelledby="collection-title" aria-busy={game.status === 'loading'}>
         <h3 id="collection-title" className={styles.sectionTitle}>
@@ -52,15 +44,6 @@ export function DashboardPage() {
           ))}
         </div>
       </section>
-
-      <OrganiserPanel />
-
-      <button type="button" className={formStyles.secondary} onClick={() => auth.logout()}>
-        {t.dashboard.logOut}
-      </button>
-      <div className={styles.links}>
-        <Link to="/">{t.dashboard.backToSite}</Link>
-      </div>
-    </div>
+    </AreaLayout>
   );
 }

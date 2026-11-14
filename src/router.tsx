@@ -24,14 +24,27 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        // The organisers of that suit only (admin_suits, set by a superuser), and super admins.
+        // Organisers of any suit (admin_suits, set by a super admin), and super admins: their "Organise" tab.
+        lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireOrganiser }),
+        // admin/<suit>: one sub-tab per suit they edit (admin alone: the first one).
+        children: [{ path: 'admin/:suit?', lazy: async () => ({ Component: (await pages()).OrganisePage }) }],
+      },
+      {
+        // The organisers of that suit only, and super admins.
         lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireSuitAdmin }),
-        children: [{ path: 'admin/suits/:suit', lazy: async () => ({ Component: (await pages()).AdminSuitPage }) }],
+        children: [
+          // One card (the hearts, diamonds and clubs).
+          { path: 'admin/cards/:suit/:rank', lazy: async () => ({ Component: (await pages()).AdminCardPage }) },
+          // Older links to a suit: now a sub-tab of the Organise tab.
+          { path: 'admin/suits/:suit', lazy: async () => ({ Component: (await pages()).AdminSuitPage }) },
+        ],
       },
       {
         // Super admins only (users flagged is_superadmin by a superuser).
         lazy: async () => ({ Component: (await import('./features/private-area/guards')).RequireSuperAdmin }),
-        children: [{ path: 'site', lazy: async () => ({ Component: (await pages()).SiteSettingsPage }) }],
+        // site/general, site/photos, site/organisers, site/rsvps, site/signup-code, site/prints/<sub>
+        // (site alone: the first tab).
+        children: [{ path: 'site/:tab?/:sub?', lazy: async () => ({ Component: (await pages()).SiteSettingsPage }) }],
       },
       {
         lazy: async () => ({ Component: (await import('./features/private-area/guards')).GuestOnly }),

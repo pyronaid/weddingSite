@@ -361,7 +361,212 @@ function deletePerson(app, personId) {
   app.delete(person);
 }
 
+// ---- Registered users (super admins assign the suits) ----
+
+/** Lists of the super admins (users, RSVPs) are paginated, this many per page. */
+const PER_PAGE = 20;
+
+function userView(user) {
+  return {
+    id: user.id,
+    name: user.getString('name'),
+    email: user.getString('email'),
+    verified: user.getBool('verified'),
+    adminSuits: user.getStringSlice('admin_suits'),
+    isSuperAdmin: user.getBool('is_superadmin'),
+  };
+}
+
+/**
+ * `[[a]] LIKE '%q%' OR [[b]] LIKE '%q%'` (case-insensitive for ASCII), with
+ * % and _ taken literally (e-mails often have an _): escaped here and
+ * declared with ESCAPE, which SQLite needs to honour the escapes.
+ */
+function containsAny(columns, q) {
+  const pattern = `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+  return $dbx.exp(columns.map((column) => `[[${column}]] LIKE {:pattern} ESCAPE '\\'`).join(' OR '), { pattern });
+}
+
+/**
+ * One page of `collection` matching `where`: counted in SQL, then never more
+ * than PER_PAGE records loaded. The page is clamped to the existing ones.
+ */
+function paginate(app, collection, where, orderBy, page, view) {
+  const totalItems = app.countRecords(collection, where);
+  const totalPages = Math.max(1, Math.ceil(totalItems / PER_PAGE));
+  const current = Math.min(Math.max(1, parseInt(page, 10) || 1), totalPages);
+  // The same condition as the count, so pages and totals always agree.
+  const items = arrayOf(new Record());
+  app
+    .recordQuery(collection)
+    .andWhere(where)
+    .orderBy(...orderBy)
+    .limit(PER_PAGE)
+    .offset((current - 1) * PER_PAGE)
+    .all(items);
+  return { items: items.map(view), page: current, perPage: PER_PAGE, totalItems, totalPages };
+}
+
+/** One page of the registered users, by name; `query` filters by name or e-mail. */
+function listUsers(app, query, page) {
+  const q = cleanText(query).slice(0, 100);
+  const where = q ? containsAny(['name', 'email'], q) : $dbx.exp('1=1');
+  return paginate(app, 'users', where, ['LOWER([[name]]) ASC', 'email ASC'], page, userView);
+}
+
+// ---- Prints (super admins) ----
+
+/**
+ * The clubs with the secret code of their QR poster (/area/riddles/<code>),
+ * and whether guests can already play them. The codes are secret: super
+ * admins only, to print the posters.
+ */
+function riddleCodes(app) {
+  return app.findRecordsByFilter('cards', 'suit = {:suit}', 'rank', 0, 0, { suit: RIDDLE_SUIT }).map((card) => ({
+    id: card.id,
+    rank: card.getInt('rank'),
+    code: card.getString('code'),
+    ready: card.getString('riddle') !== '' && card.getString('solution') !== '',
+  }));
+}
+
+/** The kinds of print designs saved for the super admins. */
+const PRINT_DESIGN_KINDS = ['logo', 'invitation', 'website'];
+/** A design is a small object of choices: well under this once in JSON. */
+const PRINT_DESIGN_MAX = 16000;
+
+function printDesignKind(app, kind) {
+  if (!PRINT_DESIGN_KINDS.includes(kind)) throw new NotFoundError(t(app, 'not_found'));
+  return kind;
+}
+
+function printDesignView(record) {
+  if (!record) return { design: null, updated: null };
+  let design = null;
+  try {
+    design = JSON.parse(record.getString('design') || 'null');
+  } catch {
+    // Unreadable: as if never saved.
+  }
+  return { design, updated: record.getDateTime('updated').string() };
+}
+
+function findPrintDesign(app, kind) {
+  try {
+    return app.findFirstRecordByFilter('print_designs', 'kind = {:kind}', { kind });
+  } catch {
+    return null;
+  }
+}
+
+/** The saved choices of a designer (`design` null when never saved). */
+function getPrintDesign(app, kind) {
+  return printDesignView(findPrintDesign(app, printDesignKind(app, kind)));
+}
+
+/**
+ * Saves the choices of a designer, replacing the previous ones (last save
+ * wins). Stored as given: the site checks every field when it loads them.
+ */
+function savePrintDesign(app, kind, design, userId) {
+  printDesignKind(app, kind);
+  if (!design || typeof design !== 'object' || Array.isArray(design)) {
+    throw new BadRequestError(t(app, 'check_fields'));
+  }
+  const json = JSON.stringify(design);
+  if (json.length > PRINT_DESIGN_MAX) throw new BadRequestError(t(app, 'check_fields'));
+  let record = findPrintDesign(app, kind);
+  if (!record) {
+    record = new Record(app.findCollectionByNameOrId('print_designs'));
+    record.set('kind', kind);
+  }
+  record.set('design', JSON.parse(json));
+  record.set('updated_by', userId);
+  saveOrBadRequest(app, record);
+  return printDesignView(record);
+}
+
+// ---- RSVPs (super admins) ----
+
+// A guest may reply again (e.g. "yes" then "no"): only their latest reply,
+// by e-mail, counts. `r` is the reply being checked.
+const NEWER_REPLY_EXISTS = `EXISTS (SELECT 1 FROM rsvps n WHERE LOWER(n.email) = LOWER(r.email)
+  AND (n.created > r.created OR (n.created = r.created AND n.id > r.id)))`;
+
+function rsvpView(app) {
+  return (rsvp) => ({
+    id: rsvp.id,
+    fullName: rsvp.getString('full_name'),
+    email: rsvp.getString('email'),
+    attending: rsvp.getBool('attending'),
+    guests: rsvp.getInt('guests'),
+    dietaryNotes: rsvp.getString('dietary_notes'),
+    message: rsvp.getString('message'),
+    created: rsvp.getDateTime('created').string(),
+    // An older reply of a guest who replied again: shown, but not counted.
+    replaced:
+      app.countRecords(
+        'rsvps',
+        $dbx.exp(
+          'LOWER([[email]]) = LOWER({:email}) AND ([[created]] > {:created} OR ([[created]] = {:created} AND [[id]] > {:id}))',
+          { email: rsvp.getString('email'), created: rsvp.getString('created'), id: rsvp.id },
+        ),
+      ) > 0,
+  });
+}
+
+/** The headcount, from the latest reply of each guest. */
+function rsvpSummary(app) {
+  const result = new DynamicModel({ replies: 0, attending: 0, declined: 0, guests: 0 });
+  app
+    .db()
+    .newQuery(
+      `SELECT COUNT(*) AS replies,
+         COALESCE(SUM(CASE WHEN r.attending THEN 1 ELSE 0 END), 0) AS attending,
+         COALESCE(SUM(CASE WHEN r.attending THEN 0 ELSE 1 END), 0) AS declined,
+         COALESCE(SUM(CASE WHEN r.attending THEN r.guests ELSE 0 END), 0) AS guests
+       FROM rsvps r WHERE NOT ${NEWER_REPLY_EXISTS}`,
+    )
+    .one(result);
+  return { replies: result.replies, attending: result.attending, declined: result.declined, guests: result.guests };
+}
+
+/**
+ * One page of the replies, newest first; `query` filters by name or e-mail,
+ * `attending` ('yes' / 'no' / anything else for all) by answer. The summary
+ * is always about every guest, whatever the filter.
+ */
+function listRsvps(app, query, attending, page) {
+  const q = cleanText(query).slice(0, 100);
+  const filters = [];
+  if (q) filters.push(containsAny(['full_name', 'email'], q));
+  if (attending === 'yes') filters.push($dbx.exp('[[attending]] = TRUE'));
+  if (attending === 'no') filters.push($dbx.exp('[[attending]] = FALSE'));
+  const where = filters.length ? $dbx.and(...filters) : $dbx.exp('1=1');
+  return {
+    ...paginate(app, 'rsvps', where, ['created DESC', 'id DESC'], page, rsvpView(app)),
+    summary: rsvpSummary(app),
+  };
+}
+
+/** Sets the suits a user organises (any of the four, no duplicates). */
+function setUserSuits(app, userId, suits) {
+  const user = findRecord(app, 'users', userId);
+  const list = Array.isArray(suits) ? suits.map(String) : [];
+  if (list.some((suit) => !SUITS.includes(suit))) throw new BadRequestError(t(app, 'unknown_suit'));
+  // In the usual order, whatever order they were ticked in.
+  user.set('admin_suits', SUITS.filter((suit) => list.includes(suit)));
+  saveOrBadRequest(app, user);
+  return userView(user);
+}
+
 module.exports = {
+  listUsers,
+  listRsvps,
+  riddleCodes,
+  getPrintDesign,
+  savePrintDesign,
+  setUserSuits,
   requireSuitAdmin,
   requireSuperAdmin,
   requireAdminOf,

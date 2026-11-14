@@ -61,6 +61,82 @@ export interface AdminPerson extends PersonFields {
   found: number;
 }
 
+/** A registered user, as the super admins see them to assign the suits. */
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  verified: boolean;
+  /** The suits they organise. */
+  adminSuits: Suit[];
+  /** Super admins organise every suit anyway. */
+  isSuperAdmin: boolean;
+}
+
+/** One page of a super admin's list (20 per page, filtered and counted by the server). */
+export interface AdminPage<T> {
+  items: T[];
+  /** 1-based; clamped by the server to the existing pages. */
+  page: number;
+  perPage: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export type AdminUsersPage = AdminPage<AdminUser>;
+
+/** A reply to the invitation, as the guest sent it. */
+export interface AdminRsvp {
+  id: string;
+  fullName: string;
+  email: string;
+  attending: boolean;
+  /** People coming, the guest included (0 when not attending). */
+  guests: number;
+  dietaryNotes: string;
+  message: string;
+  /** ISO date and time it was sent. */
+  created: string;
+  /** An older reply of a guest who replied again: not counted. */
+  replaced: boolean;
+}
+
+export type RsvpFilter = 'all' | 'yes' | 'no';
+
+/** The headcount, from the latest reply of each guest (by e-mail). */
+export interface RsvpSummary {
+  replies: number;
+  attending: number;
+  declined: number;
+  /** People coming in total. */
+  guests: number;
+}
+
+export interface AdminRsvpsPage extends AdminPage<AdminRsvp> {
+  /** About every reply, whatever the filter. */
+  summary: RsvpSummary;
+}
+
+/** A club with the secret code of its QR poster. */
+export interface RiddleCode {
+  id: string;
+  rank: Rank;
+  /** The poster's QR code opens /area/riddles/<code>. */
+  code: string;
+  /** Riddle and solution set: guests can play it. */
+  ready: boolean;
+}
+
+/** What the Prints designers save: the logo's choices, the invitation's, the website in the QR codes. */
+export type PrintDesignKind = 'logo' | 'invitation' | 'website';
+
+export interface SavedPrintDesign {
+  /** The saved choices, as stored (checked by the designers before use); null when never saved. */
+  design: unknown;
+  /** ISO date of the last save. */
+  updated: string | null;
+}
+
 export interface AdminSettings {
   /** Code required to create an account. */
   signupCode: string;
@@ -85,6 +161,18 @@ export interface AdminRepository {
   updatePerson(personId: string, person: PersonFields): Promise<AdminPerson>;
   /** Refused once the person was given to a player. */
   deletePerson(personId: string): Promise<void>;
+  /** Super admins: one page (20) of the registered users whose name or e-mail contains `query`. */
+  listUsers(query: string, page: number): Promise<AdminUsersPage>;
+  /** Super admins: the suits a user organises. */
+  setUserSuits(userId: string, suits: Suit[]): Promise<AdminUser>;
+  /** Super admins: one page (20) of the RSVPs, newest first, with the headcount. */
+  listRsvps(query: string, attending: RsvpFilter, page: number): Promise<AdminRsvpsPage>;
+  /** Super admins: the clubs and the secret codes of their posters. */
+  getRiddleCodes(): Promise<RiddleCode[]>;
+  /** Super admins: the saved choices of a Prints designer. */
+  getPrintDesign(kind: PrintDesignKind): Promise<SavedPrintDesign>;
+  /** Super admins: saves them (last save wins). */
+  savePrintDesign(kind: PrintDesignKind, design: object): Promise<SavedPrintDesign>;
   getSettings(): Promise<AdminSettings>;
   updateSettings(settings: AdminSettings): Promise<AdminSettings>;
 }

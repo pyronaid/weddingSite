@@ -72,6 +72,7 @@
 
 .suitGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 2 columns, 4 on the organisers' wide page. */
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 40%), 1fr));
   gap: 0.9rem;
 }
