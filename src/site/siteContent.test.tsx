@@ -57,6 +57,19 @@ function renderHome(site: SiteRepository) {
 }
 
 describe('site content', () => {
+  it('never shows the new content in the old language, not even for a moment', async () => {
+    // Every state of the page while the content arrives (each batch of DOM changes).
+    const seen: string[] = [];
+    const observer = new MutationObserver(() => seen.push(document.body.textContent ?? ''));
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    renderHome(repository(italian));
+    expect(await screen.findByRole('heading', { name: 'Il grande giorno' })).toBeInTheDocument();
+    observer.disconnect();
+    // The Italian couple's names never next to the English section titles.
+    const mixed = seen.filter((text) => text.includes('Sofia') && text.includes('The Big Day'));
+    expect(mixed).toEqual([]);
+  });
+
   it('shows the public page with the content and in the language chosen by the super admin', async () => {
     renderHome(repository(italian));
 
@@ -94,7 +107,10 @@ describe('site content', () => {
   });
 
   it('shows the last content seen at once, then refreshes it', async () => {
-    localStorage.setItem('site-content-v1', JSON.stringify({ ...italian, couple: { ...italian.couple, partnerTwo: 'Marco' } }));
+    localStorage.setItem(
+      'site-content-v1',
+      JSON.stringify({ ...italian, couple: { ...italian.couple, partnerTwo: 'Marco' } }),
+    );
     renderHome(repository(italian));
 
     // From the browser cache, before the server answers.
