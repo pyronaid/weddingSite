@@ -119,11 +119,12 @@ export function paint(file: BorderFile, color: string, idPrefix: string): string
   const prefix = `${idPrefix}-${file.id}`;
   const content = file.content
     // Ids and the references to them: unique on the page.
-    .replace(/\sid\s*=\s*(["'])([^"']+)\1/g, ` id="${prefix}-$2"`)
+    // (The whitespace before each attribute is kept as it is: the same output whatever the line endings.)
+    .replace(/(\s)id\s*=\s*(["'])([^"']+)\2/g, `$1id="${prefix}-$3"`)
     .replace(/url\(\s*['"]?#([^)'"]+)['"]?\s*\)/g, `url(#${prefix}-$1)`)
     .replace(/(\s(?:xlink:)?href\s*=\s*["'])#/g, `$1#${prefix}-`)
     // One colour: every fill and stroke that is not "none".
-    .replace(/\s(fill|stroke|stop-color|color)\s*=\s*(["'])(?!none\2)[^"']*\2/gi, ` $1="${color}"`);
+    .replace(/(\s)(fill|stroke|stop-color|color)\s*=\s*(["'])(?!none\3)[^"']*\3/gi, `$1$2="${color}"`);
   // Shapes without a fill of their own are black in SVG: the colour instead.
   return `<g fill="${color}" color="${color}">${content}</g>`;
 }
