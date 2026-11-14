@@ -100,6 +100,7 @@ describe('monogram', () => {
     },
   );
 
+
   it('reads the room a border leaves for the letters', () => {
     const file = (attrs: string) =>
       parseBorderFile(
