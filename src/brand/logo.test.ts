@@ -167,8 +167,8 @@ describe('monogram', () => {
     }
   });
 
-  describe('spaced letters: the same share for both, the separator in the middle', () => {
-    /** Where each drawn item's outline is centred on the 1000-wide canvas, and the canvas size of `box` em units. */
+  describe('spaced letters: the same share for both, facing each other across the middle', () => {
+    /** Where each drawn item's outline starts, ends and is centred on the 1000-wide canvas. */
     function measure(changes: Partial<MonogramDesign>, boxes: [number, number, number, number][]) {
       const { body } = monogramParts(design({ font: 'sans', ...changes }), fonts);
       const [, tx, , scale] = /<g transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)">/
@@ -177,48 +177,49 @@ describe('monogram', () => {
       const items = [
         ...body.matchAll(/<path transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)" d="([^"]+)"/g),
       ].slice(-boxes.length);
-      const centres = items.map(
-        ([, x, , s], i) => tx + scale * (Number(x) + Number(s) * ((boxes[i][0] + boxes[i][2]) / 2)),
-      );
-      return { centres, canvas: (emUnits: number) => emUnits * scale, items };
+      const at = (i: number, v: number) => tx + scale * (Number(items[i][1]) + Number(items[i][3]) * v);
+      const edges = boxes.map((b, i) => ({ left: at(i, b[0]), right: at(i, b[2]), centre: at(i, (b[0] + b[2]) / 2) }));
+      return { edges, canvas: (emUnits: number) => emUnits * scale, items };
     }
     const I = sans.glyphs.I.box;
     const W = sans.glyphs.W.box;
     const heart: [number, number, number, number] = [-575, -475, 575, 425];
     const box = Math.max(I[2] - I[0], W[2] - W[0]);
 
-    it('side by side: 48% and 48% of the width, symmetric even for a narrow I and a wide W', () => {
-      const { centres, canvas } = measure({ arrangement: 'aligned', letters: ['I', 'W'] }, [I, W]);
-      const [first, second] = centres;
-      // Symmetric around the middle of the logo.
-      expect(first + second).toBeCloseTo(1000, 0);
-      // Box centres one box (48%) plus the gap (4%) apart: 52% of the whole, with box = 48%.
+    it('side by side: 48% each, the first against the right of its share, the second against the left of its own', () => {
+      const { edges, canvas } = measure({ arrangement: 'aligned', letters: ['I', 'W'] }, [I, W]);
+      const [first, second] = edges;
       const unit = canvas(box) / SPACING.plain.letter;
-      expect(second - first).toBeCloseTo((SPACING.plain.letter + SPACING.plain.gap) * unit, 0);
+      // Facing each other across the 4% gap, centred on the middle of the logo.
+      expect(second.left - first.right).toBeCloseTo(SPACING.plain.gap * unit, 0);
+      expect((first.right + second.left) / 2).toBeCloseTo(500, 0);
+      // The wide W fills its share; the narrow I leans on the gap, not centred in its share.
+      expect(second.right - second.left).toBeCloseTo(SPACING.plain.letter * unit, 0);
+      expect(first.right - first.left).toBeLessThan((SPACING.plain.letter * unit) / 2);
     });
 
-    it('with a separator: 40%, 15% in the middle, 40%', () => {
-      const { centres, canvas, items } = measure({ arrangement: 'aligned', letters: ['I', 'W'], separator: 'heart' }, [
+    it('with a separator: 40%, 15% in the middle, 40%, the letters against the separator side', () => {
+      const { edges, canvas, items } = measure({ arrangement: 'aligned', letters: ['I', 'W'], separator: 'heart' }, [
         I,
         heart,
         W,
       ]);
       expect(items[1][4]).toBe(HEART_PATH);
-      const [first, separator, second] = centres;
-      expect(separator).toBeCloseTo(500, 0);
-      expect(first + second).toBeCloseTo(1000, 0);
+      const [first, separator, second] = edges;
       const { letter, gap, separator: share } = SPACING.separated;
       const unit = canvas(box) / letter;
-      expect(second - first).toBeCloseTo((letter + 2 * gap + share) * unit, 0);
+      expect(separator.centre).toBeCloseTo(500, 0);
+      expect(second.left - first.right).toBeCloseTo((2 * gap + share) * unit, 0);
+      expect((first.right + second.left) / 2).toBeCloseTo(500, 0);
       // The separator fits in its 15%.
-      expect(canvas(heart[2] - heart[0]) * Number(items[1][3])).toBeLessThanOrEqual(share * unit + 0.5);
+      expect(separator.right - separator.left).toBeLessThanOrEqual(share * unit + 0.5);
     });
 
-    it('diagonal: symmetric too, the separator midway', () => {
-      const { centres } = measure({ arrangement: 'diagonal', letters: ['I', 'W'], separator: 'heart' }, [I, heart, W]);
-      const [first, separator, second] = centres;
-      expect(separator).toBeCloseTo(500, 0);
-      expect(first + second).toBeCloseTo(1000, 0);
+    it('diagonal: the same, the separator midway', () => {
+      const { edges } = measure({ arrangement: 'diagonal', letters: ['I', 'W'], separator: 'heart' }, [I, heart, W]);
+      const [first, separator, second] = edges;
+      expect(separator.centre).toBeCloseTo(500, 0);
+      expect((first.right + second.left) / 2).toBeCloseTo(500, 0);
     });
   });
 
