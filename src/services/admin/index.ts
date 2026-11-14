@@ -31,6 +31,8 @@ export function createAdminRepository(): AdminRepository {
     setUserSuits: fail,
     listRsvps: fail,
     getRiddleCodes: fail,
+    getPrintDesign: fail,
+    savePrintDesign: fail,
     getSettings: fail,
     updateSettings: fail,
   };

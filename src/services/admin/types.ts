@@ -127,6 +127,16 @@ export interface RiddleCode {
   ready: boolean;
 }
 
+/** What the Prints designers save: the logo's choices, the invitation's, the website in the QR codes. */
+export type PrintDesignKind = 'logo' | 'invitation' | 'website';
+
+export interface SavedPrintDesign {
+  /** The saved choices, as stored (checked by the designers before use); null when never saved. */
+  design: unknown;
+  /** ISO date of the last save. */
+  updated: string | null;
+}
+
 export interface AdminSettings {
   /** Code required to create an account. */
   signupCode: string;
@@ -159,6 +169,10 @@ export interface AdminRepository {
   listRsvps(query: string, attending: RsvpFilter, page: number): Promise<AdminRsvpsPage>;
   /** Super admins: the clubs and the secret codes of their posters. */
   getRiddleCodes(): Promise<RiddleCode[]>;
+  /** Super admins: the saved choices of a Prints designer. */
+  getPrintDesign(kind: PrintDesignKind): Promise<SavedPrintDesign>;
+  /** Super admins: saves them (last save wins). */
+  savePrintDesign(kind: PrintDesignKind, design: object): Promise<SavedPrintDesign>;
   getSettings(): Promise<AdminSettings>;
   updateSettings(settings: AdminSettings): Promise<AdminSettings>;
 }

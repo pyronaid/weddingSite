@@ -1,4 +1,4 @@
-import { border, CANVAS, type BorderStyle } from './borders';
+import { border, BORDER_STYLES, CANVAS, type BorderStyle } from './borders';
 import type { Glyph, GlyphFont } from './glyphs/types';
 import { HEART_PATH } from './ornaments';
 
@@ -269,4 +269,37 @@ export function monogramSvg(
 ${background ? `<rect width="${CANVAS}" height="${CANVAS}" fill="${background}"/>` : ''}${body}
 </svg>
 `;
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+const record = (raw: unknown): Record<string, unknown> =>
+  raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+export const sanitizeColor = (value: unknown, fallback: string) =>
+  typeof value === 'string' && HEX.test(value) ? value.toLowerCase() : fallback;
+export const oneOf = <T extends string>(value: unknown, options: readonly T[], fallback: T): T =>
+  options.includes(value as T) ? (value as T) : fallback;
+
+/**
+ * A design as loaded from storage, made safe to draw: every field checked,
+ * anything unknown or malformed replaced by the default. (Colours end up in
+ * SVG attributes: only #rrggbb gets through.)
+ */
+export function sanitizeMonogram(raw: unknown): MonogramDesign {
+  const d = DEFAULT_MONOGRAM;
+  const r = record(raw);
+  const letter = (value: unknown, fallback: string) =>
+    typeof value === 'string' ? [...value.trim()].slice(0, 1).join('').toLocaleUpperCase() : fallback;
+  const letters = Array.isArray(r.letters) ? r.letters : [];
+  const colors = Array.isArray(r.colors) ? r.colors : [];
+  return {
+    letters: [letter(letters[0], d.letters[0]), letter(letters[1], d.letters[1])],
+    colors: [sanitizeColor(colors[0], d.colors[0]), sanitizeColor(colors[1], d.colors[1])],
+    arrangement: oneOf(r.arrangement, ARRANGEMENTS, d.arrangement),
+    separator: oneOf(r.separator, SEPARATORS, d.separator),
+    customSeparator: typeof r.customSeparator === 'string' ? r.customSeparator.slice(0, 3) : d.customSeparator,
+    separatorColor: sanitizeColor(r.separatorColor, d.separatorColor),
+    font: oneOf(r.font, MONOGRAM_FONTS, d.font),
+    border: oneOf(r.border, BORDER_STYLES, d.border),
+    borderColor: sanitizeColor(r.borderColor, d.borderColor),
+  };
 }

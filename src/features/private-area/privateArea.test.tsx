@@ -250,6 +250,8 @@ function createFakeAdmin(overrides: Partial<AdminRepository> = {}): AdminReposit
     listUsers: vi.fn(async () => ({ items: [], page: 1, perPage: 20, totalItems: 0, totalPages: 1 })),
     setUserSuits: vi.fn(),
     getRiddleCodes: vi.fn(async () => []),
+    getPrintDesign: vi.fn(async () => ({ design: null, updated: null })),
+    savePrintDesign: vi.fn(async (_kind, design) => ({ design, updated: null })),
     listRsvps: vi.fn(async () => ({
       items: [],
       page: 1,

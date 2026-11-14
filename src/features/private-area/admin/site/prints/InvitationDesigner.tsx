@@ -1,14 +1,14 @@
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import formStyles from '../../../../../components/Form/Form.module.css';
 import { loadGlyphFonts } from '../../../../../brand/glyphs';
 import { monogramParts } from '../../../../../brand/monogram';
-import { usePersistentState } from '../../../../../hooks/usePersistentState';
 import { getLanguage, isLanguage, LANGUAGES, LOCALES, useMessages, type Language } from '../../../../../i18n';
 import { DECORATIONS, spray } from '../../../../../prints/decorations';
 import {
   DEFAULT_INVITATION,
   INVITATION_SIZES,
   invitationSvg,
+  sanitizeInvitation,
   type InvitationDesign,
   type InvitationSize,
   type NameLines,
@@ -25,7 +25,9 @@ import { useAdminRepository } from '../../AdminRepositoryContext';
 import { ColorPicker } from './ColorPicker';
 import { ExportButton } from './ExportButton';
 import styles from './prints.module.css';
+import { SaveStatus } from './SaveStatus';
 import { useLogoDesign } from './useLogoDesign';
+import { useSavedDesign } from './useSavedDesign';
 
 const SIZES = Object.keys(INVITATION_SIZES) as InvitationSize[];
 const NAME_LINES: NameLines[] = ['none', 'one', 'two'];
@@ -54,12 +56,12 @@ export function InvitationDesigner({ url }: { url: string }) {
   const { repository: siteRepository } = useSiteContent();
   const repository = useAdminRepository();
   const { auth } = useAuth();
-  // First time: in the language of the site.
-  const [design, setDesign] = usePersistentState<InvitationDesign>('prints.invitation.v1', {
-    ...DEFAULT_INVITATION,
-    language: getLanguage(),
-  });
-  const [logoDesign] = useLogoDesign();
+  // Never saved: in the language of the site.
+  const sanitize = useCallback((raw: unknown) => sanitizeInvitation(raw, getLanguage()), []);
+  const saved = useSavedDesign('invitation', { sanitize, legacyKey: 'wedding.prints.invitation.v1' });
+  const design = saved.design ?? { ...DEFAULT_INVITATION, language: getLanguage() };
+  const setDesign = saved.setDesign;
+  const logoDesign = useLogoDesign().design;
   const [fonts, setFonts] = useState<Awaited<ReturnType<typeof loadGlyphFonts>> | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>({ status: 'loading' });
@@ -92,13 +94,13 @@ export function InvitationDesigner({ url }: { url: string }) {
 
   const data = state.status === 'ready' ? state.data : null;
   const svg =
-    data && fonts
+    data && fonts && saved.design
       ? invitationSvg({
           design: { ...design, language },
           content: data.content,
           url,
           qrSvg: data.qr,
-          logo: design.logo ? monogramParts(logoDesign, fonts, `${id}-logo`) : undefined,
+          logo: design.logo && logoDesign ? monogramParts(logoDesign, fonts, `${id}-logo`) : undefined,
           signupCode: data.signupCode,
           locale: LOCALES[language],
           texts: card,
@@ -177,6 +179,7 @@ export function InvitationDesigner({ url }: { url: string }) {
             // Our own SVG (every text escaped): inline, so it uses the page's fonts.
             dangerouslySetInnerHTML={svg ? { __html: svg } : undefined}
           />
+          <SaveStatus status={saved.status} error={saved.error} onRetry={saved.retry} />
           <div className={styles.actions}>
             <ExportButton
               label={t.print}
@@ -214,7 +217,8 @@ export function InvitationDesigner({ url }: { url: string }) {
           </div>
         </div>
 
-        <div className={styles.options}>
+        {/* Disabled until the saved choices are there: nothing edited is lost or overwritten. */}
+        <fieldset className={styles.options} disabled={!saved.design}>
           <fieldset className={styles.choices}>
             <legend>{inv.size}</legend>
             {SIZES.map((value) => (
@@ -344,7 +348,7 @@ export function InvitationDesigner({ url }: { url: string }) {
               names={t.colours.names}
             />
           )}
-        </div>
+        </fieldset>
       </div>
     </section>
   );

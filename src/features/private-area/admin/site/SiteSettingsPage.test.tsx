@@ -9,6 +9,7 @@ import {
   type AdminRsvpsPage,
   type AdminUser,
   type AdminUsersPage,
+  type PrintDesignKind,
   type RsvpFilter,
 } from '../../../../services/admin';
 import type { Rank, Suit } from '../../../../services/game';
@@ -176,7 +177,10 @@ function listReplies(query: string, attending: RsvpFilter, page: number): AdminR
   };
 }
 
-function fakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
+/** The Prints designs saved "on the server", shared by the renders that use the same store. */
+type DesignStore = Partial<Record<PrintDesignKind, object>>;
+
+function fakeAdmin(overrides: Partial<AdminRepository> = {}, designs: DesignStore = {}): AdminRepository {
   const fail = vi.fn().mockRejectedValue(new Error('not used here'));
   return {
     getSuit: fail,
@@ -205,6 +209,11 @@ function fakeAdmin(overrides: Partial<AdminRepository> = {}): AdminRepository {
         ready: i !== 4,
       })),
     ),
+    getPrintDesign: vi.fn(async (kind: PrintDesignKind) => ({ design: designs[kind] ?? null, updated: null })),
+    savePrintDesign: vi.fn(async (kind: PrintDesignKind, design: object) => {
+      designs[kind] = design;
+      return { design, updated: '2026-11-14T10:00:00Z' };
+    }),
     listRsvps: vi.fn(async (query: string, attending: RsvpFilter, page: number) => listReplies(query, attending, page)),
     setUserSuits: vi.fn(async (userId: string, suits: Suit[]) => ({
       ...guests.find((g) => g.id === userId)!,
@@ -690,10 +699,6 @@ describe('site settings (super admin)', () => {
       content: await (createObjectURL.mock.calls.at(-1)![0] as Blob).text(),
     });
 
-    const cleanupAndOpen = (sub: string) => {
-      cleanup();
-      return open(sub);
-    };
     const open = (sub: string, admin = fakeAdmin(), repository = fakeRepository()) => {
       const { router } = renderPage(repository, vi.fn(), `/area/site/prints${sub}`, admin);
       return { admin, repository, router };
@@ -766,19 +771,93 @@ describe('site settings (super admin)', () => {
         expect(preview.innerHTML).toContain('fill="#00aa11"');
       });
 
-      it('remembers the design in this browser', async () => {
-        open('/logo');
+      it('saves every choice on the account: another browser goes on from there', async () => {
+        const designs: DesignStore = {};
+        const admin = fakeAdmin({}, designs);
+        open('/logo', admin);
         const user = userEvent.setup();
         await screen.findByRole('img', { name: 'Logo G V' });
         await user.click(screen.getByRole('radio', { name: 'Big flowers' }));
         await user.clear(screen.getByLabelText('Second letter'));
         await user.type(screen.getByLabelText('Second letter'), 'm');
-        cleanupAndOpen('/logo');
+        await user.click(
+          within(screen.getByRole('group', { name: 'Colour of the first letter' })).getByRole('radio', {
+            name: 'Navy',
+          }),
+        );
+        expect(screen.getByText('Saving…')).toBeInTheDocument();
+        // One save for the whole burst of changes, once they stop.
+        await waitFor(() => expect(admin.savePrintDesign).toHaveBeenCalledTimes(1), { timeout: 3000 });
+        expect(await screen.findByText(/Saved ✓/)).toBeInTheDocument();
+        expect(designs.logo).toMatchObject({
+          letters: ['G', 'M'],
+          border: 'flowersBig',
+          colors: ['#2f3e5c', '#c24f78'],
+        });
+
+        // Another browser: nothing in its storage, the same account.
+        cleanup();
+        window.localStorage.clear();
+        open('/logo', fakeAdmin({}, designs));
         expect(await screen.findByRole('img', { name: 'Logo G M' })).toBeInTheDocument();
+        // The form shows the saved choices, so it matches the picture.
+        expect(screen.getByLabelText('Second letter')).toHaveValue('M');
         expect(screen.getByRole('radio', { name: 'Big flowers' })).toBeChecked();
+        expect(
+          within(screen.getByRole('group', { name: 'Colour of the first letter' })).getByRole('radio', {
+            name: 'Navy',
+          }),
+        ).toBeChecked();
 
         await user.click(screen.getByRole('button', { name: 'Start again' }));
         expect(screen.getByRole('img', { name: 'Logo G V' })).toBeInTheDocument();
+      });
+
+      it('moves a design made in this browser before to the account', async () => {
+        window.localStorage.setItem(
+          'wedding.prints.logo.v1',
+          JSON.stringify({ letters: ['R', 'M'], border: 'circles' }),
+        );
+        const designs: DesignStore = {};
+        const admin = fakeAdmin({}, designs);
+        open('/logo', admin);
+        expect(await screen.findByRole('img', { name: 'Logo R M' })).toBeInTheDocument();
+        await waitFor(() => expect(designs.logo).toMatchObject({ letters: ['R', 'M'], border: 'circles' }));
+        expect(window.localStorage.getItem('wedding.prints.logo.v1')).toBeNull();
+      });
+
+      it('never draws what is unsafe or unknown in a saved design', async () => {
+        open(
+          '/logo',
+          fakeAdmin(
+            {},
+            { logo: { letters: ['<', 'b'], colors: ['"/><script>alert(1)</script>', '#00aa11'], border: 'nonsense' } },
+          ),
+        );
+        const preview = await screen.findByRole('img', { name: 'Logo < B' });
+        expect(preview.innerHTML).not.toContain('<script');
+        expect(preview.innerHTML).toContain('fill="#6d3350"');
+        expect(preview.innerHTML).toContain('fill="#00aa11"');
+        expect(screen.getByRole('radio', { name: 'None', checked: true })).toBeInTheDocument();
+      });
+
+      it('says when a change could not be saved, and tries again', async () => {
+        const admin = fakeAdmin({
+          savePrintDesign: vi
+            .fn()
+            .mockRejectedValueOnce(new AdminError('network', 'The server cannot be reached.'))
+            .mockResolvedValue({ design: {}, updated: null }),
+        });
+        open('/logo', admin);
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
+        await user.click(screen.getByRole('radio', { name: 'Squares' }));
+        expect(
+          await screen.findByText('Not saved: The server cannot be reached.', {}, { timeout: 3000 }),
+        ).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Try again' }));
+        expect(await screen.findByText(/Saved ✓/)).toBeInTheDocument();
+        expect(admin.savePrintDesign).toHaveBeenCalledTimes(2);
       });
     });
 
@@ -846,8 +925,7 @@ describe('site settings (super admin)', () => {
       });
 
       it('shows the logo designed in the Logo tab, or none', async () => {
-        window.localStorage.setItem('wedding.prints.logo.v1', JSON.stringify({ letters: ['A', 'B'], font: 'sans' }));
-        open('/invitations');
+        open('/invitations', fakeAdmin({}, { logo: { letters: ['A', 'B'], font: 'sans' } }));
         const user = userEvent.setup();
         await ready();
         const { sans } = await import('../../../../brand/glyphs/sans');

@@ -25,6 +25,8 @@
  *   PATCH  /api/admin/users/{userId}            {adminSuits: [suits]} (super admins)
  *   GET    /api/admin/rsvps?q=&attending=&page= RSVPs, 20 per page, newest first, + headcount (super admins)
  *   GET    /api/admin/prints/riddles            clubs with the secret code of their poster (super admins)
+ *   GET    /api/admin/prints/designs/{kind}     saved choices of a designer: logo, invitation, website (super admins)
+ *   PUT    /api/admin/prints/designs/{kind}     {design}: saves them, last save wins (super admins)
  *   GET    /api/admin/settings                  {signupCode}
  *   PATCH  /api/admin/settings                  {signupCode}
  */
@@ -283,6 +285,31 @@ routerAdd(
     const admin = require(`${__hooks}/lib/admin.js`);
     admin.requireSuperAdmin(e);
     return e.json(200, { cards: admin.riddleCodes(e.app) });
+  },
+  $apis.requireAuth('users'),
+);
+
+// ---- Prints: the designers' choices, saved as the super admins edit them ----
+
+routerAdd(
+  'GET',
+  '/api/admin/prints/designs/{kind}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    return e.json(200, admin.getPrintDesign(e.app, e.request.pathValue('kind')));
+  },
+  $apis.requireAuth('users'),
+);
+
+routerAdd(
+  'PUT',
+  '/api/admin/prints/designs/{kind}',
+  (e) => {
+    const admin = require(`${__hooks}/lib/admin.js`);
+    admin.requireSuperAdmin(e);
+    const body = e.requestInfo().body;
+    return e.json(200, admin.savePrintDesign(e.app, e.request.pathValue('kind'), body.design, e.auth.id));
   },
   $apis.requireAuth('users'),
 );

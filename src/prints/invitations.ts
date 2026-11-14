@@ -1,7 +1,8 @@
-import type { Language } from '../i18n';
+import { isLanguage, type Language } from '../i18n';
+import { oneOf, sanitizeColor } from '../brand/monogram';
 import { formatDeadline, formatWeddingDate } from '../lib/format';
 import type { SiteContent, Venue } from '../services/site';
-import { spray, type Decoration } from './decorations';
+import { DECORATIONS, spray, type Decoration } from './decorations';
 import { escapeXml, nestSvg, PRINT_COLORS, PRINT_FONTS, text, wrapText } from './svg';
 
 export type { Decoration } from './decorations';
@@ -48,6 +49,31 @@ export const DEFAULT_INVITATION: InvitationDesign = {
   decoration: 'plants',
   decorationColor: '#7d9a6a',
 };
+
+const NAME_LINES: NameLines[] = ['none', 'one', 'two'];
+
+/** A design as loaded from storage, made safe to use: every field checked, the rest from the defaults. */
+export function sanitizeInvitation(raw: unknown, language: Language): InvitationDesign {
+  const d = { ...DEFAULT_INVITATION, language };
+  const r: Record<string, unknown> = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const text = (value: unknown, max: number, fallback: string | null) =>
+    value === null ? null : typeof value === 'string' ? value.slice(0, max) : fallback;
+  const flag = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
+  return {
+    size: oneOf(r.size, Object.keys(INVITATION_SIZES) as InvitationSize[], d.size),
+    names: oneOf(r.names, NAME_LINES, d.names),
+    heading: text(r.heading, 80, d.heading),
+    subheading: text(r.subheading, 80, d.subheading),
+    language: isLanguage(r.language) ? r.language : d.language,
+    logo: flag(r.logo, d.logo),
+    qr: flag(r.qr, d.qr),
+    qrText: text(r.qrText, 200, d.qrText),
+    signupCode: flag(r.signupCode, d.signupCode),
+    background: r.background === null ? null : sanitizeColor(r.background, '') || d.background,
+    decoration: oneOf(r.decoration, DECORATIONS, d.decoration),
+    decorationColor: sanitizeColor(r.decorationColor, d.decorationColor),
+  };
+}
 
 /** The texts printed on the card, in its language. */
 export interface CardTexts {

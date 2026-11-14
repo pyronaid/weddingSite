@@ -430,6 +430,62 @@ function riddleCodes(app) {
   }));
 }
 
+/** The kinds of print designs saved for the super admins. */
+const PRINT_DESIGN_KINDS = ['logo', 'invitation', 'website'];
+/** A design is a small object of choices: well under this once in JSON. */
+const PRINT_DESIGN_MAX = 16000;
+
+function printDesignKind(app, kind) {
+  if (!PRINT_DESIGN_KINDS.includes(kind)) throw new NotFoundError(t(app, 'not_found'));
+  return kind;
+}
+
+function printDesignView(record) {
+  if (!record) return { design: null, updated: null };
+  let design = null;
+  try {
+    design = JSON.parse(record.getString('design') || 'null');
+  } catch {
+    // Unreadable: as if never saved.
+  }
+  return { design, updated: record.getDateTime('updated').string() };
+}
+
+function findPrintDesign(app, kind) {
+  try {
+    return app.findFirstRecordByFilter('print_designs', 'kind = {:kind}', { kind });
+  } catch {
+    return null;
+  }
+}
+
+/** The saved choices of a designer (`design` null when never saved). */
+function getPrintDesign(app, kind) {
+  return printDesignView(findPrintDesign(app, printDesignKind(app, kind)));
+}
+
+/**
+ * Saves the choices of a designer, replacing the previous ones (last save
+ * wins). Stored as given: the site checks every field when it loads them.
+ */
+function savePrintDesign(app, kind, design, userId) {
+  printDesignKind(app, kind);
+  if (!design || typeof design !== 'object' || Array.isArray(design)) {
+    throw new BadRequestError(t(app, 'check_fields'));
+  }
+  const json = JSON.stringify(design);
+  if (json.length > PRINT_DESIGN_MAX) throw new BadRequestError(t(app, 'check_fields'));
+  let record = findPrintDesign(app, kind);
+  if (!record) {
+    record = new Record(app.findCollectionByNameOrId('print_designs'));
+    record.set('kind', kind);
+  }
+  record.set('design', JSON.parse(json));
+  record.set('updated_by', userId);
+  saveOrBadRequest(app, record);
+  return printDesignView(record);
+}
+
 // ---- RSVPs (super admins) ----
 
 // A guest may reply again (e.g. "yes" then "no"): only their latest reply,
@@ -508,6 +564,8 @@ module.exports = {
   listUsers,
   listRsvps,
   riddleCodes,
+  getPrintDesign,
+  savePrintDesign,
   setUserSuits,
   requireSuitAdmin,
   requireSuperAdmin,

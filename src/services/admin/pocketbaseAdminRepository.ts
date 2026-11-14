@@ -13,7 +13,9 @@ import type {
   AdminScene,
   AdminSettings,
   NewQuestion,
+  PrintDesignKind,
   RiddleCode,
+  SavedPrintDesign,
   RsvpFilter,
   PersonFields,
 } from './types';
@@ -115,6 +117,14 @@ export class PocketBaseAdminRepository implements AdminRepository {
   async getRiddleCodes(): Promise<RiddleCode[]> {
     const { cards } = await this.call<{ cards: RiddleCode[] }>('/prints/riddles', 'GET');
     return cards;
+  }
+
+  getPrintDesign(kind: PrintDesignKind): Promise<SavedPrintDesign> {
+    return this.call(`/prints/designs/${encodeURIComponent(kind)}`, 'GET');
+  }
+
+  savePrintDesign(kind: PrintDesignKind, design: object): Promise<SavedPrintDesign> {
+    return this.call(`/prints/designs/${encodeURIComponent(kind)}`, 'PUT', { design });
   }
 
   getSettings(): Promise<AdminSettings> {

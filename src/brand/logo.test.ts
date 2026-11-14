@@ -4,7 +4,7 @@ import path from 'node:path';
 import { sans } from './glyphs/sans';
 import { script } from './glyphs/script';
 import { serif } from './glyphs/serif';
-import { DEFAULT_MONOGRAM, monogramParts, monogramSvg, type MonogramDesign } from './monogram';
+import { DEFAULT_MONOGRAM, monogramParts, monogramSvg, sanitizeMonogram, type MonogramDesign } from './monogram';
 import { LOGO_PRESETS, LOGO_SCHEMES, withScheme, type LogoScheme } from './presets';
 
 const fonts = { script, sans, serif };
@@ -97,6 +97,31 @@ describe('monogram', () => {
     const { body } = monogramParts(design({ letters: ['A', ''] }), fonts);
     expect(body).toContain(`d="${script.glyphs.A.d}"`);
     expect(body).not.toContain('mask=');
+  });
+
+  it('checks every field of a saved design, keeping what is valid', () => {
+    expect(sanitizeMonogram(null)).toEqual(DEFAULT_MONOGRAM);
+    expect(
+      sanitizeMonogram({
+        letters: ['dd', 7],
+        colors: ['#ABCDEF', 'red" onload="x'],
+        arrangement: 'aligned',
+        separator: 'explode',
+        customSeparator: 'abcdef',
+        font: 'comic',
+        border: 'squares',
+        borderColor: '#123',
+      }),
+    ).toEqual({
+      ...DEFAULT_MONOGRAM,
+      letters: ['D', 'V'],
+      colors: ['#abcdef', DEFAULT_MONOGRAM.colors[1]],
+      arrangement: 'aligned',
+      customSeparator: 'abc',
+      border: 'squares',
+    });
+    // An empty second letter stays empty.
+    expect(sanitizeMonogram({ letters: ['A', ''] }).letters).toEqual(['A', '']);
   });
 
   it.each(files)('public/brand/$file is up to date (npm run brand)', ({ file, svg }) => {

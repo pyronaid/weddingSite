@@ -5,7 +5,13 @@ import { DEFAULT_MONOGRAM, monogramParts } from '../brand/monogram';
 import { defaultContent } from '../config/wedding';
 import { printMessages } from '../features/private-area/messages/prints';
 import { DECORATIONS, spray } from './decorations';
-import { DEFAULT_INVITATION, invitationSvg, type InvitationDesign, type InvitationInput } from './invitations';
+import {
+  DEFAULT_INVITATION,
+  invitationSvg,
+  sanitizeInvitation,
+  type InvitationDesign,
+  type InvitationInput,
+} from './invitations';
 import { printDocument } from './output';
 import { posterSvg } from './posters';
 import { wrapText } from './svg';
@@ -137,6 +143,38 @@ describe('invitations', () => {
     const couple = invitation({ language: 'it', names: 'two' });
     expect(couple).toContain('Vi invitiamo');
     expect(couple).toContain('Rispondete entro');
+  });
+});
+
+describe('sanitizeInvitation', () => {
+  it('checks every field of a saved design, keeping what is valid', () => {
+    expect(sanitizeInvitation(undefined, 'it')).toEqual({ ...DEFAULT_INVITATION, language: 'it' });
+    expect(
+      sanitizeInvitation(
+        {
+          size: 'square',
+          names: 'many',
+          heading: 'x'.repeat(100),
+          subheading: null,
+          language: 'fr',
+          qr: false,
+          qrText: 42,
+          background: '#D9E4CF',
+          decoration: 'roots',
+          decorationColor: 'url(javascript:x)',
+        },
+        'en',
+      ),
+    ).toEqual({
+      ...DEFAULT_INVITATION,
+      size: 'square',
+      heading: 'x'.repeat(80),
+      subheading: null,
+      qr: false,
+      background: '#d9e4cf',
+      decoration: 'roots',
+    });
+    expect(sanitizeInvitation({ background: '<b>' }, 'en').background).toBeNull();
   });
 });
 

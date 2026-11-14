@@ -42,6 +42,15 @@ const en = {
   generating: 'Generating…',
   failed: 'The files could not be made.',
   preview: 'Preview',
+  saving: {
+    loading: 'Loading your design…',
+    pending: 'Saving…',
+    saving: 'Saving…',
+    saved: 'Saved ✓ on your account: you can go on from any device',
+    error: (message: string) => `Not saved: ${message}`,
+    retry: 'Try again',
+  },
+  sameSite: 'Use this site’s address',
   colours: {
     custom: 'Other colour',
     names: {
@@ -62,7 +71,7 @@ const en = {
   },
   logo: {
     title: 'Logo',
-    hint: 'Design the monogram: the preview changes as you choose. SVG stays sharp at any size (print shop, embroidery, stamps); PNG for documents and social media. Your choices are kept in this browser, and the invitations can use this logo.',
+    hint: 'Design the monogram: the preview changes as you choose. SVG stays sharp at any size (print shop, embroidery, stamps); PNG for documents and social media. Every choice is saved on your account as you make it, so you can go on from any browser or computer; the invitations can use this logo.',
     letters: 'Letters',
     first: 'First letter',
     second: 'Second letter',
@@ -101,7 +110,7 @@ const en = {
   },
   invitations: {
     title: 'Invitations',
-    hint: 'Design the invitation: date, times and places come from the General tab, and the preview changes as you choose. Your choices are kept in this browser.',
+    hint: 'Design the invitation: date, times and places come from the General tab, and the preview changes as you choose. Every choice is saved on your account as you make it.',
     size: 'Size',
     sizes: { square: 'Square (15 × 15 cm)', 'a4-portrait': 'A4 portrait', 'a4-landscape': 'A4 landscape' } as Record<
       InvitationSize,
@@ -184,6 +193,15 @@ export const printMessages: Dictionary<typeof en> = {
     generating: 'Creazione…',
     failed: 'Non è stato possibile creare i file.',
     preview: 'Anteprima',
+    saving: {
+      loading: 'Caricamento del vostro progetto…',
+      pending: 'Salvataggio…',
+      saving: 'Salvataggio…',
+      saved: 'Salvato ✓ sul vostro account: potete continuare da qualsiasi dispositivo',
+      error: (message) => `Non salvato: ${message}`,
+      retry: 'Riprova',
+    },
+    sameSite: 'Usa l’indirizzo di questo sito',
     colours: {
       custom: 'Altro colore',
       names: {
@@ -201,7 +219,7 @@ export const printMessages: Dictionary<typeof en> = {
     },
     logo: {
       title: 'Logo',
-      hint: 'Disegnate il monogramma: l’anteprima cambia mentre scegliete. L’SVG resta nitido a ogni dimensione (tipografia, ricamo, timbri); il PNG per documenti e social. Le scelte restano in questo browser, e le partecipazioni possono usare questo logo.',
+      hint: 'Disegnate il monogramma: l’anteprima cambia mentre scegliete. L’SVG resta nitido a ogni dimensione (tipografia, ricamo, timbri); il PNG per documenti e social. Ogni scelta viene salvata sul vostro account mentre la fate, così potete continuare da qualsiasi browser o computer; le partecipazioni possono usare questo logo.',
       letters: 'Lettere',
       first: 'Prima lettera',
       second: 'Seconda lettera',
@@ -240,7 +258,7 @@ export const printMessages: Dictionary<typeof en> = {
     },
     invitations: {
       title: 'Partecipazioni',
-      hint: 'Disegnate la partecipazione: data, orari e luoghi vengono dalla scheda Generale, e l’anteprima cambia mentre scegliete. Le scelte restano in questo browser.',
+      hint: 'Disegnate la partecipazione: data, orari e luoghi vengono dalla scheda Generale, e l’anteprima cambia mentre scegliete. Ogni scelta viene salvata sul vostro account mentre la fate.',
       size: 'Formato',
       sizes: { square: 'Quadrato (15 × 15 cm)', 'a4-portrait': 'A4 verticale', 'a4-landscape': 'A4 orizzontale' },
       language: 'Lingua della partecipazione',

@@ -18,6 +18,7 @@ import { printMessages, SWATCHES } from '../../../messages/prints';
 import { ColorPicker } from './ColorPicker';
 import { ExportButton } from './ExportButton';
 import styles from './prints.module.css';
+import { SaveStatus } from './SaveStatus';
 import { useLogoDesign } from './useLogoDesign';
 
 const PNG_WIDTH = 2048;
@@ -84,7 +85,7 @@ export function LogoDesigner() {
   const t = useMessages(printMessages);
   const l = t.logo;
   const id = useId().replace(/:/g, '');
-  const [design, setDesign] = useLogoDesign();
+  const { design, setDesign, status, error, retry } = useLogoDesign();
   const [fonts, setFonts] = useState<GlyphFonts | null>(null);
   const [failed, setFailed] = useState(false);
   const [dark, setDark] = useState(false);
@@ -100,6 +101,23 @@ export function LogoDesigner() {
       current = false;
     };
   }, []);
+
+  if (failed) {
+    return (
+      <div role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
+        {t.failed}
+      </div>
+    );
+  }
+  if (!design || !fonts) {
+    return status === 'error' ? (
+      <SaveStatus status={status} error={error} onRetry={retry} />
+    ) : (
+      <p role="status" className={formStyles.hint}>
+        {fonts ? t.saving.loading : l.loading}
+      </p>
+    );
+  }
 
   const change = (changes: Partial<MonogramDesign>) => setDesign((current) => ({ ...current, ...changes }));
   const setLetter = (index: 0 | 1, value: string) => {
@@ -118,21 +136,6 @@ export function LogoDesigner() {
   const name = l.name(letters);
   const file = `logo-${design.letters.join('').toLowerCase() || 'monogram'}`;
   const spaced = design.arrangement !== 'crossed';
-
-  if (failed) {
-    return (
-      <div role="alert" className={`${formStyles.notice} ${formStyles.noticeError}`}>
-        {t.failed}
-      </div>
-    );
-  }
-  if (!fonts) {
-    return (
-      <p role="status" className={formStyles.hint}>
-        {l.loading}
-      </p>
-    );
-  }
 
   const svg = monogramSvg(design, fonts, { title: name });
   const exportPng = async () => {
@@ -160,6 +163,7 @@ export function LogoDesigner() {
             <input type="checkbox" checked={dark} onChange={(event) => setDark(event.target.checked)} />
             {l.background} {l.backgrounds.dark}
           </label>
+          <SaveStatus status={status} error={error} onRetry={retry} />
           <div className={styles.actions}>
             <ExportButton label={t.svg} item={name} busy={busy} id="svg" onClick={() => download(`${file}.svg`, svg)} />
             <ExportButton label={t.png} item={name} busy={busy} id="png" onClick={() => void exportPng()} />
