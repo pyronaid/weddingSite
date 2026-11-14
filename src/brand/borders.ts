@@ -102,8 +102,12 @@ for (const [path, source] of Object.entries(sources)) {
   if (file) files.set(id, file);
 }
 
-/** "none" first, then the files in alphabetical order. */
-export const BORDER_STYLES: BorderStyle[] = ['none', ...[...files.keys()].sort((a, b) => a.localeCompare(b))];
+/** Order of the borders: by the name shown, "Border 2" before "Border 10", capitals aside. */
+export const byName = (a: Pick<BorderFile, 'id' | 'label'>, b: Pick<BorderFile, 'id' | 'label'>) =>
+  a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: 'base' }) || a.id.localeCompare(b.id);
+
+/** "none" first, then the files by name. */
+export const BORDER_STYLES: BorderStyle[] = ['none', ...[...files.values()].sort(byName).map((file) => file.id)];
 
 export const isBorderStyle = (value: unknown): value is BorderStyle =>
   typeof value === 'string' && (value === 'none' || files.has(value));

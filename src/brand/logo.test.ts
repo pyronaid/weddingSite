@@ -2,11 +2,19 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BORDER_STYLES, borderLabel, paint, parseBorderFile } from './borders';
+import { BORDER_STYLES, borderLabel, byName, paint, parseBorderFile } from './borders';
 import { sans } from './glyphs/sans';
 import { script } from './glyphs/script';
 import { serif } from './glyphs/serif';
-import { DEFAULT_MONOGRAM, monogramParts, monogramSvg, sanitizeMonogram, type MonogramDesign } from './monogram';
+import {
+  DEFAULT_MONOGRAM,
+  monogramParts,
+  monogramSvg,
+  sanitizeMonogram,
+  SPACING,
+  type MonogramDesign,
+} from './monogram';
+import { HEART_PATH } from './ornaments';
 import { LOGO_PRESETS, LOGO_SCHEMES, withScheme, type LogoScheme } from './presets';
 
 const fonts = { script, sans, serif };
@@ -98,6 +106,11 @@ describe('monogram', () => {
     expect(borderLabel('my-new__border')).toBe('My new border');
   });
 
+  it('sorts the borders by the name shown, numbers in order, capitals aside', () => {
+    const named = ['Border 10', 'border 2', 'Alpha', 'Stile uno'].map((label) => ({ id: label, label }));
+    expect(named.sort(byName).map((file) => file.label)).toEqual(['Alpha', 'border 2', 'Border 10', 'Stile uno']);
+  });
+
   it('reads the room a border leaves for the letters', () => {
     const file = (attrs: string) =>
       parseBorderFile(
@@ -152,6 +165,61 @@ describe('monogram', () => {
         expect(scale).toBeLessThan(1.5);
       }
     }
+  });
+
+  describe('spaced letters: the same share for both, the separator in the middle', () => {
+    /** Where each drawn item's outline is centred on the 1000-wide canvas, and the canvas size of `box` em units. */
+    function measure(changes: Partial<MonogramDesign>, boxes: [number, number, number, number][]) {
+      const { body } = monogramParts(design({ font: 'sans', ...changes }), fonts);
+      const [, tx, , scale] = /<g transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)">/
+        .exec(body)!
+        .map(Number);
+      const items = [
+        ...body.matchAll(/<path transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)" d="([^"]+)"/g),
+      ].slice(-boxes.length);
+      const centres = items.map(
+        ([, x, , s], i) => tx + scale * (Number(x) + Number(s) * ((boxes[i][0] + boxes[i][2]) / 2)),
+      );
+      return { centres, canvas: (emUnits: number) => emUnits * scale, items };
+    }
+    const I = sans.glyphs.I.box;
+    const W = sans.glyphs.W.box;
+    const heart: [number, number, number, number] = [-575, -475, 575, 425];
+    const box = Math.max(I[2] - I[0], W[2] - W[0]);
+
+    it('side by side: 48% and 48% of the width, symmetric even for a narrow I and a wide W', () => {
+      const { centres, canvas } = measure({ arrangement: 'aligned', letters: ['I', 'W'] }, [I, W]);
+      const [first, second] = centres;
+      // Symmetric around the middle of the logo.
+      expect(first + second).toBeCloseTo(1000, 0);
+      // Box centres one box (48%) plus the gap (4%) apart: 52% of the whole, with box = 48%.
+      const unit = canvas(box) / SPACING.plain.letter;
+      expect(second - first).toBeCloseTo((SPACING.plain.letter + SPACING.plain.gap) * unit, 0);
+    });
+
+    it('with a separator: 40%, 15% in the middle, 40%', () => {
+      const { centres, canvas, items } = measure({ arrangement: 'aligned', letters: ['I', 'W'], separator: 'heart' }, [
+        I,
+        heart,
+        W,
+      ]);
+      expect(items[1][4]).toBe(HEART_PATH);
+      const [first, separator, second] = centres;
+      expect(separator).toBeCloseTo(500, 0);
+      expect(first + second).toBeCloseTo(1000, 0);
+      const { letter, gap, separator: share } = SPACING.separated;
+      const unit = canvas(box) / letter;
+      expect(second - first).toBeCloseTo((letter + 2 * gap + share) * unit, 0);
+      // The separator fits in its 15%.
+      expect(canvas(heart[2] - heart[0]) * Number(items[1][3])).toBeLessThanOrEqual(share * unit + 0.5);
+    });
+
+    it('diagonal: symmetric too, the separator midway', () => {
+      const { centres } = measure({ arrangement: 'diagonal', letters: ['I', 'W'], separator: 'heart' }, [I, heart, W]);
+      const [first, separator, second] = centres;
+      expect(separator).toBeCloseTo(500, 0);
+      expect(first + second).toBeCloseTo(1000, 0);
+    });
   });
 
   it('draws a single letter when the other one is empty', () => {
