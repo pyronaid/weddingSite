@@ -60,6 +60,21 @@ export const ADJUST = {
 export const NO_ADJUSTMENT: LetterAdjustment = { x: 0, y: 0, size: 100 };
 const isNeutral = (a: LetterAdjustment) => a.x === 0 && a.y === 0 && a.size === 100;
 
+/**
+ * The choices that lay the letters out again. Moves and resizes are a final
+ * touch made for one layout, so picking any of these puts both letters back.
+ * Letters, colours and the separator's own text keep them: the letters' boxes
+ * stay where they are.
+ */
+export const STYLE_FIELDS = ['arrangement', 'separator', 'font', 'border'] as const;
+
+/** Applies `changes`; when a style choice really changes, the letters lose their moves and resizes. */
+export function restyle(design: MonogramDesign, changes: Partial<MonogramDesign>): MonogramDesign {
+  const next = { ...design, ...changes };
+  const newStyle = STYLE_FIELDS.some((field) => next[field] !== design[field]);
+  return newStyle ? { ...next, adjustments: [NO_ADJUSTMENT, NO_ADJUSTMENT] } : next;
+}
+
 export type GlyphFonts = Record<MonogramFont, GlyphFont>;
 
 export const DEFAULT_MONOGRAM: MonogramDesign = {

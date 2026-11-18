@@ -12,6 +12,8 @@ import {
   letterFitsArea,
   monogramParts,
   monogramSvg,
+  NO_ADJUSTMENT,
+  restyle,
   sanitizeMonogram,
   SPACING,
   type MonogramDesign,
@@ -215,6 +217,34 @@ describe('monogram', () => {
   });
 
   describe('letters moved and resized by hand', () => {
+    describe('a new style starts the refinement over', () => {
+      const moved = design({
+        adjustments: [
+          { x: 2, y: -1, size: 90 },
+          { x: 0, y: 3, size: 110 },
+        ],
+      });
+      const neutral = [NO_ADJUSTMENT, NO_ADJUSTMENT];
+
+      it.each([
+        ['arrangement', { arrangement: 'diagonal' }],
+        ['separator', { separator: 'heart' }],
+        ['font', { font: 'serif' }],
+        ['border', { border: 'circles' }],
+      ] as const)('a new %s puts both letters back', (_, changes) => {
+        expect(restyle(moved, changes)).toEqual({ ...moved, ...changes, adjustments: neutral });
+      });
+
+      it('keeps them for letters, colours and the separator text', () => {
+        const changes = { letters: ['A', 'B'], colors: ['#000000', '#ffffff'], customSeparator: '+' } as const;
+        expect(restyle(moved, changes as Partial<MonogramDesign>).adjustments).toEqual(moved.adjustments);
+      });
+
+      it('keeps them when the same style is picked again', () => {
+        expect(restyle(moved, { border: moved.border, font: moved.font }).adjustments).toEqual(moved.adjustments);
+      });
+    });
+
     /** The drawn letters: their transforms in the fitted group, and the group's scale. */
     function drawn(changes: Partial<MonogramDesign>) {
       const { body } = monogramParts(

@@ -820,34 +820,44 @@ describe('site settings (super admin)', () => {
         expect(preview()).not.toBe(before);
       });
 
-      it('says when a moved letter sticks out after another change', async () => {
-        open(
-          '/logo',
-          fakeAdmin(
-            {},
-            {
-              logo: {
-                letters: ['A', 'B'],
-                font: 'sans',
-                arrangement: 'aligned',
-                adjustments: [
-                  { x: 0, y: 0, size: 100 },
-                  { x: 0, y: -12, size: 100 },
-                ],
-              },
-            },
-          ),
-        );
+      it('puts the letters back when a new style is picked, not for a new colour', async () => {
+        const designs: DesignStore = {
+          logo: {
+            letters: ['A', 'B'],
+            font: 'sans',
+            arrangement: 'aligned',
+            adjustments: [
+              { x: 0, y: 0, size: 100 },
+              { x: 0, y: -12, size: 90 },
+            ],
+          },
+        };
+        open('/logo', fakeAdmin({}, designs));
         const user = userEvent.setup();
         await screen.findByRole('img', { name: 'Logo A B' });
-        expect(screen.queryByText(/goes beyond the area/)).not.toBeInTheDocument();
-        // A round border leaves less room: the second letter, moved up, sticks out now.
+        const reset = () => screen.queryByRole('button', { name: 'Put the second letter back where it was' });
+        expect(reset()).toBeInTheDocument();
+
+        // A colour is not a style: the refinement stays.
+        const colours = screen.getByRole('group', { name: 'Colour of the second letter' });
+        await user.click(within(colours).getAllByRole('radio')[3]);
+        expect(reset()).toBeInTheDocument();
+
+        // A border lays the letters out again: both start over, and that is saved.
         await user.click(screen.getByRole('radio', { name: 'Circles' }));
-        expect(
-          screen.getByText('The second letter goes beyond the area for the letters: move it back, or reset it.'),
-        ).toBeInTheDocument();
-        await user.click(screen.getByRole('button', { name: 'Put the second letter back where it was' }));
+        expect(reset()).not.toBeInTheDocument();
         expect(screen.queryByText(/goes beyond the area/)).not.toBeInTheDocument();
+        await waitFor(
+          () =>
+            expect(designs.logo).toMatchObject({
+              border: 'circles',
+              adjustments: [
+                { x: 0, y: 0, size: 100 },
+                { x: 0, y: 0, size: 100 },
+              ],
+            }),
+          { timeout: 3000 },
+        );
       });
 
       it('takes a separator of its own, in any colour', async () => {

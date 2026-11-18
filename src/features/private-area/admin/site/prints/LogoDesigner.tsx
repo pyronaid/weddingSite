@@ -8,6 +8,7 @@ import {
   MONOGRAM_FONTS,
   monogramParts,
   letterFitsArea,
+  restyle,
   monogramSvg,
   SEPARATORS,
   type GlyphFonts,
@@ -130,6 +131,11 @@ export function LogoDesigner() {
   }
 
   const change = (changes: Partial<MonogramDesign>) => setDesign((current) => ({ ...current, ...changes }));
+  /** A new style lays the letters out again: their moves and resizes start over (see `restyle`). */
+  const changeStyle = (changes: Partial<MonogramDesign>) => {
+    setBlocked(null);
+    setDesign((current) => restyle(current, changes));
+  };
   const setLetter = (index: 0 | 1, value: string) => {
     const letters: [string, string] = [...design.letters];
     // The last typed character, upper case.
@@ -244,7 +250,7 @@ export function LogoDesigner() {
             name={`${id}-arrangement`}
             options={ARRANGEMENTS}
             value={design.arrangement}
-            onChange={(arrangement) => change({ arrangement })}
+            onChange={(arrangement) => changeStyle({ arrangement })}
             labels={l.arrangements}
             preview={(arrangement) => (
               <Monogram
@@ -266,7 +272,7 @@ export function LogoDesigner() {
                       name={`${id}-separator`}
                       checked={design.separator === separator}
                       aria-label={l.separatorNames[separator]}
-                      onChange={() => change({ separator })}
+                      onChange={() => changeStyle({ separator })}
                     />
                     <span className={styles.separatorSample}>{l.separators[separator]}</span>
                   </label>
@@ -303,7 +309,7 @@ export function LogoDesigner() {
             name={`${id}-font`}
             options={MONOGRAM_FONTS}
             value={design.font}
-            onChange={(font) => change({ font })}
+            onChange={(font) => changeStyle({ font })}
             labels={l.fonts}
             preview={(font) => (
               <Monogram design={{ ...design, font, border: 'none' }} fonts={fonts} id={`${id}-f-${font}`} />
@@ -315,7 +321,7 @@ export function LogoDesigner() {
             name={`${id}-border`}
             options={BORDER_STYLES}
             value={design.border}
-            onChange={(border) => change({ border })}
+            onChange={(border) => changeStyle({ border })}
             labels={Object.fromEntries(BORDER_STYLES.map((id) => [id, id === 'none' ? l.noBorder : borderLabel(id)]))}
             preview={(border) => <Monogram design={{ ...design, border }} fonts={fonts} id={`${id}-b-${border}`} />}
           />
