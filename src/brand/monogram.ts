@@ -31,7 +31,34 @@ export interface MonogramDesign {
   font: MonogramFont;
   border: BorderStyle;
   borderColor: string;
+  /** Each letter moved and resized by hand (the [+][^][-] [<][v][>] buttons). */
+  adjustments: [LetterAdjustment, LetterAdjustment];
 }
+
+/**
+ * A letter moved and resized from where the layout puts it: x and y in steps
+ * of ADJUST.moveStep of the letters' area (right and down are positive), size
+ * in % (100 = as laid out).
+ */
+export interface LetterAdjustment {
+  x: number;
+  y: number;
+  size: number;
+}
+
+export const ADJUST = {
+  /** One move: this fraction of the width of the letters' area. */
+  moveStep: 0.02,
+  /** At most this many steps away, in each direction. */
+  maxSteps: 50,
+  /** One resize: this many %, between the limits. */
+  sizeStep: 5,
+  minSize: 50,
+  maxSize: 200,
+};
+
+export const NO_ADJUSTMENT: LetterAdjustment = { x: 0, y: 0, size: 100 };
+const isNeutral = (a: LetterAdjustment) => a.x === 0 && a.y === 0 && a.size === 100;
 
 export type GlyphFonts = Record<MonogramFont, GlyphFont>;
 
@@ -45,6 +72,7 @@ export const DEFAULT_MONOGRAM: MonogramDesign = {
   font: 'script',
   border: 'none',
   borderColor: '#6d3350',
+  adjustments: [NO_ADJUSTMENT, NO_ADJUSTMENT],
 };
 
 /** Fallback when a character has no outline here: real text in the site fonts (embedded on export). */
@@ -73,6 +101,8 @@ interface Item {
   fill: string;
   /** The first letter, when crossed: cut where the second one passes. */
   masked?: boolean;
+  /** Which letter it is (the separator has none). */
+  letter?: 0 | 1;
 }
 
 const bounds = (item: Item) => ({
@@ -193,8 +223,8 @@ function fittedSeparator(
 /** Places the letters (and separator) in em units, before fitting them into the canvas. */
 function layout(design: MonogramDesign, glyphs: GlyphFont): Layout {
   const [one, two] = design.letters.map((letter) => letter.trim().slice(0, 1));
-  const first = one ? character(design.font, glyphs, one, design.colors[0]) : null;
-  const second = two ? character(design.font, glyphs, two, design.colors[1]) : null;
+  const first: Item | null = one ? { ...character(design.font, glyphs, one, design.colors[0]), letter: 0 } : null;
+  const second: Item | null = two ? { ...character(design.font, glyphs, two, design.colors[1]), letter: 1 } : null;
   if (!first || !second) return { items: [first, second].filter((item): item is Item => item !== null) };
 
   // Height of a capital in this font (the first letter's top to the baseline).
@@ -254,34 +284,98 @@ function renderItem(item: Item & { parts?: Item[] }, design: MonogramDesign, mas
   return `<text transform="${transform}" font-family="${escapeXml(FONT_FAMILIES[design.font])}" font-size="1000" fill="${item.fill}"${mask}>${escapeXml(item.text ?? '')}</text>`;
 }
 
-/** viewBox and drawing of a monogram, to place inside another SVG (e.g. an invitation). */
-export function monogramParts(design: MonogramDesign, fonts: GlyphFonts, idPrefix = 'monogram') {
+interface Placement {
+  frame: ReturnType<typeof border>;
+  /** The items, each letter moved and resized as adjusted (em units). */
+  items: Item[];
+  /** em units -> canvas: canvas = t + scale * em. */
+  scale: number;
+  tx: number;
+  ty: number;
+}
+
+/**
+ * Where everything goes: the layout fitted into the room the border leaves,
+ * centred; then each letter moved and resized as adjusted. The adjustments
+ * come after the fit, so moving or resizing one letter changes nothing else.
+ */
+function place(design: MonogramDesign, fonts: GlyphFonts, idPrefix: string): Placement {
   const frame = border(design.border, design.borderColor, idPrefix);
   const { items, centerX } = layout(design, fonts[design.font]);
+  if (items.length === 0) return { frame, items, scale: 1, tx: 0, ty: 0 };
+
+  const all = items.map(bounds);
+  let left = Math.min(...all.map((b) => b.left));
+  let right = Math.max(...all.map((b) => b.right));
+  const top = Math.min(...all.map((b) => b.top));
+  const bottom = Math.max(...all.map((b) => b.bottom));
+  if (centerX !== undefined) {
+    // Spaced letters: centred on their boxes, not on the ink (symmetric logo,
+    // separator in the middle), wide enough for whatever sticks out.
+    const half = Math.max(centerX - left, right - centerX);
+    left = centerX - half;
+    right = centerX + half;
+  }
+  const w = right - left;
+  const h = bottom - top;
+  const { shape, size } = frame.room;
+  const scale = shape === 'circle' ? (2 * size) / Math.hypot(w, h) : (2 * size) / Math.max(w, h);
+  const tx = CANVAS / 2 - ((left + right) / 2) * scale;
+  const ty = CANVAS / 2 - ((top + bottom) / 2) * scale;
+
+  // One move step, in em units (a share of the width of the letters' area).
+  const step = (ADJUST.moveStep * 2 * size) / scale;
+  const adjusted = items.map((item) => {
+    const adjustment = item.letter === undefined ? undefined : design.adjustments[item.letter];
+    if (!adjustment || isNeutral(adjustment)) return item;
+    // Resized around the middle of its outline, then moved.
+    const factor = adjustment.size / 100;
+    const cx = item.x + ((item.box[0] + item.box[2]) / 2) * item.scale;
+    const cy = item.y + ((item.box[1] + item.box[3]) / 2) * item.scale;
+    const s = item.scale * factor;
+    return {
+      ...item,
+      scale: s,
+      x: cx - ((item.box[0] + item.box[2]) / 2) * s + adjustment.x * step,
+      y: cy - ((item.box[1] + item.box[3]) / 2) * s + adjustment.y * step,
+    };
+  });
+  return { frame, items: adjusted, scale, tx, ty };
+}
+
+/**
+ * Whether a letter (0 or 1) lies entirely inside the letters' area: the
+ * circle or square the border leaves free (the whole canvas without one).
+ * Measured on its outline's box, so the check is on the safe side.
+ */
+export function letterFitsArea(design: MonogramDesign, fonts: GlyphFonts, letter: 0 | 1): boolean {
+  const { frame, items, scale, tx, ty } = place(design, fonts, 'check');
+  const item = items.find((candidate) => candidate.letter === letter);
+  if (!item) return true;
+  const b = bounds(item);
+  const corners = [
+    [tx + b.left * scale, ty + b.top * scale],
+    [tx + b.right * scale, ty + b.top * scale],
+    [tx + b.left * scale, ty + b.bottom * scale],
+    [tx + b.right * scale, ty + b.bottom * scale],
+  ];
+  // A unit of tolerance: the fitted layout touches the area's edge.
+  const { shape, size } = frame.room;
+  const c = CANVAS / 2;
+  return corners.every(([x, y]) =>
+    shape === 'circle'
+      ? Math.hypot(x - c, y - c) <= size + 1
+      : Math.abs(x - c) <= size + 1 && Math.abs(y - c) <= size + 1,
+  );
+}
+
+/** viewBox and drawing of a monogram, to place inside another SVG (e.g. an invitation). */
+export function monogramParts(design: MonogramDesign, fonts: GlyphFonts, idPrefix = 'monogram') {
+  const { frame, items, scale, tx, ty } = place(design, fonts, idPrefix);
   const maskId = `${idPrefix}-gap`;
 
   let body = frame.svg;
   if (items.length > 0) {
-    // Fit everything into the room the border leaves, centred.
-    const all = items.map(bounds);
-    let left = Math.min(...all.map((b) => b.left));
-    let right = Math.max(...all.map((b) => b.right));
-    const top = Math.min(...all.map((b) => b.top));
-    const bottom = Math.max(...all.map((b) => b.bottom));
-    if (centerX !== undefined) {
-      // Spaced letters: centred on their boxes, not on the ink (symmetric logo,
-      // separator in the middle), wide enough for whatever sticks out.
-      const half = Math.max(centerX - left, right - centerX);
-      left = centerX - half;
-      right = centerX + half;
-    }
-    const w = right - left;
-    const h = bottom - top;
-    const { shape, size } = frame.room;
-    const scale = shape === 'circle' ? (2 * size) / Math.hypot(w, h) : (2 * size) / Math.max(w, h);
-    const tx = CANVAS / 2 - ((left + right) / 2) * scale;
-    const ty = CANVAS / 2 - ((top + bottom) / 2) * scale;
-
     const crossed = design.arrangement === 'crossed' && items.length === 2 && items[1].d;
     // A gap of GAP canvas units on each side of the second letter, whatever the fit.
     const GAP = 11;
@@ -334,6 +428,7 @@ export function sanitizeMonogram(raw: unknown): MonogramDesign {
     typeof value === 'string' ? [...value.trim()].slice(0, 1).join('').toLocaleUpperCase() : fallback;
   const letters = Array.isArray(r.letters) ? r.letters : [];
   const colors = Array.isArray(r.colors) ? r.colors : [];
+  const adjustments = Array.isArray(r.adjustments) ? r.adjustments : [];
   return {
     letters: [letter(letters[0], d.letters[0]), letter(letters[1], d.letters[1])],
     colors: [sanitizeColor(colors[0], d.colors[0]), sanitizeColor(colors[1], d.colors[1])],
@@ -349,5 +444,21 @@ export function sanitizeMonogram(raw: unknown): MonogramDesign {
         ? LEGACY_BORDERS[r.border]
         : d.border,
     borderColor: sanitizeColor(r.borderColor, d.borderColor),
+    adjustments: [sanitizeAdjustment(adjustments[0]), sanitizeAdjustment(adjustments[1])],
   };
+}
+
+/** Whole steps within the limits; anything else: not adjusted. */
+function sanitizeAdjustment(raw: unknown): LetterAdjustment {
+  const r = record(raw);
+  const steps = (value: unknown) =>
+    typeof value === 'number' && Number.isInteger(value) && Math.abs(value) <= ADJUST.maxSteps ? value : 0;
+  const size =
+    typeof r.size === 'number' &&
+    r.size >= ADJUST.minSize &&
+    r.size <= ADJUST.maxSize &&
+    (r.size - ADJUST.minSize) % ADJUST.sizeStep === 0
+      ? r.size
+      : 100;
+  return { x: steps(r.x), y: steps(r.y), size };
 }

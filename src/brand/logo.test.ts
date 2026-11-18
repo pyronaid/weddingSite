@@ -7,7 +7,9 @@ import { sans } from './glyphs/sans';
 import { script } from './glyphs/script';
 import { serif } from './glyphs/serif';
 import {
+  ADJUST,
   DEFAULT_MONOGRAM,
+  letterFitsArea,
   monogramParts,
   monogramSvg,
   sanitizeMonogram,
@@ -99,7 +101,6 @@ describe('monogram', () => {
       expect(body).not.toMatch(/(fill|stroke)="#000000"/);
     },
   );
-
 
   it('reads the room a border leaves for the letters', () => {
     const file = (attrs: string) =>
@@ -210,6 +211,97 @@ describe('monogram', () => {
       const [first, separator, second] = edges;
       expect(separator.centre).toBeCloseTo(500, 0);
       expect((first.right + second.left) / 2).toBeCloseTo(500, 0);
+    });
+  });
+
+  describe('letters moved and resized by hand', () => {
+    /** The drawn letters: their transforms in the fitted group, and the group's scale. */
+    function drawn(changes: Partial<MonogramDesign>) {
+      const { body } = monogramParts(
+        design({ font: 'sans', arrangement: 'aligned', letters: ['A', 'B'], ...changes }),
+        fonts,
+      );
+      const [, tx, ty, scale] = /<g transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)">/
+        .exec(body)!
+        .map(Number);
+      const letters = [
+        ...body.matchAll(/<path transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)" d="([^"]+)"/g),
+      ].map(([, x, y, s, d]) => ({ x: Number(x), y: Number(y), s: Number(s), d }));
+      return { body, tx, ty, scale, letters };
+    }
+    const moved = (first: Partial<(typeof DEFAULT_MONOGRAM.adjustments)[0]>, second = {}) =>
+      [
+        { x: 0, y: 0, size: 100, ...first },
+        { x: 0, y: 0, size: 100, ...second },
+      ] as MonogramDesign['adjustments'];
+
+    it('changes nothing when not adjusted', () => {
+      expect(monogramParts(design({ adjustments: moved({}) }), fonts).body).toBe(
+        monogramParts(DEFAULT_MONOGRAM, fonts).body,
+      );
+    });
+
+    it('moves only that letter, by steps of 2% of the letters area, without refitting the rest', () => {
+      const before = drawn({});
+      const after = drawn({ adjustments: moved({ x: 3, y: -2 }) });
+      // The group is not refitted.
+      expect([after.tx, after.ty, after.scale]).toEqual([before.tx, before.ty, before.scale]);
+      // Area: 2 × 390 canvas units without a border (a square of half side 390).
+      const step = (ADJUST.moveStep * 2 * 390) / before.scale;
+      expect(after.letters[0].x - before.letters[0].x).toBeCloseTo(3 * step, 1);
+      expect(after.letters[0].y - before.letters[0].y).toBeCloseTo(-2 * step, 1);
+      expect(after.letters[1]).toEqual(before.letters[1]);
+    });
+
+    it('resizes a letter around its own middle', () => {
+      const box = sans.glyphs.A.box;
+      const middle = ({ x, y, s }: { x: number; y: number; s: number }) => [
+        x + s * ((box[0] + box[2]) / 2),
+        y + s * ((box[1] + box[3]) / 2),
+      ];
+      const before = drawn({}).letters[0];
+      const after = drawn({ adjustments: moved({ size: 120 }) }).letters[0];
+      expect(after.s).toBeCloseTo(before.s * 1.2, 3);
+      expect(middle(after)[0]).toBeCloseTo(middle(before)[0], 1);
+      expect(middle(after)[1]).toBeCloseTo(middle(before)[1], 1);
+    });
+
+    it('keeps the gap of crossed letters around the moved second letter', () => {
+      const { body } = monogramParts(design({ adjustments: moved({}, { x: 4 }) }), fonts);
+      const mask = /<mask[\s\S]*?<path transform="translate\(([-\d.]+) ([-\d.]+)\)/.exec(body)!;
+      const plain = /<mask[\s\S]*?<path transform="translate\(([-\d.]+) ([-\d.]+)\)/.exec(
+        monogramParts(DEFAULT_MONOGRAM, fonts).body,
+      )!;
+      expect(Number(mask[1])).toBeGreaterThan(Number(plain[1]));
+    });
+
+    it('tells whether a letter stays inside the area for the letters', () => {
+      const base = { font: 'sans' as const, arrangement: 'aligned' as const, letters: ['A', 'B'] as [string, string] };
+      expect(letterFitsArea(design(base), fonts, 0)).toBe(true);
+      expect(letterFitsArea(design(base), fonts, 1)).toBe(true);
+      // Laid out against the edge of the area: one step out is too far.
+      expect(letterFitsArea(design({ ...base, adjustments: moved({ x: -1 }) }), fonts, 0)).toBe(false);
+      expect(letterFitsArea(design({ ...base, adjustments: moved({ x: 1 }) }), fonts, 0)).toBe(true);
+      expect(letterFitsArea(design({ ...base, adjustments: moved({ size: 200 }) }), fonts, 0)).toBe(false);
+      // In a round border, measured against its circle.
+      expect(letterFitsArea(design({ ...base, border: 'circles', adjustments: moved({}, { y: -20 }) }), fonts, 1)).toBe(
+        false,
+      );
+    });
+
+    it('keeps only whole steps within the limits from a saved design', () => {
+      expect(sanitizeMonogram({}).adjustments).toEqual(DEFAULT_MONOGRAM.adjustments);
+      expect(
+        sanitizeMonogram({
+          adjustments: [
+            { x: 3, y: -4, size: 120 },
+            { x: 1.5, y: 999, size: 123 },
+          ],
+        }).adjustments,
+      ).toEqual([
+        { x: 3, y: -4, size: 120 },
+        { x: 0, y: 0, size: 100 },
+      ]);
     });
   });
 

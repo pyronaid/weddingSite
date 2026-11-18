@@ -752,6 +752,104 @@ describe('site settings (super admin)', () => {
         expect(file.content).toContain('<title>Logo D S</title>');
       });
 
+      it('moves and resizes each letter with its buttons, saved with the design', async () => {
+        const designs: DesignStore = {};
+        open('/logo', fakeAdmin({}, designs));
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
+        const first = screen.getByRole('group', { name: 'Position and size of the first letter' });
+        expect(
+          within(first)
+            .getAllByRole('button')
+            .map((button) => button.getAttribute('aria-label')),
+        ).toEqual([
+          'Make the first letter bigger',
+          'Move the first letter up',
+          'Make the first letter smaller',
+          'Move the first letter left',
+          'Move the first letter down',
+          'Move the first letter right',
+        ]);
+        // No controls for the separator.
+        expect(screen.queryByRole('group', { name: /Position and size of the separator/ })).not.toBeInTheDocument();
+
+        const preview = () => screen.getByRole('img', { name: 'Logo G V' }).innerHTML;
+        const before = preview();
+        await user.click(within(first).getByRole('button', { name: 'Make the first letter smaller' }));
+        await user.click(within(first).getByRole('button', { name: 'Move the first letter down' }));
+        expect(preview()).not.toBe(before);
+        await waitFor(
+          () =>
+            expect(designs.logo).toMatchObject({
+              adjustments: [
+                { x: 0, y: 1, size: 95 },
+                { x: 0, y: 0, size: 100 },
+              ],
+            }),
+          {
+            timeout: 3000,
+          },
+        );
+
+        // Back where it was.
+        await user.click(within(first).getByRole('button', { name: 'Put the first letter back where it was' }));
+        expect(preview()).toBe(before);
+      });
+
+      it('refuses a move that would take the letter out of the area, with a warning', async () => {
+        const designs: DesignStore = {};
+        const admin = fakeAdmin({}, designs);
+        open('/logo', admin);
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
+        const second = screen.getByRole('group', { name: 'Position and size of the second letter' });
+        const preview = () => screen.getByRole('img', { name: 'Logo G V' }).innerHTML;
+        const before = preview();
+
+        // The letters already fill their area: bigger is too big.
+        await user.click(within(second).getByRole('button', { name: 'Make the second letter bigger' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+          'The second letter would go out of the area for the letters: nothing changed.',
+        );
+        expect(preview()).toBe(before);
+        expect(admin.savePrintDesign).not.toHaveBeenCalled();
+
+        // A change that fits clears the warning.
+        await user.click(within(second).getByRole('button', { name: 'Make the second letter smaller' }));
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(preview()).not.toBe(before);
+      });
+
+      it('says when a moved letter sticks out after another change', async () => {
+        open(
+          '/logo',
+          fakeAdmin(
+            {},
+            {
+              logo: {
+                letters: ['A', 'B'],
+                font: 'sans',
+                arrangement: 'aligned',
+                adjustments: [
+                  { x: 0, y: 0, size: 100 },
+                  { x: 0, y: -12, size: 100 },
+                ],
+              },
+            },
+          ),
+        );
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo A B' });
+        expect(screen.queryByText(/goes beyond the area/)).not.toBeInTheDocument();
+        // A round border leaves less room: the second letter, moved up, sticks out now.
+        await user.click(screen.getByRole('radio', { name: 'Circles' }));
+        expect(
+          screen.getByText('The second letter goes beyond the area for the letters: move it back, or reset it.'),
+        ).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Put the second letter back where it was' }));
+        expect(screen.queryByText(/goes beyond the area/)).not.toBeInTheDocument();
+      });
+
       it('takes a separator of its own, in any colour', async () => {
         open('/logo');
         const user = userEvent.setup();
