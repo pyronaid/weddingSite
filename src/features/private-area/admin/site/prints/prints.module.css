@@ -222,6 +222,8 @@
 .corners {
   display: flex;
   flex-wrap: wrap;
+  /* Each column as tall as it needs: a Reset under one does not push the others down. */
+  align-items: flex-start;
   gap: 1rem 2rem;
 }
 

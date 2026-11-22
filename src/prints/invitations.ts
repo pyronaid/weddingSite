@@ -38,6 +38,8 @@ export interface InvitationDesign {
   decorationColor: string;
   /** Moves and size of the decoration: top left, bottom right (see CORNER_ADJUST). */
   decorationAdjustments: [CornerAdjustment, CornerAdjustment];
+  /** Moves and size of the logo (same steps and limits), grown from its centre. */
+  logoAdjustment: CornerAdjustment;
   /** A background pattern, drawn faintly over the whole card. */
   pattern: Pattern;
   patternColor: string;
@@ -59,7 +61,10 @@ export interface CornerAdjustment {
   size: number;
 }
 
-/** A step is a share of the card's short side, so it looks the same on any card size. */
+/**
+ * A step is a share of the card's short side, so it looks the same on any card
+ * size. The same steps and limits for the logo.
+ */
 export const CORNER_ADJUST = { moveStep: 0.02, maxSteps: 50, sizeStep: 5, minSize: 25, maxSize: 300 };
 export const NO_CORNER_ADJUSTMENT: CornerAdjustment = { x: 0, y: 0, size: 100 };
 
@@ -82,6 +87,7 @@ export const DEFAULT_INVITATION: InvitationDesign = {
   decoration: 'plants',
   decorationColor: '#7d9a6a',
   decorationAdjustments: [NO_CORNER_ADJUSTMENT, NO_CORNER_ADJUSTMENT],
+  logoAdjustment: NO_CORNER_ADJUSTMENT,
   pattern: 'none',
   patternColor: '#6d3350',
   patternOpacity: PATTERN_OPACITY.initial,
@@ -113,6 +119,7 @@ export function sanitizeInvitation(raw: unknown, language: Language): Invitation
       sanitizeCornerAdjustment(Array.isArray(r.decorationAdjustments) ? r.decorationAdjustments[0] : undefined),
       sanitizeCornerAdjustment(Array.isArray(r.decorationAdjustments) ? r.decorationAdjustments[1] : undefined),
     ],
+    logoAdjustment: sanitizeCornerAdjustment(r.logoAdjustment),
     pattern: isPattern(r.pattern) ? r.pattern : d.pattern,
     patternColor: sanitizeColor(r.patternColor, d.patternColor),
     patternOpacity: isPatternOpacity(r.patternOpacity) ? r.patternOpacity : d.patternOpacity,
@@ -342,12 +349,18 @@ export function invitationSvg({
   if (design.logo && logo) {
     const size = 30;
     intro.push(
-      block(
-        size,
-        size + 6,
-        (cx, top) =>
-          `<svg x="${cx - (size * s) / 2}" y="${top}" width="${size * s}" height="${size * s}" viewBox="${logo.viewBox}">${logo.body}</svg>`,
-      ),
+      block(size, size + 6, (cx, top) => {
+        const drawn = `<svg x="${cx - (size * s) / 2}" y="${top}" width="${size * s}" height="${size * s}" viewBox="${logo.viewBox}">${logo.body}</svg>`;
+        const { x, y, size: percent } = design.logoAdjustment;
+        if (x === 0 && y === 0 && percent === 100) return drawn;
+        // Moved by hand, and resized around its centre: the rest of the card stays where it is.
+        const step = Math.min(width, height) * CORNER_ADJUST.moveStep;
+        const middle = { x: round(cx), y: round(top + (size * s) / 2) };
+        return (
+          `<g transform="translate(${round(middle.x + x * step)} ${round(middle.y + y * step)}) scale(${percent / 100}) translate(${-middle.x} ${-middle.y})">` +
+          `${drawn}</g>`
+        );
+      }),
     );
   }
   if (design.names !== 'none') {
