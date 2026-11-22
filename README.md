@@ -327,6 +327,9 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `lib/i18n.js` holds the messages the hooks send to the guests, in English and Italian.
   - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
 
+- **The e-mails** (confirmation of the address, password reset, and the change-of-address and one-time-code ones PocketBase may send) are designed HTML, in the site's language and **colour palette** (header with the couple's names, a button, the link written out for mail programs that block buttons, the footer). They are built with tables and inline styles, because e-mail programs ignore `<style>` blocks; PocketBase adds a plain-text version to every message. A new language or palette reaches them as soon as the site content is saved.
+- **No "new login" alerts:** the e-mail PocketBase sends when an account logs in from a new device is turned off (`1760400016_disable_login_alerts.js`): guests log in from several devices during the wedding.
+
 > Because the hooks rewrite the e-mail templates on every start and when the site content is saved, **edit them in `pb_hooks/lib/emails.js`**, not in the admin UI.
 
 The **image** ([`pocketbase/Dockerfile`](pocketbase/Dockerfile)):
