@@ -11,7 +11,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "brand": "BRAND_WRITE=1 vitest run src/brand/logo.test.ts"
+    "brand": "cross-env BRAND_WRITE=1 vitest run src/brand/logo.test.ts"
   },
   "dependencies": {
     "framer-motion": "^14.1.0",
@@ -29,11 +29,12 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "cross-env": "^10.1.0",
     "jsdom": "^29.1.1",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.4"
+    "vitest": "5.0.5"
   },
   "engines": {
     "node": ">=20"

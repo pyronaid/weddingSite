@@ -219,7 +219,7 @@ Everything to print is made **in the browser, from the current data**, by a supe
     - may say how much room it leaves for the letters, on its `<svg>` element: `data-room="0.56"` is the diameter of the free circle as a fraction of the width (default `0.6`), and `data-room-shape="square"` makes it a free square. Lower it if the letters touch the drawing;
     - keeps only its drawing: scripts, event handlers, links to other files, styles, embedded HTML and images are removed when it is loaded, and its ids are made unique on the page.
 
-    **Renaming or deleting a file:** saved designs that used it show no border (they still open). The four first borders (`small_flowers`, `big_flowers`, `circles`, `squares`) were drawn by code before; designs saved with their old names find their files.
+    **Renaming or deleting a file:** saved designs that used it show no border (they still open).
   - Ready-made logos in [`public/brand/`](public/brand/): `gv-script.svg` (G and V crossed, script) and `gv-seal.svg` (serif, circles border), each also `-mono` (one colour) and `-light` (for dark backgrounds). They are made by the same code (`src/brand/presets.ts`); `npm run brand` rewrites them, and a test fails while they differ.
 
 ### Organisers (admin view)

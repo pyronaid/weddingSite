@@ -112,14 +112,6 @@ export const BORDER_STYLES: BorderStyle[] = ['none', ...[...files.values()].sort
 export const isBorderStyle = (value: unknown): value is BorderStyle =>
   typeof value === 'string' && (value === 'none' || files.has(value));
 
-/** The border names of earlier versions (drawn by code), now files. */
-export const LEGACY_BORDERS: Record<string, BorderStyle> = {
-  flowersSmall: 'small_flowers',
-  flowersBig: 'big_flowers',
-  circles: 'circles',
-  squares: 'squares',
-};
-
 /** The drawing of a file, repainted in `color`, its ids made unique with `idPrefix`. */
 export function paint(file: BorderFile, color: string, idPrefix: string): string {
   const prefix = `${idPrefix}-${file.id}`;

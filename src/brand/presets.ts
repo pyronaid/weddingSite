@@ -11,7 +11,7 @@ export type LogoScheme = keyof typeof LOGO_SCHEMES;
 /** The couple's logos ready in public/brand/ (npm run brand): G and V crossed, in script, and as a seal. */
 export const LOGO_PRESETS = {
   'gv-script': DEFAULT_MONOGRAM,
-  'gv-seal': { ...DEFAULT_MONOGRAM, font: 'serif', border: 'circles' },
+  'gv-seal': { ...DEFAULT_MONOGRAM, font: 'serif', border: 'stile_01' },
 } satisfies Record<string, MonogramDesign>;
 
 export const withScheme = (design: MonogramDesign, scheme: LogoScheme): MonogramDesign => ({

@@ -139,12 +139,6 @@ describe('monogram', () => {
     expect(painted).toMatch(/^<g fill="#123456"/);
   });
 
-  it('turns the border names of earlier versions into their files, and a missing file into none', () => {
-    expect(sanitizeMonogram({ border: 'flowersBig' }).border).toBe('big_flowers');
-    expect(sanitizeMonogram({ border: 'circles' }).border).toBe('circles');
-    expect(sanitizeMonogram({ border: 'deleted_file' }).border).toBe('none');
-  });
-
   it('keeps the letters inside the canvas, whatever the arrangement', () => {
     for (const arrangement of ['crossed', 'aligned', 'diagonal'] as const) {
       for (const border of ['none', 'circles'] as const) {
@@ -230,7 +224,7 @@ describe('monogram', () => {
         ['arrangement', { arrangement: 'diagonal' }],
         ['separator', { separator: 'heart' }],
         ['font', { font: 'serif' }],
-        ['border', { border: 'circles' }],
+        ['border', { border: 'stile_01' }],
       ] as const)('a new %s puts both letters back', (_, changes) => {
         expect(restyle(moved, changes)).toEqual({ ...moved, ...changes, adjustments: neutral });
       });
@@ -314,7 +308,7 @@ describe('monogram', () => {
       expect(letterFitsArea(design({ ...base, adjustments: moved({ x: 1 }) }), fonts, 0)).toBe(true);
       expect(letterFitsArea(design({ ...base, adjustments: moved({ size: 200 }) }), fonts, 0)).toBe(false);
       // In a round border, measured against its circle.
-      expect(letterFitsArea(design({ ...base, border: 'circles', adjustments: moved({}, { y: -20 }) }), fonts, 1)).toBe(
+      expect(letterFitsArea(design({ ...base, border: 'stile_01', adjustments: moved({}, { y: -20 }) }), fonts, 1)).toBe(
         false,
       );
     });
@@ -351,7 +345,7 @@ describe('monogram', () => {
         separator: 'explode',
         customSeparator: 'abcdef',
         font: 'comic',
-        border: 'squares',
+        border: 'stile_01',
         borderColor: '#123',
       }),
     ).toEqual({
@@ -360,7 +354,7 @@ describe('monogram', () => {
       colors: ['#abcdef', DEFAULT_MONOGRAM.colors[1]],
       arrangement: 'aligned',
       customSeparator: 'abc',
-      border: 'squares',
+      border: 'stile_01',
     });
     // An empty second letter stays empty.
     expect(sanitizeMonogram({ letters: ['A', ''] }).letters).toEqual(['A', '']);
@@ -411,10 +405,10 @@ describe('monogram', () => {
     );
 
     it('makes the very same seal logo from border files with CRLF', () => {
-      const source = readFileSync(path.resolve(process.cwd(), 'src/brand/borders/circles.svg'), 'utf8');
+      const source = readFileSync(path.resolve(process.cwd(), 'src/brand/borders/stile_01.svg'), 'utf8');
       const fromWindows = parseBorderFile('circles', toCrlf(source))!;
       const seal = files.find(({ file }) => file === 'gv-seal.svg')!;
-      // The ready-made seal (made from circles.svg) has no CR, so a Windows copy of the border changes nothing in it.
+      // The ready-made seal (made from stile_01.svg) has no CR, so a Windows copy of the border changes nothing in it.
       expect(seal.svg).not.toContain('\r');
       expect(fromWindows.content).not.toContain('\r');
     });

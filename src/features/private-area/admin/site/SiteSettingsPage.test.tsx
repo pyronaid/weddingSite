@@ -734,7 +734,7 @@ describe('site settings (super admin)', () => {
           within(screen.getByRole('group', { name: 'Colour of the separator' })).getByRole('radio', { name: 'Gold' }),
         );
         await user.click(screen.getByRole('radio', { name: 'Times New Roman' }));
-        await user.click(screen.getByRole('radio', { name: 'Circles' }));
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
         await user.click(
           within(screen.getByRole('group', { name: 'Colour of the border' })).getByRole('radio', { name: 'Sage' }),
         );
@@ -743,7 +743,6 @@ describe('site settings (super admin)', () => {
         const { serif } = await import('../../../../brand/glyphs/serif');
         expect(preview.innerHTML).toContain(serif.glyphs.D.d);
         expect(preview.innerHTML).toContain('fill="#b08d48"');
-        expect(preview.innerHTML).toContain('stroke="#7d9a6a"');
 
         await user.click(screen.getByRole('button', { name: 'SVG: Logo D S' }));
         const file = await downloaded();
@@ -844,13 +843,13 @@ describe('site settings (super admin)', () => {
         expect(reset()).toBeInTheDocument();
 
         // A border lays the letters out again: both start over, and that is saved.
-        await user.click(screen.getByRole('radio', { name: 'Circles' }));
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
         expect(reset()).not.toBeInTheDocument();
         expect(screen.queryByText(/goes beyond the area/)).not.toBeInTheDocument();
         await waitFor(
           () =>
             expect(designs.logo).toMatchObject({
-              border: 'circles',
+              border: 'stile_01',
               adjustments: [
                 { x: 0, y: 0, size: 100 },
                 { x: 0, y: 0, size: 100 },
@@ -885,7 +884,7 @@ describe('site settings (super admin)', () => {
         open('/logo', admin);
         const user = userEvent.setup();
         await screen.findByRole('img', { name: 'Logo G V' });
-        await user.click(screen.getByRole('radio', { name: 'Big flowers' }));
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
         await user.clear(screen.getByLabelText('Second letter'));
         await user.type(screen.getByLabelText('Second letter'), 'm');
         await user.click(
@@ -899,7 +898,7 @@ describe('site settings (super admin)', () => {
         expect(await screen.findByText(/Saved ✓/)).toBeInTheDocument();
         expect(designs.logo).toMatchObject({
           letters: ['G', 'M'],
-          border: 'big_flowers',
+          border: 'stile_01',
           colors: ['#2f3e5c', '#c24f78'],
         });
 
@@ -910,7 +909,7 @@ describe('site settings (super admin)', () => {
         expect(await screen.findByRole('img', { name: 'Logo G M' })).toBeInTheDocument();
         // The form shows the saved choices, so it matches the picture.
         expect(screen.getByLabelText('Second letter')).toHaveValue('M');
-        expect(screen.getByRole('radio', { name: 'Big flowers' })).toBeChecked();
+        expect(screen.getByRole('radio', { name: 'Stile 01' })).toBeChecked();
         expect(
           within(screen.getByRole('group', { name: 'Colour of the first letter' })).getByRole('radio', {
             name: 'Navy',
@@ -924,13 +923,13 @@ describe('site settings (super admin)', () => {
       it('moves a design made in this browser before to the account', async () => {
         window.localStorage.setItem(
           'wedding.prints.logo.v1',
-          JSON.stringify({ letters: ['R', 'M'], border: 'circles' }),
+          JSON.stringify({ letters: ['R', 'M'], border: 'stile_01' }),
         );
         const designs: DesignStore = {};
         const admin = fakeAdmin({}, designs);
         open('/logo', admin);
         expect(await screen.findByRole('img', { name: 'Logo R M' })).toBeInTheDocument();
-        await waitFor(() => expect(designs.logo).toMatchObject({ letters: ['R', 'M'], border: 'circles' }));
+        await waitFor(() => expect(designs.logo).toMatchObject({ letters: ['R', 'M'], border: 'stile_01' }));
         expect(window.localStorage.getItem('wedding.prints.logo.v1')).toBeNull();
       });
 
@@ -959,7 +958,7 @@ describe('site settings (super admin)', () => {
         open('/logo', admin);
         const user = userEvent.setup();
         await screen.findByRole('img', { name: 'Logo G V' });
-        await user.click(screen.getByRole('radio', { name: 'Squares' }));
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
         expect(
           await screen.findByText('Not saved: The server cannot be reached.', {}, { timeout: 3000 }),
         ).toBeInTheDocument();

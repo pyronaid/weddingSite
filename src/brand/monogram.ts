@@ -1,4 +1,4 @@
-import { border, CANVAS, isBorderStyle, LEGACY_BORDERS, type BorderStyle } from './borders';
+import { border, CANVAS, isBorderStyle, type BorderStyle } from './borders';
 import type { Glyph, GlyphFont } from './glyphs/types';
 import { HEART_PATH } from './ornaments';
 
@@ -455,9 +455,7 @@ export function sanitizeMonogram(raw: unknown): MonogramDesign {
     // A border file renamed or deleted: no border. Older names: their file.
     border: isBorderStyle(r.border)
       ? r.border
-      : typeof r.border === 'string' && isBorderStyle(LEGACY_BORDERS[r.border])
-        ? LEGACY_BORDERS[r.border]
-        : d.border,
+      : d.border,
     borderColor: sanitizeColor(r.borderColor, d.borderColor),
     adjustments: [sanitizeAdjustment(adjustments[0]), sanitizeAdjustment(adjustments[1])],
   };
