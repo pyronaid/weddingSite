@@ -205,8 +205,8 @@ function fakeAdmin(overrides: Partial<AdminRepository> = {}, designs: DesignStor
     addPerson: fail,
     updatePerson: fail,
     deletePerson: fail,
-    getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
-    updateSettings: vi.fn(async (settings) => settings),
+    getSettings: vi.fn(async () => ({ signupCode: '#wedding', superAdminSignupCode: '' })),
+    updateSettings: vi.fn(async (changes) => ({ signupCode: '#wedding', superAdminSignupCode: '', ...changes })),
     listUsers: vi.fn(async (query: string, page: number) => listGuests(query, page)),
     getRiddleCodes: vi.fn(async () =>
       Array.from({ length: 13 }, (_, i) => ({
@@ -541,6 +541,56 @@ describe('site settings (super admin)', () => {
       signupCode: '#Sposi2027',
     });
     expect(await screen.findByText('Saved ✓')).toBeInTheDocument();
+  });
+
+  describe('super-admin sign-up code', () => {
+    it('is closed until a code is set, with a warning, and is saved on its own', async () => {
+      const admin = fakeAdmin();
+      renderPage(fakeRepository(), vi.fn(), '/area/site/signup-code', admin);
+      const user = userEvent.setup();
+
+      const code = await screen.findByLabelText('Code that makes the new account a super admin');
+      await waitFor(() => expect(code).toBeEnabled());
+      expect(code).toHaveValue('');
+      expect(screen.getByText('Closed: nobody can sign up as a super admin.')).toBeInTheDocument();
+      expect(screen.getByText(/can change everything, as you can/)).toBeInTheDocument();
+      const save = screen.getByRole('button', { name: 'Save super-admin code' });
+      expect(save).toBeDisabled();
+
+      await user.type(code, 'Sposi-Admin-2027');
+      expect(screen.queryByText('Closed: nobody can sign up as a super admin.')).not.toBeInTheDocument();
+      await user.click(save);
+      // Only this code: the guests' one is left as it is.
+      expect(admin.updateSettings).toHaveBeenCalledWith({ superAdminSignupCode: 'Sposi-Admin-2027' });
+      expect(await screen.findByText('Saved ✓')).toBeInTheDocument();
+      expect(save).toBeDisabled();
+
+      // Emptied again: closed (empty is allowed here, not for the guests' code).
+      await user.clear(code);
+      expect(save).toBeEnabled();
+      await user.clear(screen.getByLabelText(/code guests need/i));
+      expect(screen.getByRole('button', { name: 'Save code' })).toBeDisabled();
+    });
+
+    it('shows the reason the server refuses a code, on its field', async () => {
+      const admin = fakeAdmin({
+        updateSettings: vi.fn().mockRejectedValue(
+          new AdminError('validation', 'Please check the highlighted fields.', {
+            superAdminSignupCode: 'The guests’ code and the super-admin code must be different.',
+          }),
+        ),
+      });
+      renderPage(fakeRepository(), vi.fn(), '/area/site/signup-code', admin);
+      const user = userEvent.setup();
+      const code = await screen.findByLabelText('Code that makes the new account a super admin');
+      await waitFor(() => expect(code).toBeEnabled());
+      await user.type(code, '#wedding-long');
+      await user.click(screen.getByRole('button', { name: 'Save super-admin code' }));
+      expect(
+        await screen.findByText('The guests’ code and the super-admin code must be different.'),
+      ).toBeInTheDocument();
+      expect(code).toHaveAttribute('aria-invalid', 'true');
+    });
   });
 
   describe('organisers', () => {

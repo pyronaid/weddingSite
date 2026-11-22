@@ -158,6 +158,15 @@ const en = {
     label: 'Code guests need to create an account',
     hint: 'Capital letters and spaces around it do not matter. Changing it does not affect existing accounts.',
     save: 'Save code',
+    superAdmin: {
+      title: 'Super-admin sign-up code',
+      label: 'Code that makes the new account a super admin',
+      hint: 'At least 10 characters, different from the guests’ code. Leave it empty to close this way in.',
+      warning:
+        'Whoever signs up with this code can change everything, as you can: give it only to the people who will run the site with you, never print it.',
+      closed: 'Closed: nobody can sign up as a super admin.',
+      save: 'Save super-admin code',
+    },
   },
 };
 
@@ -317,6 +326,15 @@ export const adminMessages: Dictionary<typeof en> = {
       label: 'Codice che gli ospiti devono inserire per creare un account',
       hint: 'Maiuscole e spazi intorno non contano. Cambiarlo non ha effetto sugli account esistenti.',
       save: 'Salva codice',
+      superAdmin: {
+        title: 'Codice di registrazione per i super admin',
+        label: 'Codice che rende il nuovo account un super admin',
+        hint: 'Almeno 10 caratteri, diverso da quello degli ospiti. Lascialo vuoto per chiudere questo accesso.',
+        warning:
+          'Chi si registra con questo codice può cambiare tutto, come te: dallo solo a chi gestirà il sito con te, e non stamparlo mai.',
+        closed: 'Chiuso: nessuno può registrarsi come super admin.',
+        save: 'Salva codice dei super admin',
+      },
     },
   },
 };

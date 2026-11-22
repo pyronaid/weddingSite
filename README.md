@@ -150,7 +150,10 @@ npm run dev                  # http://localhost:5173
 
 Flows and security choices:
 
-- **Sign up** requires the **secret code** given to the guests (default `#wedding`; capital letters and surrounding spaces do not matter). It is checked by the server (`pb_hooks/signup.pb.js`), never stored with the user, and super admins can change it in *Site settings* → *Sign-up code*.
+- **Sign up** requires a **secret code** (capital letters and surrounding spaces do not matter), checked by the server (`pb_hooks/signup.pb.js`) and never stored with the user:
+  - the **guests' code**: an ordinary account. Its first value is `PB_SIGNUP_CODE` (`.env`); without it a random one is made and written to the PocketBase log;
+  - the **super-admin code**: the new account is a **super admin** (everything, like the couple). Its first value is `PB_SUPERADMIN_SIGNUP_CODE`; without it, this way in is closed. At least 10 characters, different from the guests' code. Like every account, it works only once its e-mail is confirmed, and each one is written to the log (`[signup] new super admin`). The `is_superadmin` flag itself can still never be sent at sign-up (collection rules): the server sets it.
+  - The variables are **starting values**: they are read when the database is created (the super-admin one at the first start of the version that added it). Afterwards super admins change both codes in *Site settings* → *Sign-up code*, and a restart keeps what they set.
 - **Sign up** creates the user and sends a confirmation e-mail. **Only verified users can log in**: this is enforced by the server (`authRule = "verified = true"`), not just by the UI.
 - Logging in **before confirming** shows "please confirm your e-mail", with a **resend** button (60 s cooldown).
 - **Forgot password** always shows the same message, whether or not the account exists, so nobody can find out which e-mails are registered.
@@ -260,7 +263,7 @@ Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) �
 | **Colour palette** | `/area/site/colours` | the colours of the whole site ([below](#colour-palette)) |
 | **Organisers** | `/area/site/organisers` | who organises which suit |
 | **RSVPs** | `/area/site/rsvps` | the replies to the invitation and the headcount |
-| **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters) |
+| **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters), and the one that registers a super admin (10–50 characters, or empty: closed) |
 | **Prints** | `/area/site/prints/<sub>` | sub-tabs: logo designer, invitation designer, clubs posters ([below](#printing-logo-invitations-and-clubs-posters)) |
 
 The *General* and *Photos* tabs:
@@ -304,7 +307,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
     It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
   - `users.admin_suits`: the suits a user organises (set by a superuser only; it replaced the yes/no `is_admin`, whose organisers got every suit). `users.is_superadmin`: super admins (set by a superuser only).
   - `site_content` (one record) and `site_photos`: the content of the public site, edited by the super admins (see above).
-  - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
+  - `app_settings`: key/value settings edited by the super admins: `signup_code`, `superadmin_signup_code` (never readable through the API).
   - `print_designs`: the super admins' choices in the Prints designers (logo, invitation, QR website address), saved as they edit (never readable through the API: `pb_hooks/admin.pb.js` only).
   - `quiz_questions`, `quiz_answers`: the diamonds quiz (organisers only; seeded with two example questions per card). `quiz_attempts`: per user and card, the current question, the questions already faced and the wrong answers (server only).
   - `guess_people`, `guess_hints`: the people of the spades "guess who" and their 13 hints (organisers only; seeded with two example people). `guess_assignments`: the person drawn for each user, its attempts and `found` (server only). `guess_selfies`: one per (user, card), a protected photo or `same_as` the earlier selfie confirmed; created only by the hook, visible to the owner and the organisers.
@@ -319,7 +322,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `quiz.pb.js` serves the diamonds quiz: current question, answers, lives and penalties.
   - `guess.pb.js` serves the spades "guess who": the hints of a card (`POST /api/game/guess/{cardId}`), the selfie upload and the "same person as before" confirmation, the status and the final guess.
   - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code, who organises which suit), each endpoint for the organisers of its suit only (the secret code and the users for super admins).
-  - `signup.pb.js` checks the sign-up secret code.
+  - `signup.pb.js` checks the sign-up secret code (and makes the account a super admin with the super-admin code).
   - `site.pb.js` validates the site content (IBAN checksum, BIC, date with its offset, time zone, a reception with its address and time) and the photo slots, and re-applies the e-mails in the chosen language.
   - `lib/i18n.js` holds the messages the hooks send to the guests, in English and Italian.
   - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
@@ -364,6 +367,8 @@ The frontend container reads it **at start-up** (written to `/env-config.js`), s
 | `PB_SMTP_HOST`, `PB_SMTP_PORT`, `PB_SMTP_USERNAME`, `PB_SMTP_PASSWORD`, `PB_SMTP_TLS` | SMTP server (SMTP is enabled when `PB_SMTP_HOST` is set) |
 | `PB_ORIGINS`                              | Allowed CORS origins, comma separated (default `*`)               |
 | `PB_RATE_LIMIT`                           | `false` disables the built-in rate limiter (default: enabled)     |
+| `PB_SIGNUP_CODE`                          | First guests' sign-up code (quote it in `.env`: `"#wedding"`); not set: a random one, in the log. Then changed from the site |
+| `PB_SUPERADMIN_SIGNUP_CODE`               | First sign-up code that makes the account a super admin (10–50 characters, different from the guests' one); not set: closed. Then changed from the site |
 | `PB_RATE_LIMIT_EXCLUDED_IPS`              | IPs the rate limits don't apply to (e.g. the venue Wi-Fi on the day), comma separated; `-` clears the list |
 | `PB_TRUSTED_PROXY_HEADERS`                | Behind a reverse proxy: header(s) holding the client IP, e.g. `X-Forwarded-For` (set in `deploy/docker-compose.prod.yml`) |
 

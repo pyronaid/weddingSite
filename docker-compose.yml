@@ -35,6 +35,9 @@ services:
       PB_SMTP_USERNAME: ${PB_SMTP_USERNAME:-}
       PB_SMTP_PASSWORD: ${PB_SMTP_PASSWORD:-}
       PB_SMTP_TLS: ${PB_SMTP_TLS:-false}
+      # Starting values of the sign-up codes (see .env.example).
+      PB_SIGNUP_CODE: ${PB_SIGNUP_CODE:-}
+      PB_SUPERADMIN_SIGNUP_CODE: ${PB_SUPERADMIN_SIGNUP_CODE:-}
     volumes:
       - pb_data:/pb/pb_data
     restart: unless-stopped

@@ -131,7 +131,7 @@ export class PocketBaseAdminRepository implements AdminRepository {
     return this.call('/settings', 'GET');
   }
 
-  updateSettings(settings: AdminSettings): Promise<AdminSettings> {
-    return this.call('/settings', 'PATCH', settings);
+  updateSettings(changes: Partial<AdminSettings>): Promise<AdminSettings> {
+    return this.call('/settings', 'PATCH', changes);
   }
 }

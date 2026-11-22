@@ -140,6 +140,8 @@ export interface SavedPrintDesign {
 export interface AdminSettings {
   /** Code required to create an account. */
   signupCode: string;
+  /** Code that makes the new account a super admin; empty: nobody can sign up as one. */
+  superAdminSignupCode: string;
 }
 
 /** Organisers' operations; every one is checked by the server (the suits of `admin_suits`, or a super admin). */
@@ -174,7 +176,8 @@ export interface AdminRepository {
   /** Super admins: saves them (last save wins). */
   savePrintDesign(kind: PrintDesignKind, design: object): Promise<SavedPrintDesign>;
   getSettings(): Promise<AdminSettings>;
-  updateSettings(settings: AdminSettings): Promise<AdminSettings>;
+  /** Either code, or both: the other stays as it is. Resolves with both, as saved. */
+  updateSettings(changes: Partial<AdminSettings>): Promise<AdminSettings>;
 }
 
 export type AdminErrorCode =

@@ -627,3 +627,14 @@
   font-size: 0.72rem;
   font-weight: 700;
 }
+
+/* The warning above the super-admin sign-up code. */
+.codeNote {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.codeNote p {
+  margin: 0;
+}

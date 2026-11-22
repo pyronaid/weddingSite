@@ -352,9 +352,9 @@ Fill in `/opt/wedding/.env`:
    - better still, store them **off the server**: same page → S3 storage (Hetzner Object Storage, Backblaze B2 or Cloudflare R2, a few cents a month).
    - **These nightly backups include the photos.** The per-deploy copies in `/opt/wedding/backups/` include only the database.
 3. **The couple (super admins):**
-   1. Sign up on the site (with the secret code `#wedding`) and confirm the e-mail.
-   2. In the admin UI: **users** → you → tick **`is_superadmin`** → Save.
-   3. Log out and in again.
+   - **Either** with the super-admin code: set `PB_SUPERADMIN_SIGNUP_CODE` in `/opt/wedding/.env` (at least 10 characters, different from `PB_SIGNUP_CODE`) **before the first start** of the site, or of the version that added this code, sign up on the site with it, and confirm the e-mail: the account is a super admin. Then, in *Site settings* → *Sign-up code*, **empty the super-admin code** (closed) once both of you are in, or keep it secret.
+   - **Or** by hand: sign up with the guests' code (`PB_SIGNUP_CODE`), confirm the e-mail, then in the admin UI: **users** → you → tick **`is_superadmin`** → Save; log out and in again.
+   - The two variables are only the **first** values: once the database exists, change the codes from the site (a new value in `.env` does nothing).
    - **Organisers:** the same, choosing their suits in **`admin_suits`** (e.g. only clubs). They still play the game, and edit only those suits.
 4. **Site settings** (private area → *Site settings*): **language**, names, date and time zone, RSVP deadline, ceremony/reception, gift text and **IBAN**, and all the **photos**. These texts are shown as written, so write them in the chosen language.
 5. **The game content** (private area → **Organise** tab: cards with a red frame still need something, and the overview counts what is left):

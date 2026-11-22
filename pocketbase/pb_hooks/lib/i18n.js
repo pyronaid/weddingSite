@@ -20,6 +20,8 @@ const MESSAGES = {
     secret_code_wrong: 'This secret code is not correct.',
     secret_code_missing: 'Please enter the secret code.',
     secret_code_length: 'The secret code must be 3 to 50 characters long.',
+    superadmin_code_length: 'The super-admin code must be 10 to 50 characters long (or empty, to close it).',
+    signup_codes_same: 'The guests\' code and the super-admin code must be different.',
     // RSVP
     rsvp_guests_not_attending: 'Guests must be 0 when not attending.',
     rsvp_guests_attending: 'At least 1 guest is required when attending.',
@@ -79,6 +81,8 @@ const MESSAGES = {
     secret_code_wrong: 'Il codice segreto non è corretto.',
     secret_code_missing: 'Inserisci il codice segreto.',
     secret_code_length: 'Il codice segreto deve avere da 3 a 50 caratteri.',
+    superadmin_code_length: 'Il codice dei super admin deve avere da 10 a 50 caratteri (oppure vuoto, per chiuderlo).',
+    signup_codes_same: 'Il codice degli ospiti e quello dei super admin devono essere diversi.',
     rsvp_guests_not_attending: 'Se non partecipi, gli ospiti devono essere 0.',
     rsvp_guests_attending: 'Se partecipi serve almeno 1 ospite.',
     card_not_found: 'Carta non trovata.',
