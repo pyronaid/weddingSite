@@ -276,105 +276,33 @@ export function InvitationDesigner({ url }: { url: string }) {
 
         {/* Disabled until the saved choices are there: nothing edited is lost or overwritten. */}
         <fieldset className={styles.options} disabled={!saved.design}>
-          <fieldset className={styles.choices}>
-            <legend>{inv.size}</legend>
-            {SIZES.map((value) => (
-              <label key={value} className={styles.choice}>
-                <input
-                  type="radio"
-                  name={`${id}-size`}
-                  checked={design.size === value}
-                  onChange={() => change({ size: value })}
-                />
-                {inv.sizes[value]}
-              </label>
-            ))}
-          </fieldset>
-
-          <div className={formStyles.field}>
-            <label htmlFor={`${id}-language`}>{inv.language}</label>
-            <select
-              id={`${id}-language`}
-              value={language}
-              aria-describedby={`${id}-language-hint`}
-              onChange={(event) => isLanguage(event.target.value) && change({ language: event.target.value })}
-            >
-              {LANGUAGES.map((value) => (
-                <option key={value} value={value}>
-                  {languageNames[value]}
-                </option>
-              ))}
-            </select>
-            <span id={`${id}-language-hint`} className={formStyles.hint}>
-              {inv.languageHint}
-            </span>
-          </div>
-
-          <fieldset className={styles.choices}>
-            <legend>{inv.names}</legend>
-            {NAME_LINES.map((value) => (
-              <label key={value} className={styles.choice}>
-                <input
-                  type="radio"
-                  name={`${id}-names`}
-                  checked={design.names === value}
-                  onChange={() => change({ names: value })}
-                />
-                {inv.nameLines[value]}
-              </label>
-            ))}
-          </fieldset>
-
-          {textOption('heading', inv.heading, card.heading[design.names])}
-          {textOption('subheading', inv.subheading, card.to)}
-
-          <label className={styles.check}>
-            <input type="checkbox" checked={design.logo} onChange={(event) => change({ logo: event.target.checked })} />
-            {inv.logo}
-          </label>
-          <label className={styles.check}>
-            <input type="checkbox" checked={design.qr} onChange={(event) => change({ qr: event.target.checked })} />
-            {inv.qr}
-          </label>
-          {design.qr && textOption('qrText', inv.qrText, card.website, true)}
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={design.signupCode}
-              onChange={(event) => change({ signupCode: event.target.checked })}
-            />
-            {inv.signupCode}
-          </label>
-
-          <fieldset className={styles.choices}>
-            <legend>{inv.background}</legend>
-            <label className={styles.choice}>
-              <input
-                type="radio"
-                name={`${id}-bg`}
-                checked={design.background === null}
-                onChange={() => change({ background: null })}
-              />
-              {inv.backgroundNone}
-            </label>
-            <label className={styles.choice}>
-              <input
-                type="radio"
-                name={`${id}-bg`}
-                checked={design.background !== null}
-                onChange={() => change({ background: BACKGROUND_SWATCHES.blush })}
-              />
-              {inv.backgroundGradient}
-            </label>
-          </fieldset>
-          {design.background !== null && (
-            <ColorPicker
-              legend={inv.backgroundColour}
-              value={design.background}
-              onChange={(background) => change({ background })}
-              swatches={BACKGROUND_SWATCHES}
-              names={t.colours.backgrounds}
-            />
+          {design.decoration !== 'none' && (
+            <fieldset className={styles.choices}>
+              <legend>{inv.corners}</legend>
+              <p className={formStyles.hint}>{inv.cornersHint}</p>
+              <div className={styles.corners}>
+                {([0, 1] as const).map((corner) => (
+                  <div key={corner} className={styles.corner}>
+                    <span className={styles.cornerTitle}>{inv.cornerTitles[corner]}</span>
+                    <NudgeControls
+                      which={inv.cornerAdjust.which[corner]}
+                      value={design.decorationAdjustments[corner]}
+                      limits={CORNER_ADJUST}
+                      labels={inv.cornerAdjust}
+                      onChange={(next) => adjustCorner(corner, next)}
+                    />
+                  </div>
+                ))}
+              </div>
+              {resolution &&
+                ([0, 1] as const)
+                  .filter((corner) => resolution[corner] < 200)
+                  .map((corner) => (
+                    <p key={corner} role="status" className={styles.letterNote}>
+                      {inv.lowResolution(inv.cornerAdjust.which[corner], resolution[corner])}
+                    </p>
+                  ))}
+            </fieldset>
           )}
 
           <fieldset className={styles.choices}>
@@ -423,33 +351,36 @@ export function InvitationDesigner({ url }: { url: string }) {
                 names={t.colours.names}
               />
             ))}
-          {design.decoration !== 'none' && (
-            <fieldset className={styles.choices}>
-              <legend>{inv.corners}</legend>
-              <p className={formStyles.hint}>{inv.cornersHint}</p>
-              <div className={styles.corners}>
-                {([0, 1] as const).map((corner) => (
-                  <div key={corner} className={styles.corner}>
-                    <span className={styles.cornerTitle}>{inv.cornerTitles[corner]}</span>
-                    <NudgeControls
-                      which={inv.cornerAdjust.which[corner]}
-                      value={design.decorationAdjustments[corner]}
-                      limits={CORNER_ADJUST}
-                      labels={inv.cornerAdjust}
-                      onChange={(next) => adjustCorner(corner, next)}
-                    />
-                  </div>
-                ))}
-              </div>
-              {resolution &&
-                ([0, 1] as const)
-                  .filter((corner) => resolution[corner] < 200)
-                  .map((corner) => (
-                    <p key={corner} role="status" className={styles.letterNote}>
-                      {inv.lowResolution(inv.cornerAdjust.which[corner], resolution[corner])}
-                    </p>
-                  ))}
-            </fieldset>
+
+          <fieldset className={styles.choices}>
+            <legend>{inv.background}</legend>
+            <label className={styles.choice}>
+              <input
+                type="radio"
+                name={`${id}-bg`}
+                checked={design.background === null}
+                onChange={() => change({ background: null })}
+              />
+              {inv.backgroundNone}
+            </label>
+            <label className={styles.choice}>
+              <input
+                type="radio"
+                name={`${id}-bg`}
+                checked={design.background !== null}
+                onChange={() => change({ background: BACKGROUND_SWATCHES.blush })}
+              />
+              {inv.backgroundGradient}
+            </label>
+          </fieldset>
+          {design.background !== null && (
+            <ColorPicker
+              legend={inv.backgroundColour}
+              value={design.background}
+              onChange={(background) => change({ background })}
+              swatches={BACKGROUND_SWATCHES}
+              names={t.colours.backgrounds}
+            />
           )}
 
           <fieldset className={styles.choices}>
@@ -519,6 +450,76 @@ export function InvitationDesigner({ url }: { url: string }) {
               </div>
             </>
           )}
+
+          <fieldset className={styles.choices}>
+            <legend>{inv.size}</legend>
+            {SIZES.map((value) => (
+              <label key={value} className={styles.choice}>
+                <input
+                  type="radio"
+                  name={`${id}-size`}
+                  checked={design.size === value}
+                  onChange={() => change({ size: value })}
+                />
+                {inv.sizes[value]}
+              </label>
+            ))}
+          </fieldset>
+
+          <div className={formStyles.field}>
+            <label htmlFor={`${id}-language`}>{inv.language}</label>
+            <select
+              id={`${id}-language`}
+              value={language}
+              aria-describedby={`${id}-language-hint`}
+              onChange={(event) => isLanguage(event.target.value) && change({ language: event.target.value })}
+            >
+              {LANGUAGES.map((value) => (
+                <option key={value} value={value}>
+                  {languageNames[value]}
+                </option>
+              ))}
+            </select>
+            <span id={`${id}-language-hint`} className={formStyles.hint}>
+              {inv.languageHint}
+            </span>
+          </div>
+
+          <fieldset className={styles.choices}>
+            <legend>{inv.names}</legend>
+            {NAME_LINES.map((value) => (
+              <label key={value} className={styles.choice}>
+                <input
+                  type="radio"
+                  name={`${id}-names`}
+                  checked={design.names === value}
+                  onChange={() => change({ names: value })}
+                />
+                {inv.nameLines[value]}
+              </label>
+            ))}
+          </fieldset>
+
+          {textOption('heading', inv.heading, card.heading[design.names])}
+          {textOption('subheading', inv.subheading, card.to)}
+
+          <label className={styles.check}>
+            <input type="checkbox" checked={design.logo} onChange={(event) => change({ logo: event.target.checked })} />
+            {inv.logo}
+          </label>
+          <label className={styles.check}>
+            <input type="checkbox" checked={design.qr} onChange={(event) => change({ qr: event.target.checked })} />
+            {inv.qr}
+          </label>
+          {design.qr && textOption('qrText', inv.qrText, card.website, true)}
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={design.signupCode}
+              onChange={(event) => change({ signupCode: event.target.checked })}
+            />
+            {inv.signupCode}
+          </label>
         </fieldset>
       </div>
     </section>

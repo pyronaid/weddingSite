@@ -1216,6 +1216,37 @@ describe('site settings (super admin)', () => {
         expect(card()).not.toContain('invitation-pattern');
       });
 
+      it('lists the choices decorations first, then background, pattern, and the card itself', async () => {
+        open('/invitations');
+        const user = userEvent.setup();
+        await ready();
+        await user.click(
+          within(screen.getByRole('group', { name: 'Side decorations' })).getByRole('radio', { name: 'Plants' }),
+        );
+        await user.click(
+          within(screen.getByRole('group', { name: 'Pattern', exact: true })).getByRole('radio', {
+            name: fileLabel(PATTERNS[1]),
+          }),
+        );
+        const options = [
+          screen.getByRole('group', { name: 'Position and size of the decorations' }),
+          screen.getByRole('group', { name: 'Side decorations' }),
+          screen.getByRole('group', { name: 'Colour of the decorations' }),
+          screen.getByRole('group', { name: 'Background' }),
+          screen.getByRole('group', { name: 'Pattern', exact: true }),
+          screen.getByRole('group', { name: 'Colour of the pattern' }),
+          screen.getByLabelText('Strength of the pattern'),
+          screen.getByRole('group', { name: 'Size' }),
+          screen.getByLabelText('Language of the invitation'),
+          screen.getByLabelText('Title', { exact: true }),
+          screen.getByRole('checkbox', { name: /Show the QR code/ }),
+        ];
+        // Each one after the one before it in the page.
+        options.slice(1).forEach((option, i) =>
+          expect(options[i].compareDocumentPosition(option) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(),
+        );
+      });
+
       it('uses watercolour pictures in their own colours, and moves and resizes each corner', async () => {
         const designs: DesignStore = {};
         open('/invitations', fakeAdmin({}, designs));
