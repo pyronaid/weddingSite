@@ -7,9 +7,12 @@ import {
   DEFAULT_MONOGRAM,
   MONOGRAM_FONTS,
   monogramParts,
+  letterFitsArea,
+  restyle,
   monogramSvg,
   SEPARATORS,
   type GlyphFonts,
+  type LetterAdjustment,
   type MonogramDesign,
 } from '../../../../../brand/monogram';
 import { useMessages } from '../../../../../i18n';
@@ -17,6 +20,7 @@ import { download, svgToPng } from '../../../../../prints/output';
 import { printMessages, SWATCHES } from '../../../messages/prints';
 import { ColorPicker } from './ColorPicker';
 import { ExportButton } from './ExportButton';
+import { LetterControls } from './LetterControls';
 import styles from './prints.module.css';
 import { SaveStatus } from './SaveStatus';
 import { useLogoDesign } from './useLogoDesign';
@@ -90,6 +94,13 @@ export function LogoDesigner() {
   const [failed, setFailed] = useState(false);
   const [dark, setDark] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  // A move or resize refused (it would leave the area): which letter, shown a few seconds.
+  const [blocked, setBlocked] = useState<0 | 1 | null>(null);
+  useEffect(() => {
+    if (blocked === null) return;
+    const timer = setTimeout(() => setBlocked(null), 5000);
+    return () => clearTimeout(timer);
+  }, [blocked]);
 
   useEffect(() => {
     let current = true;
@@ -120,11 +131,27 @@ export function LogoDesigner() {
   }
 
   const change = (changes: Partial<MonogramDesign>) => setDesign((current) => ({ ...current, ...changes }));
+  /** A new style lays the letters out again: their moves and resizes start over (see `restyle`). */
+  const changeStyle = (changes: Partial<MonogramDesign>) => {
+    setBlocked(null);
+    setDesign((current) => restyle(current, changes));
+  };
   const setLetter = (index: 0 | 1, value: string) => {
     const letters: [string, string] = [...design.letters];
     // The last typed character, upper case.
     letters[index] = [...value.trim()].slice(-1).join('').toLocaleUpperCase();
     change({ letters });
+  };
+  /** Moves or resizes a letter, only if it stays inside the area for the letters. */
+  const adjust = (index: 0 | 1, next: LetterAdjustment) => {
+    const adjustments: [LetterAdjustment, LetterAdjustment] = [...design.adjustments];
+    adjustments[index] = next;
+    if (!letterFitsArea({ ...design, adjustments }, fonts, index)) {
+      setBlocked(index);
+      return;
+    }
+    setBlocked(null);
+    change({ adjustments });
   };
   const setColor = (index: 0 | 1, color: string) => {
     const colors: [string, string] = [...design.colors];
@@ -190,6 +217,11 @@ export function LogoDesigner() {
                     onChange={(event) => setLetter(index, event.target.value)}
                   />
                 </div>
+                <LetterControls
+                  letter={index}
+                  adjustment={design.adjustments[index]}
+                  onAdjust={(next) => adjust(index, next)}
+                />
                 <ColorPicker
                   legend={index === 0 ? l.firstColour : l.secondColour}
                   value={design.colors[index]}
@@ -197,6 +229,18 @@ export function LogoDesigner() {
                   swatches={SWATCHES}
                   names={t.colours.names}
                 />
+                {blocked === index ? (
+                  <p role="alert" className={`${styles.warning} ${styles.letterNote}`}>
+                    {l.adjust.blocked(l.adjust.which[index])}
+                  </p>
+                ) : (
+                  // Moved earlier, then the border or the letters changed: it may stick out now.
+                  !letterFitsArea(design, fonts, index) && (
+                    <p role="status" className={`${styles.warning} ${styles.letterNote}`}>
+                      {l.adjust.outside(l.adjust.which[index])}
+                    </p>
+                  )
+                )}
               </div>
             ))}
           </fieldset>
@@ -206,7 +250,7 @@ export function LogoDesigner() {
             name={`${id}-arrangement`}
             options={ARRANGEMENTS}
             value={design.arrangement}
-            onChange={(arrangement) => change({ arrangement })}
+            onChange={(arrangement) => changeStyle({ arrangement })}
             labels={l.arrangements}
             preview={(arrangement) => (
               <Monogram
@@ -228,7 +272,7 @@ export function LogoDesigner() {
                       name={`${id}-separator`}
                       checked={design.separator === separator}
                       aria-label={l.separatorNames[separator]}
-                      onChange={() => change({ separator })}
+                      onChange={() => changeStyle({ separator })}
                     />
                     <span className={styles.separatorSample}>{l.separators[separator]}</span>
                   </label>
@@ -265,7 +309,7 @@ export function LogoDesigner() {
             name={`${id}-font`}
             options={MONOGRAM_FONTS}
             value={design.font}
-            onChange={(font) => change({ font })}
+            onChange={(font) => changeStyle({ font })}
             labels={l.fonts}
             preview={(font) => (
               <Monogram design={{ ...design, font, border: 'none' }} fonts={fonts} id={`${id}-f-${font}`} />
@@ -277,7 +321,7 @@ export function LogoDesigner() {
             name={`${id}-border`}
             options={BORDER_STYLES}
             value={design.border}
-            onChange={(border) => change({ border })}
+            onChange={(border) => changeStyle({ border })}
             labels={Object.fromEntries(BORDER_STYLES.map((id) => [id, id === 'none' ? l.noBorder : borderLabel(id)]))}
             preview={(border) => <Monogram design={{ ...design, border }} fonts={fonts} id={`${id}-b-${border}`} />}
           />

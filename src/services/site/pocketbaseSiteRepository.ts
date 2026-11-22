@@ -1,6 +1,7 @@
 import type PocketBase from 'pocketbase';
 import { defaultContent, defaultPhoto } from '../../config/wedding';
 import { isLanguage } from '../../i18n';
+import { sanitizePalette, type Palette } from '../../theme/palette';
 // Errors of the organisers' screens (field messages included): the super admin page uses them too.
 import { toAdminError } from '../admin/errors';
 import { isPhotoSlot, PHOTO_SLOTS } from './slots';
@@ -37,6 +38,8 @@ interface ContentRecord {
   bic: string;
   bank_name: string;
   payment_reason: string;
+  /** JSON: colours by name (empty: the defaults). */
+  palette?: unknown;
 }
 
 interface PhotoRecord {
@@ -132,7 +135,7 @@ export class PocketBaseSiteRepository implements SiteRepository {
       const record = records.items[0];
       if (!record) return defaultContent;
       this.contentId = record.id;
-      return { ...toSettings(record), ...this.toPhotos(photos) };
+      return { ...toSettings(record), ...this.toPhotos(photos), palette: sanitizePalette(record.palette) };
     } catch (error) {
       throw toAdminError(error);
     }
@@ -142,6 +145,16 @@ export class PocketBaseSiteRepository implements SiteRepository {
     if (!this.contentId) await this.load();
     try {
       await this.pb.collection(CONTENT).update(this.contentId ?? '', toRecord(settings));
+    } catch (error) {
+      throw toAdminError(error);
+    }
+    return this.load();
+  }
+
+  async savePalette(palette: Palette): Promise<SiteContent> {
+    if (!this.contentId) await this.load();
+    try {
+      await this.pb.collection(CONTENT).update(this.contentId ?? '', { palette });
     } catch (error) {
       throw toAdminError(error);
     }

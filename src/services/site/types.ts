@@ -1,4 +1,5 @@
 import type { Language } from '../../i18n';
+import type { Palette } from '../../theme/palette';
 
 export interface Photo {
   src: string;
@@ -74,6 +75,8 @@ export interface SiteContent extends SiteSettings {
   photos: Record<PhotoSlot, Photo>;
   /** Slots with an uploaded photo (the others show the default). */
   uploaded: PhotoSlot[];
+  /** The site's colours (the defaults until the super admin changes them). */
+  palette: Palette;
 }
 
 /** Content of the public site, editable by the super admin. */
@@ -87,4 +90,6 @@ export interface SiteRepository {
   updatePhotoAlt(slot: PhotoSlot, alt: string): Promise<SiteContent>;
   /** Back to the default picture. */
   resetPhoto(slot: PhotoSlot): Promise<SiteContent>;
+  /** Super admin only: the colours, on their own (a General save never touches them). */
+  savePalette(palette: Palette): Promise<SiteContent>;
 }

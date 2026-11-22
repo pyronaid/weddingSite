@@ -27,8 +27,8 @@
  *   GET    /api/admin/prints/riddles            clubs with the secret code of their poster (super admins)
  *   GET    /api/admin/prints/designs/{kind}     saved choices of a designer: logo, invitation, website (super admins)
  *   PUT    /api/admin/prints/designs/{kind}     {design}: saves them, last save wins (super admins)
- *   GET    /api/admin/settings                  {signupCode}
- *   PATCH  /api/admin/settings                  {signupCode}
+ *   GET    /api/admin/settings                  {signupCode, superAdminSignupCode}
+ *   PATCH  /api/admin/settings                  {signupCode?, superAdminSignupCode?}
  */
 
 routerAdd(
@@ -94,7 +94,10 @@ routerAdd(
     const admin = require(`${__hooks}/lib/admin.js`);
     const { getSetting } = require(`${__hooks}/lib/settings.js`);
     admin.requireSuperAdmin(e);
-    return e.json(200, { signupCode: getSetting(e.app, 'signup_code', '') });
+    return e.json(200, {
+      signupCode: getSetting(e.app, 'signup_code', ''),
+      superAdminSignupCode: getSetting(e.app, 'superadmin_signup_code', ''),
+    });
   },
   $apis.requireAuth('users'),
 );
@@ -104,19 +107,31 @@ routerAdd(
   '/api/admin/settings',
   (e) => {
     const admin = require(`${__hooks}/lib/admin.js`);
-    const { setSetting } = require(`${__hooks}/lib/settings.js`);
+    const { checkSignupCodes, getSetting, setSetting } = require(`${__hooks}/lib/settings.js`);
     admin.requireSuperAdmin(e);
 
-    const code = String(e.requestInfo().body.signupCode ?? '').trim();
-    // Empty would let anyone sign up: require a real code.
-    if (code.length < 3 || code.length > 50) {
-      const { t } = require(`${__hooks}/lib/i18n.js`);
-      throw new BadRequestError(t(e.app, 'check_fields'), {
-        signupCode: new ValidationError('validation_length', t(e.app, 'secret_code_length')),
-      });
+    // Either code, or both: the one not sent stays as it is, and the pair is checked.
+    const body = e.requestInfo().body;
+    const read = (field, key) =>
+      body[field] === undefined || body[field] === null ? getSetting(e.app, key, '') : String(body[field]).trim();
+    const signupCode = read('signupCode', 'signup_code');
+    const superAdminSignupCode = read('superAdminSignupCode', 'superadmin_signup_code');
+    const problems = checkSignupCodes(signupCode, superAdminSignupCode);
+    // Two codes the same: said on the one being changed.
+    if (problems.superAdminSignupCode === 'signup_codes_same' && body.superAdminSignupCode === undefined) {
+      delete problems.superAdminSignupCode;
+      problems.signupCode = 'signup_codes_same';
     }
-    setSetting(e.app, 'signup_code', code);
-    return e.json(200, { signupCode: code });
+    if (Object.keys(problems).length > 0) {
+      const { t } = require(`${__hooks}/lib/i18n.js`);
+      const errors = {};
+      for (const [field, key] of Object.entries(problems))
+        errors[field] = new ValidationError(`validation_${key}`, t(e.app, key));
+      throw new BadRequestError(t(e.app, 'check_fields'), errors);
+    }
+    setSetting(e.app, 'signup_code', signupCode);
+    setSetting(e.app, 'superadmin_signup_code', superAdminSignupCode);
+    return e.json(200, { signupCode, superAdminSignupCode });
   },
   $apis.requireAuth('users'),
 );

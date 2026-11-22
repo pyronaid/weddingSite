@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactN
 import { defaultContent } from '../config/wedding';
 import { isLanguage, setLanguage } from '../i18n';
 import type { SiteContent, SiteRepository } from '../services/site/types';
+import { applyPalette, sanitizePalette } from '../theme/palette';
 import { SiteContentContext, type SiteContentValue } from './SiteContentContext';
 import styles from './SiteContentProvider.module.css';
 
@@ -12,8 +13,11 @@ const FALLBACK_AFTER_MS = 6000;
 function readCache(): SiteContent | null {
   try {
     const cached = JSON.parse(localStorage.getItem(CACHE_KEY) ?? 'null') as SiteContent | null;
-    // Shape check: an old or damaged entry is ignored.
-    return cached && isLanguage(cached.language) && cached.couple && cached.photos ? cached : null;
+    // Shape check: an old or damaged entry is ignored. (Its colours are checked
+    // again: they go into the page's CSS, and older entries have none.)
+    return cached && isLanguage(cached.language) && cached.couple && cached.photos
+      ? { ...cached, palette: sanitizePalette(cached.palette) }
+      : null;
   } catch {
     return null;
   }
@@ -33,7 +37,7 @@ interface SiteContentProviderProps {
 }
 
 /**
- * Loads the site content (names, date, venues, photos, language) once for
+ * Loads the site content (names, date, venues, photos, language, colours) once for
  * the whole app. The last content seen is cached in the browser: returning
  * visitors get the page immediately while it refreshes in the background;
  * first-time visitors see a short loading screen, never the wrong names.
@@ -77,6 +81,13 @@ export function SiteContentProvider({ repository, children }: SiteContentProvide
   useLayoutEffect(() => {
     if (content) setLanguage(content.language);
   }, [content]);
+
+  // The site's colours, before the browser paints: the page never shows the
+  // previous ones (the cached content has them from the very first paint).
+  const palette = content?.palette;
+  useLayoutEffect(() => {
+    if (palette) applyPalette(palette);
+  }, [palette]);
 
   const value = useMemo<SiteContentValue | null>(
     () => (content ? { content, repository, replace } : null),

@@ -11,7 +11,7 @@
   padding: 0;
   border: 2px solid transparent;
   border-radius: 10px;
-  background: var(--white-warm);
+  background: var(--page-light);
   color: var(--text);
   font: 700 clamp(1.3rem, 6vw, 1.7rem) / 1 var(--font-serif);
   text-align: center;

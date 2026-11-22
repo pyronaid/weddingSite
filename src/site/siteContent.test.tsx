@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router';
 import { defaultContent } from '../config/wedding';
 import { HomePage } from '../pages/HomePage';
 import type { SiteContent, SiteRepository } from '../services/site';
+import { applyPalette, DEFAULT_PALETTE, PALETTE_PRESETS } from '../theme/palette';
 import { SiteContentProvider } from './SiteContentProvider';
 
 // The page embeds framer-motion scroll effects: jsdom needs these.
@@ -44,6 +45,7 @@ const repository = (content: SiteContent | Promise<SiteContent>): SiteRepository
   uploadPhoto: vi.fn(),
   updatePhotoAlt: vi.fn(),
   resetPhoto: vi.fn(),
+  savePalette: vi.fn(),
 });
 
 function renderHome(site: SiteRepository) {
@@ -117,6 +119,41 @@ describe('site content', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sofia & Marco');
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sofia & Luca'));
     expect(JSON.parse(localStorage.getItem('site-content-v1')!).couple.partnerTwo).toBe('Luca');
+  });
+
+  describe('colours', () => {
+    const cardBg = () => document.documentElement.style.getPropertyValue('--card-bg');
+    afterEach(() => applyPalette(DEFAULT_PALETTE));
+
+    it('paints the whole site in the colours chosen by the super admin', async () => {
+      renderHome(repository({ ...italian, palette: PALETTE_PRESETS.sage }));
+      await screen.findByRole('heading', { name: 'Il grande giorno' });
+      expect(cardBg()).toBe(PALETTE_PRESETS.sage.cardBg);
+    });
+
+    it('has the cached colours from the very first paint, never a colour that is not one', () => {
+      localStorage.setItem(
+        'site-content-v1',
+        JSON.stringify({
+          ...italian,
+          palette: { ...PALETTE_PRESETS.navy, accent: 'url(https://example.com/track)' },
+        }),
+      );
+      // The server never answers: what shows is the cache alone.
+      renderHome(repository(new Promise<SiteContent>(() => {})));
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sofia & Luca');
+      expect(cardBg()).toBe(PALETTE_PRESETS.navy.cardBg);
+      // The bad colour is dropped: the default one is left to global.css.
+      expect(document.documentElement.style.getPropertyValue('--accent')).toBe('');
+    });
+
+    it('takes the default colours with a cache from before the palette existed', () => {
+      const { palette: _palette, ...old } = italian;
+      localStorage.setItem('site-content-v1', JSON.stringify(old));
+      renderHome(repository(new Promise<SiteContent>(() => {})));
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Sofia & Luca');
+      expect(cardBg()).toBe('');
+    });
   });
 
   it('falls back to the default content when the server cannot be reached', async () => {

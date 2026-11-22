@@ -12,7 +12,7 @@
 
 .hashtag {
   margin: 0.25rem 0 1.5rem;
-  color: var(--pink-600);
+  color: var(--accent-strong);
   letter-spacing: 0.1em;
 }
 
@@ -21,9 +21,9 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.7rem 1.6rem;
-  border: 1.5px solid var(--pink-600);
+  border: 1.5px solid var(--accent-strong);
   border-radius: 999px;
-  color: var(--pink-600);
+  color: var(--accent-strong);
   text-decoration: none;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -36,7 +36,7 @@
 }
 
 .privateLink:hover {
-  background: var(--pink-600);
+  background: var(--accent-strong);
   color: #fff;
 }
 

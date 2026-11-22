@@ -1,6 +1,6 @@
 import type { Dictionary } from '../../../i18n';
 import type { Arrangement, MonogramFont, Separator } from '../../../brand/monogram';
-import type { Decoration, InvitationSize, NameLines } from '../../../prints/invitations';
+import type { InvitationSize, NameLines } from '../../../prints/invitations';
 
 /** The palette offered by the colour pickers (any other colour can be chosen too). */
 export const SWATCHES = {
@@ -75,6 +75,20 @@ const en = {
     first: 'First letter',
     second: 'Second letter',
     firstColour: 'Colour of the first letter',
+    adjust: {
+      group: (letter: string) => `Position and size of the ${letter}`,
+      which: ['first letter', 'second letter'] as [string, string],
+      bigger: (letter: string) => `Make the ${letter} bigger`,
+      smaller: (letter: string) => `Make the ${letter} smaller`,
+      up: (letter: string) => `Move the ${letter} up`,
+      down: (letter: string) => `Move the ${letter} down`,
+      left: (letter: string) => `Move the ${letter} left`,
+      right: (letter: string) => `Move the ${letter} right`,
+      reset: 'Reset',
+      resetLabel: (letter: string) => `Put the ${letter} back where it was`,
+      blocked: (letter: string) => `The ${letter} would go out of the area for the letters: nothing changed.`,
+      outside: (letter: string) => `The ${letter} goes beyond the area for the letters: move it back, or reset it.`,
+    },
     secondColour: 'Colour of the second letter',
     arrangement: 'Style',
     arrangements: { crossed: 'Crossed', aligned: 'Side by side', diagonal: 'Diagonal' } as Record<Arrangement, string>,
@@ -126,11 +140,15 @@ const en = {
     backgroundGradient: 'Colour shading',
     backgroundColour: 'Colour of the shading',
     decoration: 'Side decorations',
-    decorations: { none: 'None', plants: 'Plants', flowers: 'Flowers', hearts: 'Hearts', roots: 'Roots' } as Record<
-      Decoration,
-      string
-    >,
+    /** The others are named after their files (src/prints/decorations/). */
+    noDecoration: 'None',
     decorationColour: 'Colour of the decorations',
+    pattern: 'Pattern',
+    /** The others are named after their files (src/prints/patterns/). */
+    noPattern: 'None',
+    patternColour: 'Colour of the pattern',
+    patternOpacity: 'Strength of the pattern',
+    patternHint: 'Keep it faint, so the texts stay easy to read.',
     name: 'Invitation',
     reset: 'Start again',
   },
@@ -218,6 +236,20 @@ export const printMessages: Dictionary<typeof en> = {
       first: 'Prima lettera',
       second: 'Seconda lettera',
       firstColour: 'Colore della prima lettera',
+      adjust: {
+        group: (letter) => `Posizione e dimensione della ${letter}`,
+        which: ['prima lettera', 'seconda lettera'],
+        bigger: (letter) => `Ingrandisci la ${letter}`,
+        smaller: (letter) => `Rimpicciolisci la ${letter}`,
+        up: (letter) => `Sposta in alto la ${letter}`,
+        down: (letter) => `Sposta in basso la ${letter}`,
+        left: (letter) => `Sposta a sinistra la ${letter}`,
+        right: (letter) => `Sposta a destra la ${letter}`,
+        reset: 'Ripristina',
+        resetLabel: (letter) => `Rimetti la ${letter} dov’era`,
+        blocked: (letter) => `La ${letter} uscirebbe dall’area delle lettere: non è cambiato nulla.`,
+        outside: (letter) => `La ${letter} esce dall’area delle lettere: spostala indietro o ripristinala.`,
+      },
       secondColour: 'Colore della seconda lettera',
       arrangement: 'Stile',
       arrangements: { crossed: 'Incrociate', aligned: 'Affiancate', diagonal: 'In diagonale' },
@@ -265,8 +297,13 @@ export const printMessages: Dictionary<typeof en> = {
       backgroundGradient: 'Sfumatura di colore',
       backgroundColour: 'Colore della sfumatura',
       decoration: 'Decorazioni laterali',
-      decorations: { none: 'Nessuna', plants: 'Piante', flowers: 'Fiori', hearts: 'Cuori', roots: 'Radici' },
+      noDecoration: 'Nessuna',
       decorationColour: 'Colore delle decorazioni',
+      pattern: 'Motivo di sfondo',
+      noPattern: 'Nessuno',
+      patternColour: 'Colore del motivo',
+      patternOpacity: 'Intensità del motivo',
+      patternHint: 'Tienilo leggero, così i testi restano facili da leggere.',
       name: 'Partecipazione',
       reset: 'Ricomincia',
     },

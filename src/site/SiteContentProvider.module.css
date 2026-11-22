@@ -2,8 +2,8 @@
   display: grid;
   place-items: center;
   min-height: 100vh;
-  background: var(--pink-100);
-  color: var(--pink-400);
+  background: var(--page-band);
+  color: var(--accent);
   font-size: 2.5rem;
 }
 

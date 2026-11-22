@@ -87,6 +87,6 @@
 }
 
 .form input[type='file']:focus-visible + label {
-  outline: 3px solid var(--pink-400);
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
 }

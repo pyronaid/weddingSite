@@ -194,7 +194,7 @@
 }
 
 .choiceCard:has(input:focus-visible) {
-  outline: 3px solid var(--pink-400);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -211,6 +211,25 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* A slider with its value next to it (the pattern's strength). */
+.range {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.range input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.range output {
+  min-width: 3rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .separatorSample {
@@ -269,7 +288,7 @@
 }
 
 .swatch input:focus-visible + span {
-  outline: 3px solid var(--pink-400);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -308,9 +327,70 @@
 
 .letterRow {
   display: grid;
-  grid-template-columns: 6rem minmax(0, 1fr);
+  /* Letter | move and resize | colours. */
+  grid-template-columns: 5rem auto minmax(0, 1fr);
   align-items: end;
   gap: 0.8rem;
+}
+
+@media (max-width: 480px) {
+  .letterRow {
+    grid-template-columns: 5rem auto;
+  }
+
+  .letterRow > fieldset {
+    grid-column: 1 / -1;
+  }
+}
+
+.letterNote {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.adjust {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+}
+
+.adjustGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 2rem);
+  gap: 0.25rem;
+}
+
+.adjustButton {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--card-surface);
+  color: var(--card-text);
+  font: 700 0.95rem var(--font-sans);
+  cursor: pointer;
+}
+
+.adjustButton:hover:not(:disabled) {
+  border-color: var(--card-accent);
+}
+
+.adjustButton:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.adjustButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.adjustReset {
+  font-size: 0.75rem;
 }
 
 .letterInput {

@@ -7,9 +7,13 @@ import { sans } from './glyphs/sans';
 import { script } from './glyphs/script';
 import { serif } from './glyphs/serif';
 import {
+  ADJUST,
   DEFAULT_MONOGRAM,
+  letterFitsArea,
   monogramParts,
   monogramSvg,
+  NO_ADJUSTMENT,
+  restyle,
   sanitizeMonogram,
   SPACING,
   type MonogramDesign,
@@ -100,7 +104,6 @@ describe('monogram', () => {
     },
   );
 
-
   it('reads the room a border leaves for the letters', () => {
     const file = (attrs: string) =>
       parseBorderFile(
@@ -134,12 +137,6 @@ describe('monogram', () => {
     expect(painted).toContain('href="#p-evil-g"');
     expect(painted).toContain('stop-color="#123456"');
     expect(painted).toMatch(/^<g fill="#123456"/);
-  });
-
-  it('turns the border names of earlier versions into their files, and a missing file into none', () => {
-    expect(sanitizeMonogram({ border: 'flowersBig' }).border).toBe('big_flowers');
-    expect(sanitizeMonogram({ border: 'circles' }).border).toBe('circles');
-    expect(sanitizeMonogram({ border: 'deleted_file' }).border).toBe('none');
   });
 
   it('keeps the letters inside the canvas, whatever the arrangement', () => {
@@ -213,6 +210,125 @@ describe('monogram', () => {
     });
   });
 
+  describe('letters moved and resized by hand', () => {
+    describe('a new style starts the refinement over', () => {
+      const moved = design({
+        adjustments: [
+          { x: 2, y: -1, size: 90 },
+          { x: 0, y: 3, size: 110 },
+        ],
+      });
+      const neutral = [NO_ADJUSTMENT, NO_ADJUSTMENT];
+
+      it.each([
+        ['arrangement', { arrangement: 'diagonal' }],
+        ['separator', { separator: 'heart' }],
+        ['font', { font: 'serif' }],
+        ['border', { border: 'stile_01' }],
+      ] as const)('a new %s puts both letters back', (_, changes) => {
+        expect(restyle(moved, changes)).toEqual({ ...moved, ...changes, adjustments: neutral });
+      });
+
+      it('keeps them for letters, colours and the separator text', () => {
+        const changes = { letters: ['A', 'B'], colors: ['#000000', '#ffffff'], customSeparator: '+' } as const;
+        expect(restyle(moved, changes as Partial<MonogramDesign>).adjustments).toEqual(moved.adjustments);
+      });
+
+      it('keeps them when the same style is picked again', () => {
+        expect(restyle(moved, { border: moved.border, font: moved.font }).adjustments).toEqual(moved.adjustments);
+      });
+    });
+
+    /** The drawn letters: their transforms in the fitted group, and the group's scale. */
+    function drawn(changes: Partial<MonogramDesign>) {
+      const { body } = monogramParts(
+        design({ font: 'sans', arrangement: 'aligned', letters: ['A', 'B'], ...changes }),
+        fonts,
+      );
+      const [, tx, ty, scale] = /<g transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)">/
+        .exec(body)!
+        .map(Number);
+      const letters = [
+        ...body.matchAll(/<path transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)" d="([^"]+)"/g),
+      ].map(([, x, y, s, d]) => ({ x: Number(x), y: Number(y), s: Number(s), d }));
+      return { body, tx, ty, scale, letters };
+    }
+    const moved = (first: Partial<(typeof DEFAULT_MONOGRAM.adjustments)[0]>, second = {}) =>
+      [
+        { x: 0, y: 0, size: 100, ...first },
+        { x: 0, y: 0, size: 100, ...second },
+      ] as MonogramDesign['adjustments'];
+
+    it('changes nothing when not adjusted', () => {
+      expect(monogramParts(design({ adjustments: moved({}) }), fonts).body).toBe(
+        monogramParts(DEFAULT_MONOGRAM, fonts).body,
+      );
+    });
+
+    it('moves only that letter, by steps of 2% of the letters area, without refitting the rest', () => {
+      const before = drawn({});
+      const after = drawn({ adjustments: moved({ x: 3, y: -2 }) });
+      // The group is not refitted.
+      expect([after.tx, after.ty, after.scale]).toEqual([before.tx, before.ty, before.scale]);
+      // Area: 2 × 390 canvas units without a border (a square of half side 390).
+      const step = (ADJUST.moveStep * 2 * 390) / before.scale;
+      expect(after.letters[0].x - before.letters[0].x).toBeCloseTo(3 * step, 1);
+      expect(after.letters[0].y - before.letters[0].y).toBeCloseTo(-2 * step, 1);
+      expect(after.letters[1]).toEqual(before.letters[1]);
+    });
+
+    it('resizes a letter around its own middle', () => {
+      const box = sans.glyphs.A.box;
+      const middle = ({ x, y, s }: { x: number; y: number; s: number }) => [
+        x + s * ((box[0] + box[2]) / 2),
+        y + s * ((box[1] + box[3]) / 2),
+      ];
+      const before = drawn({}).letters[0];
+      const after = drawn({ adjustments: moved({ size: 120 }) }).letters[0];
+      expect(after.s).toBeCloseTo(before.s * 1.2, 3);
+      expect(middle(after)[0]).toBeCloseTo(middle(before)[0], 1);
+      expect(middle(after)[1]).toBeCloseTo(middle(before)[1], 1);
+    });
+
+    it('keeps the gap of crossed letters around the moved second letter', () => {
+      const { body } = monogramParts(design({ adjustments: moved({}, { x: 4 }) }), fonts);
+      const mask = /<mask[\s\S]*?<path transform="translate\(([-\d.]+) ([-\d.]+)\)/.exec(body)!;
+      const plain = /<mask[\s\S]*?<path transform="translate\(([-\d.]+) ([-\d.]+)\)/.exec(
+        monogramParts(DEFAULT_MONOGRAM, fonts).body,
+      )!;
+      expect(Number(mask[1])).toBeGreaterThan(Number(plain[1]));
+    });
+
+    it('tells whether a letter stays inside the area for the letters', () => {
+      const base = { font: 'sans' as const, arrangement: 'aligned' as const, letters: ['A', 'B'] as [string, string] };
+      expect(letterFitsArea(design(base), fonts, 0)).toBe(true);
+      expect(letterFitsArea(design(base), fonts, 1)).toBe(true);
+      // Laid out against the edge of the area: one step out is too far.
+      expect(letterFitsArea(design({ ...base, adjustments: moved({ x: -1 }) }), fonts, 0)).toBe(false);
+      expect(letterFitsArea(design({ ...base, adjustments: moved({ x: 1 }) }), fonts, 0)).toBe(true);
+      expect(letterFitsArea(design({ ...base, adjustments: moved({ size: 200 }) }), fonts, 0)).toBe(false);
+      // In a round border, measured against its circle.
+      expect(letterFitsArea(design({ ...base, border: 'stile_01', adjustments: moved({}, { y: -20 }) }), fonts, 1)).toBe(
+        false,
+      );
+    });
+
+    it('keeps only whole steps within the limits from a saved design', () => {
+      expect(sanitizeMonogram({}).adjustments).toEqual(DEFAULT_MONOGRAM.adjustments);
+      expect(
+        sanitizeMonogram({
+          adjustments: [
+            { x: 3, y: -4, size: 120 },
+            { x: 1.5, y: 999, size: 123 },
+          ],
+        }).adjustments,
+      ).toEqual([
+        { x: 3, y: -4, size: 120 },
+        { x: 0, y: 0, size: 100 },
+      ]);
+    });
+  });
+
   it('draws a single letter when the other one is empty', () => {
     const { body } = monogramParts(design({ letters: ['A', ''] }), fonts);
     expect(body).toContain(`d="${script.glyphs.A.d}"`);
@@ -229,7 +345,7 @@ describe('monogram', () => {
         separator: 'explode',
         customSeparator: 'abcdef',
         font: 'comic',
-        border: 'squares',
+        border: 'stile_01',
         borderColor: '#123',
       }),
     ).toEqual({
@@ -238,7 +354,7 @@ describe('monogram', () => {
       colors: ['#abcdef', DEFAULT_MONOGRAM.colors[1]],
       arrangement: 'aligned',
       customSeparator: 'abc',
-      border: 'squares',
+      border: 'stile_01',
     });
     // An empty second letter stays empty.
     expect(sanitizeMonogram({ letters: ['A', ''] }).letters).toEqual(['A', '']);
@@ -289,10 +405,10 @@ describe('monogram', () => {
     );
 
     it('makes the very same seal logo from border files with CRLF', () => {
-      const source = readFileSync(path.resolve(process.cwd(), 'src/brand/borders/circles.svg'), 'utf8');
+      const source = readFileSync(path.resolve(process.cwd(), 'src/brand/borders/stile_01.svg'), 'utf8');
       const fromWindows = parseBorderFile('circles', toCrlf(source))!;
       const seal = files.find(({ file }) => file === 'gv-seal.svg')!;
-      // The ready-made seal (made from circles.svg) has no CR, so a Windows copy of the border changes nothing in it.
+      // The ready-made seal (made from stile_01.svg) has no CR, so a Windows copy of the border changes nothing in it.
       expect(seal.svg).not.toContain('\r');
       expect(fromWindows.content).not.toContain('\r');
     });

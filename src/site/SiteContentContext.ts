@@ -15,7 +15,14 @@ const fail = () => Promise.reject(adminError('not_configured'));
 /** Without a provider (tests, isolated components): the default content, read-only. */
 const DEFAULT_VALUE: SiteContentValue = {
   content: defaultContent,
-  repository: { load: async () => defaultContent, save: fail, uploadPhoto: fail, updatePhotoAlt: fail, resetPhoto: fail },
+  repository: {
+    load: async () => defaultContent,
+    save: fail,
+    uploadPhoto: fail,
+    updatePhotoAlt: fail,
+    resetPhoto: fail,
+    savePalette: fail,
+  },
   replace: () => {},
 };
 

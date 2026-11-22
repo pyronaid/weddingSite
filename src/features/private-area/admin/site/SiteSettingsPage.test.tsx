@@ -2,6 +2,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { defaultContent } from '../../../../config/wedding';
+import { fileLabel } from '../../../../brand/svgFiles';
+import { PATTERNS } from '../../../../prints/art';
+import { DEFAULT_PALETTE, PALETTE_PRESETS, type Palette } from '../../../../theme/palette';
 import {
   AdminError,
   type AdminRepository,
@@ -77,6 +80,10 @@ function fakeRepository(): SiteRepository & { content: SiteContent } {
         photos: defaultContent.photos,
         uploaded: [],
       };
+      return repository.content;
+    }),
+    savePalette: vi.fn(async (palette: Palette) => {
+      repository.content = { ...repository.content, palette };
       return repository.content;
     }),
   };
@@ -198,8 +205,8 @@ function fakeAdmin(overrides: Partial<AdminRepository> = {}, designs: DesignStor
     addPerson: fail,
     updatePerson: fail,
     deletePerson: fail,
-    getSettings: vi.fn(async () => ({ signupCode: '#wedding' })),
-    updateSettings: vi.fn(async (settings) => settings),
+    getSettings: vi.fn(async () => ({ signupCode: '#wedding', superAdminSignupCode: '' })),
+    updateSettings: vi.fn(async (changes) => ({ signupCode: '#wedding', superAdminSignupCode: '', ...changes })),
     listUsers: vi.fn(async (query: string, page: number) => listGuests(query, page)),
     getRiddleCodes: vi.fn(async () =>
       Array.from({ length: 13 }, (_, i) => ({
@@ -379,6 +386,7 @@ describe('site settings (super admin)', () => {
       expect(tabs.map((tab) => tab.textContent)).toEqual([
         'General',
         'Photos',
+        'Colour palette',
         'Organisers',
         'RSVPs',
         'Sign-up code',
@@ -426,6 +434,99 @@ describe('site settings (super admin)', () => {
     });
   });
 
+  describe('colour palette', () => {
+    const preview = () => screen.getByTestId('palette-preview');
+
+    it('tries colours in the preview only, then saves them for the whole site', async () => {
+      const repository = fakeRepository();
+      const { replace } = renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+
+      const cardBackground = await screen.findByLabelText('Card background');
+      expect(cardBackground).toHaveValue(DEFAULT_PALETTE.cardBg);
+      const save = screen.getByRole('button', { name: 'Save the colours' });
+      expect(save).toBeDisabled();
+      expect(screen.getByText('All the texts are easy to read.')).toBeInTheDocument();
+
+      // The picker, and the code typed by hand (with or without "#").
+      fireEvent.change(cardBackground, { target: { value: '#2F3E5C' } });
+      const code = screen.getByLabelText('Card highlights: colour code');
+      await user.clear(code);
+      await user.type(code, 'b9d4f2');
+      expect(code).toHaveValue('b9d4f2');
+      expect(preview().style.getPropertyValue('--card-bg')).toBe('#2f3e5c');
+      expect(preview().style.getPropertyValue('--card-accent')).toBe('#b9d4f2');
+      expect(screen.getByText('Not saved yet: only the preview shows these colours.')).toBeInTheDocument();
+      // Nothing changes on the site until it is saved.
+      expect(repository.savePalette).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+
+      await user.click(save);
+      expect(repository.savePalette).toHaveBeenCalledWith({
+        ...DEFAULT_PALETTE,
+        cardBg: '#2f3e5c',
+        cardAccent: '#b9d4f2',
+      });
+      expect(await screen.findByText('Saved: the whole site uses these colours ✓')).toBeInTheDocument();
+      expect(replace).toHaveBeenCalledWith(
+        expect.objectContaining({ palette: expect.objectContaining({ cardBg: '#2f3e5c' }) }),
+      );
+      expect(save).toBeDisabled();
+    });
+
+    it('starts from a ready-made palette, undoes the changes, or goes back to the original colours', async () => {
+      const repository = fakeRepository();
+      repository.content = { ...repository.content, palette: PALETTE_PRESETS.sage };
+      renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+
+      expect(await screen.findByRole('button', { name: 'Sage' })).toHaveAttribute('aria-pressed', 'true');
+      await user.click(screen.getByRole('button', { name: 'Navy' }));
+      expect(screen.getByRole('button', { name: 'Navy' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('Text on the page')).toHaveValue(PALETTE_PRESETS.navy.text);
+
+      await user.click(screen.getByRole('button', { name: 'Undo the changes' }));
+      expect(screen.getByLabelText('Text on the page')).toHaveValue(PALETTE_PRESETS.sage.text);
+      expect(screen.queryByRole('button', { name: 'Undo the changes' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Back to the original colours' }));
+      expect(screen.getByRole('button', { name: 'Pink (original)' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('Card background')).toHaveValue(DEFAULT_PALETTE.cardBg);
+    });
+
+    it('warns when a text would be hard to read, and ignores a code that is not a colour', async () => {
+      const repository = fakeRepository();
+      renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+
+      const code = await screen.findByLabelText('Card text: colour code');
+      await user.clear(code);
+      await user.type(code, '#7a45');
+      // Not a whole colour yet: shown as typed, marked, nothing else changes.
+      expect(code).toHaveAttribute('aria-invalid', 'true');
+      expect(preview().style.getPropertyValue('--card-text')).toBe(DEFAULT_PALETTE.cardText);
+      await user.type(code, '60');
+      expect(preview().style.getPropertyValue('--card-text')).toBe('#7a4560');
+      expect(screen.getByText('Hard to read')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Card text on the card background: contrast 1\.2:1, at least 4\.5:1 is recommended\./),
+      ).toBeInTheDocument();
+      // A warning, not a block: it can still be saved.
+      expect(screen.getByRole('button', { name: 'Save the colours' })).toBeEnabled();
+    });
+
+    it('shows why a save failed', async () => {
+      const repository = fakeRepository();
+      repository.savePalette = vi.fn().mockRejectedValue(new AdminError('network', 'No connection: try again.'));
+      renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Sage' }));
+      await user.click(screen.getByRole('button', { name: 'Save the colours' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('No connection: try again.');
+      expect(screen.getByRole('button', { name: 'Save the colours' })).toBeEnabled();
+    });
+  });
+
   it('changes the sign-up secret code in its own tab', async () => {
     const admin = fakeAdmin();
     renderPage(fakeRepository(), vi.fn(), '/area/site/signup-code', admin);
@@ -440,6 +541,56 @@ describe('site settings (super admin)', () => {
       signupCode: '#Sposi2027',
     });
     expect(await screen.findByText('Saved ✓')).toBeInTheDocument();
+  });
+
+  describe('super-admin sign-up code', () => {
+    it('is closed until a code is set, with a warning, and is saved on its own', async () => {
+      const admin = fakeAdmin();
+      renderPage(fakeRepository(), vi.fn(), '/area/site/signup-code', admin);
+      const user = userEvent.setup();
+
+      const code = await screen.findByLabelText('Code that makes the new account a super admin');
+      await waitFor(() => expect(code).toBeEnabled());
+      expect(code).toHaveValue('');
+      expect(screen.getByText('Closed: nobody can sign up as a super admin.')).toBeInTheDocument();
+      expect(screen.getByText(/can change everything, as you can/)).toBeInTheDocument();
+      const save = screen.getByRole('button', { name: 'Save super-admin code' });
+      expect(save).toBeDisabled();
+
+      await user.type(code, 'Sposi-Admin-2027');
+      expect(screen.queryByText('Closed: nobody can sign up as a super admin.')).not.toBeInTheDocument();
+      await user.click(save);
+      // Only this code: the guests' one is left as it is.
+      expect(admin.updateSettings).toHaveBeenCalledWith({ superAdminSignupCode: 'Sposi-Admin-2027' });
+      expect(await screen.findByText('Saved ✓')).toBeInTheDocument();
+      expect(save).toBeDisabled();
+
+      // Emptied again: closed (empty is allowed here, not for the guests' code).
+      await user.clear(code);
+      expect(save).toBeEnabled();
+      await user.clear(screen.getByLabelText(/code guests need/i));
+      expect(screen.getByRole('button', { name: 'Save code' })).toBeDisabled();
+    });
+
+    it('shows the reason the server refuses a code, on its field', async () => {
+      const admin = fakeAdmin({
+        updateSettings: vi.fn().mockRejectedValue(
+          new AdminError('validation', 'Please check the highlighted fields.', {
+            superAdminSignupCode: 'The guests’ code and the super-admin code must be different.',
+          }),
+        ),
+      });
+      renderPage(fakeRepository(), vi.fn(), '/area/site/signup-code', admin);
+      const user = userEvent.setup();
+      const code = await screen.findByLabelText('Code that makes the new account a super admin');
+      await waitFor(() => expect(code).toBeEnabled());
+      await user.type(code, '#wedding-long');
+      await user.click(screen.getByRole('button', { name: 'Save super-admin code' }));
+      expect(
+        await screen.findByText('The guests’ code and the super-admin code must be different.'),
+      ).toBeInTheDocument();
+      expect(code).toHaveAttribute('aria-invalid', 'true');
+    });
   });
 
   describe('organisers', () => {
@@ -734,7 +885,7 @@ describe('site settings (super admin)', () => {
           within(screen.getByRole('group', { name: 'Colour of the separator' })).getByRole('radio', { name: 'Gold' }),
         );
         await user.click(screen.getByRole('radio', { name: 'Times New Roman' }));
-        await user.click(screen.getByRole('radio', { name: 'Circles' }));
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
         await user.click(
           within(screen.getByRole('group', { name: 'Colour of the border' })).getByRole('radio', { name: 'Sage' }),
         );
@@ -743,13 +894,120 @@ describe('site settings (super admin)', () => {
         const { serif } = await import('../../../../brand/glyphs/serif');
         expect(preview.innerHTML).toContain(serif.glyphs.D.d);
         expect(preview.innerHTML).toContain('fill="#b08d48"');
-        expect(preview.innerHTML).toContain('stroke="#7d9a6a"');
 
         await user.click(screen.getByRole('button', { name: 'SVG: Logo D S' }));
         const file = await downloaded();
         expect(file.name).toBe('logo-ds.svg');
         expect(file.content).toContain(serif.glyphs.S.d);
         expect(file.content).toContain('<title>Logo D S</title>');
+      });
+
+      it('moves and resizes each letter with its buttons, saved with the design', async () => {
+        const designs: DesignStore = {};
+        open('/logo', fakeAdmin({}, designs));
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
+        const first = screen.getByRole('group', { name: 'Position and size of the first letter' });
+        expect(
+          within(first)
+            .getAllByRole('button')
+            .map((button) => button.getAttribute('aria-label')),
+        ).toEqual([
+          'Make the first letter bigger',
+          'Move the first letter up',
+          'Make the first letter smaller',
+          'Move the first letter left',
+          'Move the first letter down',
+          'Move the first letter right',
+        ]);
+        // No controls for the separator.
+        expect(screen.queryByRole('group', { name: /Position and size of the separator/ })).not.toBeInTheDocument();
+
+        const preview = () => screen.getByRole('img', { name: 'Logo G V' }).innerHTML;
+        const before = preview();
+        await user.click(within(first).getByRole('button', { name: 'Make the first letter smaller' }));
+        await user.click(within(first).getByRole('button', { name: 'Move the first letter down' }));
+        expect(preview()).not.toBe(before);
+        await waitFor(
+          () =>
+            expect(designs.logo).toMatchObject({
+              adjustments: [
+                { x: 0, y: 1, size: 95 },
+                { x: 0, y: 0, size: 100 },
+              ],
+            }),
+          {
+            timeout: 3000,
+          },
+        );
+
+        // Back where it was.
+        await user.click(within(first).getByRole('button', { name: 'Put the first letter back where it was' }));
+        expect(preview()).toBe(before);
+      });
+
+      it('refuses a move that would take the letter out of the area, with a warning', async () => {
+        const designs: DesignStore = {};
+        const admin = fakeAdmin({}, designs);
+        open('/logo', admin);
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo G V' });
+        const second = screen.getByRole('group', { name: 'Position and size of the second letter' });
+        const preview = () => screen.getByRole('img', { name: 'Logo G V' }).innerHTML;
+        const before = preview();
+
+        // The letters already fill their area: bigger is too big.
+        await user.click(within(second).getByRole('button', { name: 'Make the second letter bigger' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+          'The second letter would go out of the area for the letters: nothing changed.',
+        );
+        expect(preview()).toBe(before);
+        expect(admin.savePrintDesign).not.toHaveBeenCalled();
+
+        // A change that fits clears the warning.
+        await user.click(within(second).getByRole('button', { name: 'Make the second letter smaller' }));
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(preview()).not.toBe(before);
+      });
+
+      it('puts the letters back when a new style is picked, not for a new colour', async () => {
+        const designs: DesignStore = {
+          logo: {
+            letters: ['A', 'B'],
+            font: 'sans',
+            arrangement: 'aligned',
+            adjustments: [
+              { x: 0, y: 0, size: 100 },
+              { x: 0, y: -12, size: 90 },
+            ],
+          },
+        };
+        open('/logo', fakeAdmin({}, designs));
+        const user = userEvent.setup();
+        await screen.findByRole('img', { name: 'Logo A B' });
+        const reset = () => screen.queryByRole('button', { name: 'Put the second letter back where it was' });
+        expect(reset()).toBeInTheDocument();
+
+        // A colour is not a style: the refinement stays.
+        const colours = screen.getByRole('group', { name: 'Colour of the second letter' });
+        await user.click(within(colours).getAllByRole('radio')[3]);
+        expect(reset()).toBeInTheDocument();
+
+        // A border lays the letters out again: both start over, and that is saved.
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
+        expect(reset()).not.toBeInTheDocument();
+        expect(screen.queryByText(/goes beyond the area/)).not.toBeInTheDocument();
+        await waitFor(
+          () =>
+            expect(designs.logo).toMatchObject({
+              border: 'stile_01',
+              adjustments: [
+                { x: 0, y: 0, size: 100 },
+                { x: 0, y: 0, size: 100 },
+              ],
+            }),
+          { timeout: 3000 },
+        );
       });
 
       it('takes a separator of its own, in any colour', async () => {
@@ -777,7 +1035,7 @@ describe('site settings (super admin)', () => {
         open('/logo', admin);
         const user = userEvent.setup();
         await screen.findByRole('img', { name: 'Logo G V' });
-        await user.click(screen.getByRole('radio', { name: 'Big flowers' }));
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
         await user.clear(screen.getByLabelText('Second letter'));
         await user.type(screen.getByLabelText('Second letter'), 'm');
         await user.click(
@@ -791,7 +1049,7 @@ describe('site settings (super admin)', () => {
         expect(await screen.findByText(/Saved ✓/)).toBeInTheDocument();
         expect(designs.logo).toMatchObject({
           letters: ['G', 'M'],
-          border: 'big_flowers',
+          border: 'stile_01',
           colors: ['#2f3e5c', '#c24f78'],
         });
 
@@ -802,7 +1060,7 @@ describe('site settings (super admin)', () => {
         expect(await screen.findByRole('img', { name: 'Logo G M' })).toBeInTheDocument();
         // The form shows the saved choices, so it matches the picture.
         expect(screen.getByLabelText('Second letter')).toHaveValue('M');
-        expect(screen.getByRole('radio', { name: 'Big flowers' })).toBeChecked();
+        expect(screen.getByRole('radio', { name: 'Stile 01' })).toBeChecked();
         expect(
           within(screen.getByRole('group', { name: 'Colour of the first letter' })).getByRole('radio', {
             name: 'Navy',
@@ -816,13 +1074,13 @@ describe('site settings (super admin)', () => {
       it('moves a design made in this browser before to the account', async () => {
         window.localStorage.setItem(
           'wedding.prints.logo.v1',
-          JSON.stringify({ letters: ['R', 'M'], border: 'circles' }),
+          JSON.stringify({ letters: ['R', 'M'], border: 'stile_01' }),
         );
         const designs: DesignStore = {};
         const admin = fakeAdmin({}, designs);
         open('/logo', admin);
         expect(await screen.findByRole('img', { name: 'Logo R M' })).toBeInTheDocument();
-        await waitFor(() => expect(designs.logo).toMatchObject({ letters: ['R', 'M'], border: 'circles' }));
+        await waitFor(() => expect(designs.logo).toMatchObject({ letters: ['R', 'M'], border: 'stile_01' }));
         expect(window.localStorage.getItem('wedding.prints.logo.v1')).toBeNull();
       });
 
@@ -851,7 +1109,7 @@ describe('site settings (super admin)', () => {
         open('/logo', admin);
         const user = userEvent.setup();
         await screen.findByRole('img', { name: 'Logo G V' });
-        await user.click(screen.getByRole('radio', { name: 'Squares' }));
+        await user.click(screen.getByRole('radio', { name: 'Stile 01' }));
         expect(
           await screen.findByText('Not saved: The server cannot be reached.', {}, { timeout: 3000 }),
         ).toBeInTheDocument();
@@ -922,6 +1180,40 @@ describe('site settings (super admin)', () => {
           within(screen.getByRole('group', { name: 'Side decorations' })).getByRole('radio', { name: 'None' }),
         );
         expect(card()).not.toContain('rotate(180)');
+      });
+
+      it('adds a faint background pattern from the files, in any colour and strength, saved with the design', async () => {
+        const designs: DesignStore = {};
+        open('/invitations', fakeAdmin({}, designs));
+        const user = userEvent.setup();
+        await ready();
+        const patterns = screen.getByRole('group', { name: 'Pattern' });
+        // "None", then one choice per file, named after it.
+        expect(within(patterns).getAllByRole('radio')).toHaveLength(PATTERNS.length);
+        expect(within(patterns).getByRole('radio', { name: 'None' })).toBeChecked();
+        expect(card()).not.toContain('invitation-pattern');
+        expect(screen.queryByLabelText('Strength of the pattern')).not.toBeInTheDocument();
+
+        const first = PATTERNS[1];
+        await user.click(within(patterns).getByRole('radio', { name: fileLabel(first) }));
+        expect(card()).toContain('fill="#6d3350" fill-opacity="0.15" mask="url(#invitation-pattern-mask)"');
+        const strength = screen.getByLabelText('Strength of the pattern');
+        expect(strength).toHaveValue('15');
+        fireEvent.change(strength, { target: { value: '40' } });
+        expect(card()).toContain('fill-opacity="0.4" mask="url(#invitation-pattern-mask)"');
+        expect(screen.getByText('40%')).toBeInTheDocument();
+        await user.click(
+          within(screen.getByRole('group', { name: 'Colour of the pattern' })).getByRole('radio', { name: 'Gold' }),
+        );
+        expect(card()).toContain('fill="#b08d48" fill-opacity="0.4" mask="url(#invitation-pattern-mask)"');
+        await waitFor(
+          () =>
+            expect(designs.invitation).toMatchObject({ pattern: first, patternColor: '#b08d48', patternOpacity: 40 }),
+          { timeout: 3000 },
+        );
+
+        await user.click(within(patterns).getByRole('radio', { name: 'None' }));
+        expect(card()).not.toContain('invitation-pattern');
       });
 
       it('shows the logo designed in the Logo tab, or none', async () => {

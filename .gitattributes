@@ -15,3 +15,6 @@ deploy/**   text eol=lf
 public/brand/*.svg text eol=lf
 # The logo borders: the ready-made logos are made from them.
 src/brand/borders/*.svg text eol=lf
+# The invitations' decorations and patterns (same files on every checkout).
+src/prints/decorations/*.svg text eol=lf
+src/prints/patterns/*.svg text eol=lf

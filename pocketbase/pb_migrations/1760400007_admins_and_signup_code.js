@@ -11,8 +11,12 @@
  *   `signup_code` is the secret code required to create an account
  *   (pb_hooks/signup.pb.js); an empty value disables the check.
  *   Superusers/hooks only: never readable through the API.
+ *
+ * The first code comes from the PB_SIGNUP_CODE environment variable (.env);
+ * without it, a random one is made and written to the log, so the site never
+ * starts open to anybody. Change it afterwards from the site (Site settings →
+ * Sign-up code): the variable only gives the starting value.
  */
-const DEFAULT_SIGNUP_CODE = '#wedding';
 
 migrate(
   (app) => {
@@ -40,9 +44,16 @@ migrate(
     });
     app.save(settings);
 
+    let code = ($os.getenv('PB_SIGNUP_CODE') || '').trim();
+    if (!code) {
+      code = $security.randomString(10);
+      console.log(
+        `[signup] PB_SIGNUP_CODE is not set: the guests' sign-up code is "${code}" (change it from the site)`,
+      );
+    }
     const signupCode = new Record(settings);
     signupCode.set('key', 'signup_code');
-    signupCode.set('value', DEFAULT_SIGNUP_CODE);
+    signupCode.set('value', code);
     app.save(signupCode);
   },
   (app) => {

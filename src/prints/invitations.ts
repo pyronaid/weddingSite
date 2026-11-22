@@ -2,10 +2,11 @@ import { isLanguage, type Language } from '../i18n';
 import { oneOf, sanitizeColor } from '../brand/monogram';
 import { formatDeadline, formatWeddingDate } from '../lib/format';
 import type { SiteContent, Venue } from '../services/site';
-import { DECORATIONS, spray, type Decoration } from './decorations';
+import { paint, stencil, viewBoxOf, type SvgFile } from '../brand/svgFiles';
+import { isDecoration, isPattern, type Decoration, type InvitationArt, type Pattern } from './art';
 import { escapeXml, nestSvg, PRINT_COLORS, PRINT_FONTS, text, wrapText } from './svg';
 
-export type { Decoration } from './decorations';
+export type { Decoration, InvitationArt, Pattern } from './art';
 
 /** Sizes in millimetres. */
 export const INVITATION_SIZES = {
@@ -33,7 +34,17 @@ export interface InvitationDesign {
   background: string | null;
   decoration: Decoration;
   decorationColor: string;
+  /** A background pattern, drawn faintly over the whole card. */
+  pattern: Pattern;
+  patternColor: string;
+  /** How strong the pattern is: a percentage (see PATTERN_OPACITY). */
+  patternOpacity: number;
 }
+
+/** The pattern's opacity, in percent: faint by default, so the texts stay easy to read. */
+export const PATTERN_OPACITY = { min: 5, max: 100, step: 5, initial: 15 };
+/** A pattern tile's width on the card, in millimetres, when its file does not say (data-tile). */
+export const PATTERN_TILE = 150;
 
 export const DEFAULT_INVITATION: InvitationDesign = {
   size: 'a4-portrait',
@@ -48,6 +59,9 @@ export const DEFAULT_INVITATION: InvitationDesign = {
   background: null,
   decoration: 'plants',
   decorationColor: '#7d9a6a',
+  pattern: 'none',
+  patternColor: '#6d3350',
+  patternOpacity: PATTERN_OPACITY.initial,
 };
 
 const NAME_LINES: NameLines[] = ['none', 'one', 'two'];
@@ -70,9 +84,58 @@ export function sanitizeInvitation(raw: unknown, language: Language): Invitation
     qrText: text(r.qrText, 200, d.qrText),
     signupCode: flag(r.signupCode, d.signupCode),
     background: r.background === null ? null : sanitizeColor(r.background, '') || d.background,
-    decoration: oneOf(r.decoration, DECORATIONS, d.decoration),
+    decoration: isDecoration(r.decoration) ? r.decoration : d.decoration,
     decorationColor: sanitizeColor(r.decorationColor, d.decorationColor),
+    pattern: isPattern(r.pattern) ? r.pattern : d.pattern,
+    patternColor: sanitizeColor(r.patternColor, d.patternColor),
+    patternOpacity: isPatternOpacity(r.patternOpacity) ? r.patternOpacity : d.patternOpacity,
   };
+}
+
+const isPatternOpacity = (value: unknown): value is number =>
+  typeof value === 'number' &&
+  Number.isInteger(value) &&
+  value >= PATTERN_OPACITY.min &&
+  value <= PATTERN_OPACITY.max &&
+  (value - PATTERN_OPACITY.min) % PATTERN_OPACITY.step === 0;
+
+const round = (value: number) => Math.round(value * 1000) / 1000;
+
+/**
+ * A pattern over a `width` × `height` area (the card's units: millimetres),
+ * in `color` at `opacity` percent. The file is a mask: its drawing shows the
+ * colour, its white parts and the rest let the card show through, so it works
+ * on a white or a shaded background alike.
+ */
+export function patternLayer(
+  file: SvgFile,
+  color: string,
+  opacity: number,
+  width: number,
+  height: number,
+  idPrefix: string,
+): string {
+  const box = viewBoxOf(file);
+  if (!(box.width > 0 && box.height > 0)) return '';
+  const drawing = stencil(file, idPrefix);
+  let defs = '';
+  let shapes: string;
+  if (file.data.fit === 'cover') {
+    // Once, as big as needed to cover the area (artwork that does not repeat).
+    shapes = `<svg width="${width}" height="${height}" viewBox="${file.viewBox}" preserveAspectRatio="xMidYMid slice">${drawing}</svg>`;
+  } else {
+    // Tiles of the same size on any card: the same density on a square card and on an A4.
+    const tile = Math.min(1000, Math.max(10, parseFloat(file.data.tile ?? '') || PATTERN_TILE));
+    const tileHeight = round((tile * box.height) / box.width);
+    defs =
+      `<pattern id="${idPrefix}-tile" patternUnits="userSpaceOnUse" width="${tile}" height="${tileHeight}">` +
+      `<svg width="${tile}" height="${tileHeight}" viewBox="${file.viewBox}" preserveAspectRatio="none">${drawing}</svg></pattern>`;
+    shapes = `<rect width="${width}" height="${height}" fill="url(#${idPrefix}-tile)"/>`;
+  }
+  return (
+    `<defs>${defs}<mask id="${idPrefix}-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}">${shapes}</mask></defs>` +
+    `<rect width="${width}" height="${height}" fill="${color}" fill-opacity="${round(opacity / 100)}" mask="url(#${idPrefix}-mask)"/>`
+  );
 }
 
 /** The texts printed on the card, in its language. */
@@ -102,6 +165,8 @@ export interface InvitationInput {
   /** e.g. "it-IT": the dates in the card's language. */
   locale: string;
   texts: CardTexts;
+  /** The decoration and pattern files (loadInvitationArt); without them, none is drawn. */
+  art?: InvitationArt;
 }
 
 const capitalise = (value: string) => value.charAt(0).toLocaleUpperCase() + value.slice(1);
@@ -136,6 +201,7 @@ export function invitationSvg({
   signupCode,
   locale,
   texts,
+  art,
 }: InvitationInput): string {
   const { width, height } = INVITATION_SIZES[design.size];
   const { ink, accent, frame: plum, muted, paper } = PRINT_COLORS;
@@ -390,17 +456,31 @@ export function invitationSvg({
     : '';
   const background = `<rect width="${width}" height="${height}" fill="${design.background ? 'url(#invitation-shade)' : '#ffffff'}"/>`;
 
-  // Side decorations: top left, and the same turned round at the bottom right.
-  const decorationSize = Math.min(width, height) * (landscape ? 0.42 : 0.38);
-  const art = spray(design.decoration, design.decorationColor);
-  const decorations = art
-    ? `<g transform="scale(${decorationSize / 100})">${art}</g>` +
-      `<g transform="translate(${width} ${height}) rotate(180) scale(${decorationSize / 100})">${art}</g>`
+  // A faint pattern over the background.
+  const patternFile = design.pattern === 'none' ? undefined : art?.patterns.get(design.pattern);
+  const pattern = patternFile
+    ? patternLayer(patternFile, design.patternColor, design.patternOpacity, width, height, 'invitation-pattern')
     : '';
+
+  // Side decorations: top left, and the same turned round at the bottom right.
+  const decorationFile = design.decoration === 'none' ? undefined : art?.decorations.get(design.decoration);
+  let decorations = '';
+  if (decorationFile) {
+    const box = viewBoxOf(decorationFile);
+    const decorationWidth = Math.min(width, height) * (landscape ? 0.42 : 0.38);
+    const decorationHeight = box.width > 0 ? round((decorationWidth * box.height) / box.width) : decorationWidth;
+    const corner = (idPrefix: string) =>
+      `<svg width="${round(decorationWidth)}" height="${decorationHeight}" viewBox="${decorationFile.viewBox}" preserveAspectRatio="xMinYMin meet">` +
+      `${paint(decorationFile, design.decorationColor, idPrefix, { keepWhite: true })}</svg>`;
+    decorations =
+      corner('invitation-decoration-1') +
+      `<g transform="translate(${width} ${height}) rotate(180)">${corner('invitation-decoration-2')}</g>`;
+  }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}">
 <title>${escapeXml(`${one} & ${two}`)}</title>
 ${defs}${background}
+${pattern}
 ${decorations}
 ${drawn}
 </svg>`;

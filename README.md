@@ -140,7 +140,7 @@ npm run dev                  # http://localhost:5173
 | `/area` (organisers)         | The same game home, as the *My game* tab next to *Organise* | organisers |
 | `/area/admin/:suit?`         | *Organise* tab: days left, things still to set, then one sub-tab per suit they edit: its cards (red frame = something missing), or the people to find for the spades (+ the site settings link for super admins) | organisers |
 | `/area/admin/cards/:suit/:rank` | One card: letter, clubs riddle/solution, hearts scenes, diamonds quiz; what is still missing; previous/next card | organisers of that suit |
-| `/area/site/:tab?/:sub?`     | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, RSVPs, sign-up code, prints (sub-tabs: logo, invitations, posters) | super admins only |
+| `/area/site/:tab?/:sub?`     | Site settings in tabs: general (language, names, date, places, gift), photos, colour palette, organisers, RSVPs, sign-up code, prints (sub-tabs: logo, invitations, posters) | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -150,7 +150,10 @@ npm run dev                  # http://localhost:5173
 
 Flows and security choices:
 
-- **Sign up** requires the **secret code** given to the guests (default `#wedding`; capital letters and surrounding spaces do not matter). It is checked by the server (`pb_hooks/signup.pb.js`), never stored with the user, and super admins can change it in *Site settings* → *Sign-up code*.
+- **Sign up** requires a **secret code** (capital letters and surrounding spaces do not matter), checked by the server (`pb_hooks/signup.pb.js`) and never stored with the user:
+  - the **guests' code**: an ordinary account. Its first value is `PB_SIGNUP_CODE` (`.env`); without it a random one is made and written to the PocketBase log;
+  - the **super-admin code**: the new account is a **super admin** (everything, like the couple). Its first value is `PB_SUPERADMIN_SIGNUP_CODE`; without it, this way in is closed. At least 10 characters, different from the guests' code. Like every account, it works only once its e-mail is confirmed, and each one is written to the log (`[signup] new super admin`). The `is_superadmin` flag itself can still never be sent at sign-up (collection rules): the server sets it.
+  - The variables are **starting values**: they are read when the database is created (the super-admin one at the first start of the version that added it). Afterwards super admins change both codes in *Site settings* → *Sign-up code*, and a restart keeps what they set.
 - **Sign up** creates the user and sends a confirmation e-mail. **Only verified users can log in**: this is enforced by the server (`authRule = "verified = true"`), not just by the UI.
 - Logging in **before confirming** shows "please confirm your e-mail", with a **resend** button (60 s cooldown).
 - **Forgot password** always shows the same message, whether or not the account exists, so nobody can find out which e-mails are registered.
@@ -203,15 +206,15 @@ Everything to print is made **in the browser, from the current data**, by a supe
 
 | Sub-tab | Address | What you choose | Files |
 | --- | --- | --- | --- |
-| **Logo** | `/area/site/prints/logo` | The **two letters** and the colour of each; the **style**: crossed, side by side, or diagonal; a **separator** between spaced letters (&, \|, ♥ or your own text) and its colour; the **font**: script, sans serif or Times New Roman; a **border**: none, or one of the SVG files in [`src/brand/borders/`](src/brand/borders/) (see below), in the colour you choose. Colours from the site palette, or any other. | SVG (vector: print shop, embroidery, stamps) and PNG (2048 px, transparent) |
-| **Invitations** | `/area/site/prints/invitations` | The **size**: square (15 × 15 cm), A4 portrait or landscape; the **language** of the card (dates, times and texts, also different from the site's); a **line for the names** to write by hand (none, one guest, a couple); the **title** and **subtitle**; the **logo** from the Logo sub-tab; the **QR code** section and its text; the **sign-up code**; a white or **shaded background**; **side decorations**: plants, flowers, hearts or roots, and their colour. Date, times, places, RSVP deadline and hashtag come from the *General* tab. | Print / PDF at the card's size, SVG, PNG at 300 dpi |
+| **Logo** | `/area/site/prints/logo` | The **two letters** and the colour of each; the **style**: crossed, side by side, or diagonal; a **separator** between spaced letters (&, \|, ♥ or your own text) and its colour; the **font**: script, sans serif or Times New Roman; a **border**: none, or one of the SVG files in [`src/brand/borders/`](src/brand/borders/) (see below), in the colour you choose. Colours from the site palette, or any other. Next to each letter, **six buttons** (＋ ▲ − / ◀ ▼ ▶) move it or make it bigger or smaller (steps of 2% of the logo, sizes 50–200%), plus **Reset**; a change that would push the letter out of the letters' area is refused with a warning. They are a final touch: picking a new style, separator, font or border puts both letters back. | SVG (vector: print shop, embroidery, stamps) and PNG (2048 px, transparent) |
+| **Invitations** | `/area/site/prints/invitations` | The **size**: square (15 × 15 cm), A4 portrait or landscape; the **language** of the card (dates, times and texts, also different from the site's); a **line for the names** to write by hand (none, one guest, a couple); the **title** and **subtitle**; the **logo** from the Logo sub-tab; the **QR code** section and its text; the **sign-up code**; a white or **shaded background**; **side decorations**: none, or one of the SVG files in [`src/prints/decorations/`](src/prints/decorations/), in the colour you choose; a **pattern** over the background: none, or one of the SVG files in [`src/prints/patterns/`](src/prints/patterns/), its colour and its **strength** (a slider, 5–100%, 15% by default: keep it faint). Date, times, places, RSVP deadline and hashtag come from the *General* tab. | Print / PDF at the card's size, SVG, PNG at 300 dpi |
 | **Clubs posters** | `/area/site/prints/posters` | Nothing: one A3 poster per club, the card and the QR code of its riddle. The secret codes come from `/api/admin/prints/riddles` (super admins only). | Print all / PDF (13 A3 pages), or one poster: SVG, Print / PDF |
 
 - **The QR codes** point to the **website address** field (Invitations and Clubs posters): by default the address the page was opened at (*Use this site's address* goes back to it), so **make the final prints from the live site**. A `localhost` address gets a warning: guests' phones cannot open it. Codes use 25% error correction (level Q): they scan with glare or a fold.
 - **The posters' codes** are secret and differ between databases: print them from production, and **don't share the files**. Clubs without a riddle or solution yet are framed in red; their page tells guests "not available yet". **↻ Regenerate** makes the files again from the latest data (it never changes the codes: printed posters keep working).
 - **To try a QR code with a real phone** on your local setup, open the site on your computer's LAN address (e.g. `npm run dev -- --host`, then `http://192.168.1.20:5173`, and add it to `PB_ORIGINS`), and put that address in the website field.
 - **How the designs are saved:** in the `print_designs` collection, one record per designer (`logo`, `invitation`, `website`), through `GET`/`PUT /api/admin/prints/designs/{kind}` (super admins only; objects up to 16 kB; no API rules on the collection). The last save wins: if both super admins edit at once, the later change stays; a tab that comes back into view reloads the latest choices. Saved choices are checked field by field before use (unknown values fall back to the defaults, colours must be `#rrggbb`). A design made in a browser before saving existed is moved to the account the first time.
-- **How the logo is drawn** ([`src/brand/`](src/brand/)): letters are **outlines** of the fonts, not text, so the logo looks the same in any program, with or without the fonts installed. Crossed letters: the first one stops short of the second with a transparent gap, so it works on any background. The invitations' decorations are line art drawn from a few shapes (leaf, berry, flower, heart). Fonts: Great Vibes and Lato (SIL Open Font License) and Tinos, the free metric-compatible Times New Roman (Apache 2.0), all free for logos.
+- **How the logo is drawn** ([`src/brand/`](src/brand/)): letters are **outlines** of the fonts, not text, so the logo looks the same in any program, with or without the fonts installed. Crossed letters: the first one stops short of the second with a transparent gap, so it works on any background. Fonts: Great Vibes and Lato (SIL Open Font License) and Tinos, the free metric-compatible Times New Roman (Apache 2.0), all free for logos.
   - The outlines (A–Z and `& | / + - ~ * . :`) are in `src/brand/glyphs/*.ts`, loaded only by the Prints pages. Another character (e.g. "é" as a separator) is written as text in the same font instead. To add characters or fonts, edit `CHARS` in [`scripts/brand/extract-glyphs.py`](scripts/brand/extract-glyphs.py) and run it on the fonts' WOFF files (`npm pack @fontsource/<family>`; the command is at the top of the script).
   - **Borders are SVG files** in [`src/brand/borders/`](src/brand/borders/): every file is a style, named after the file (`stile_uno.svg` shows as "Stile uno": underscores and dashes become spaces, first letter capitalised). **To add one**, put the SVG in the folder and deploy (the build reads the folder). A file:
     - is drawn in **one colour** (any): the site repaints every fill and stroke with the border colour chosen on the page;
@@ -219,7 +222,12 @@ Everything to print is made **in the browser, from the current data**, by a supe
     - may say how much room it leaves for the letters, on its `<svg>` element: `data-room="0.56"` is the diameter of the free circle as a fraction of the width (default `0.6`), and `data-room-shape="square"` makes it a free square. Lower it if the letters touch the drawing;
     - keeps only its drawing: scripts, event handlers, links to other files, styles, embedded HTML and images are removed when it is loaded, and its ids are made unique on the page.
 
-    **Renaming or deleting a file:** saved designs that used it show no border (they still open). The four first borders (`small_flowers`, `big_flowers`, `circles`, `squares`) were drawn by code before; designs saved with their old names find their files.
+    **Renaming or deleting a file:** saved designs that used it show no border (they still open).
+  - **The invitations' decorations and patterns are SVG files too**, read by the same code ([`src/brand/svgFiles.ts`](src/brand/svgFiles.ts): named after the file, only drawing kept, ids made unique). They can be big, so they are downloaded only when the invitation designer opens; the build makes one small file per drawing.
+    - [`src/prints/decorations/`](src/prints/decorations/): drawn for the **top left corner**; the bottom right one is the same, turned round. Width: 38% of the card's short side (42% on landscape cards), keeping the file's proportions. Repainted in the colour chosen on the page, except **white**, which stays white (e.g. the petals over the leaves). Saved designs with a decoration that is gone get the default one (`plants`).
+    - [`src/prints/patterns/`](src/prints/patterns/): drawn faintly over the whole card, under the decorations and the texts, in the chosen colour and strength. Whatever is drawn takes the colour; **white** parts hide what is behind them and are left see-through, like the empty background, so the card (white or shaded) shows through. On its `<svg>` element a file may say how it covers the card: `data-tile="200"` repeats it in tiles 200 mm wide (default `150`: the same density on every card size; for artwork that repeats seamlessly), or `data-fit="cover"` uses it once, as big as the card needs (for artwork that does not repeat). The file's own background, if any, must be removed, or it covers the whole card. Saved designs with a pattern that is gone show none.
+    - `pattern_04.svg` (speckled paper: flecks and fibres) is made by [`scripts/brand/speckled-paper.cjs`](scripts/brand/speckled-paper.cjs): change its counts, sizes or seed and run it again to get more or fewer flecks.
+    - From Illustrator (EPS/AI), export as SVG with *Styling: Presentation Attributes* (a `<style>` block is removed when the file is read, and its colours with it). Without Illustrator: `gs -dSAFER -dBATCH -dNOPAUSE -dEPSCrop -sDEVICE=pdfwrite -sOutputFile=art.pdf art.eps`, then `pdftocairo -svg art.pdf art.svg`.
   - Ready-made logos in [`public/brand/`](public/brand/): `gv-script.svg` (G and V crossed, script) and `gv-seal.svg` (serif, circles border), each also `-mono` (one colour) and `-light` (for dark backgrounds). They are made by the same code (`src/brand/presets.ts`); `npm run brand` rewrites them, and a test fails while they differ.
 
 ### Organisers (admin view)
@@ -252,9 +260,10 @@ Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) �
 | --- | --- | --- |
 | **General** | `/area/site` or `/area/site/general` | language, the couple, date, places, gift (IBAN) |
 | **Photos** | `/area/site/photos` | every photo of the site |
+| **Colour palette** | `/area/site/colours` | the colours of the whole site ([below](#colour-palette)) |
 | **Organisers** | `/area/site/organisers` | who organises which suit |
 | **RSVPs** | `/area/site/rsvps` | the replies to the invitation and the headcount |
-| **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters) |
+| **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters), and the one that registers a super admin (10–50 characters, or empty: closed) |
 | **Prints** | `/area/site/prints/<sub>` | sub-tabs: logo designer, invitation designer, clubs posters ([below](#printing-logo-invitations-and-clubs-posters)) |
 
 The *General* and *Photos* tabs:
@@ -272,7 +281,7 @@ The *RSVPs* tab shows the **headcount** on top (people coming, replies yes / no,
 
 How it is stored and loaded:
 
-- `site_content` holds **one** record; `site_photos` one record per replaced photo (a slot without one shows the default). Anyone can read them (they are the public page); only super admins can write them (collection rules), and `pb_hooks/site.pb.js` validates every save.
+- `site_content` holds **one** record (its `palette` field: the colours, see below); `site_photos` one record per replaced photo (a slot without one shows the default). Anyone can read them (they are the public page); only super admins can write them (collection rules), and `pb_hooks/site.pb.js` validates every save.
 - The site loads the content once ([`SiteContentProvider`](src/site/SiteContentProvider.tsx)) and **caches it in the browser**: returning visitors see the page at once while it refreshes in the background. First-time visitors see a short loading screen (never the default names); after 6 s without an answer, or if PocketBase cannot be reached, the defaults are shown.
 
 ### Languages
@@ -282,6 +291,9 @@ How it is stored and loaded:
 - **Dates** are formatted for the language (`en-GB`, `it-IT`); card names follow it too ("6 of spades", "6 di picche").
 - Changing the language **re-renders the whole app at once** (`LanguageBoundary`) and updates `<html lang>`.
 - **Server messages** (`pb_hooks/lib/i18n.js`) and the **e-mails** (`pb_hooks/lib/emails.js`, re-applied when the content is saved) follow the same setting. PocketBase's own generic field messages (e.g. "Cannot be blank") stay in English.
+- <a id="colour-palette"></a>**Colour palette** (`/area/site/colours`): ten colours paint the whole site, the public page, the private area and the game: the page background (top and bottom, middle band, light bands), the text on the page, a soft and a strong accent, and the info cards (background, text, secondary text, highlights). Start from a ready-made palette (pink, the original; sage, lavender, navy, champagne, black and white) and change any colour with the picker or its `#rrggbb` code. The preview shows the draft only; **Save the colours** changes them for every visitor at once (and on this page). A warning lists any text that would be hard to read (WCAG contrast: 4.5:1 for text, 3:1 for titles and highlights); it does not stop the save.
+  - **How it works:** the colours are the CSS custom properties of `src/styles/global.css` (`--page-edge`, `--card-bg`…: the defaults); [`src/theme/palette.ts`](src/theme/palette.ts) lists them with the same defaults (a test keeps the two in step), the presets and the contrast checks. They are saved in `site_content.palette` (JSON, only names and `#rrggbb` colours: `pb_hooks/site.pb.js` refuses anything else, since they end up in the page's CSS) and loaded with the rest of the content; the site sets them on `<html>` before the page is painted, and from the browser's cached copy for returning visitors (no pink flash). Card surfaces, borders and shadows are derived from them (`color-mix()`), so a light card gets dark lines. Error, success and game colours (stars, collected cards) stay as they are; so do the default photos (they are pictures: replace them in the Photos tab).
+  - **Adding a colour:** use a new custom property in `global.css`, and add it to `PALETTE_KEYS`, `PALETTE_VARS`, `DEFAULT_PALETTE` and the presets in `palette.ts`, and its name to `messages/palette.ts`. The server needs no change.
 - **Adding a language:** add it to `LANGUAGES` in `src/i18n/language.ts` and to `LOCALES`; TypeScript then lists every dictionary missing it. Add it to the `language` select of `site_content` (a new migration), to `pb_hooks/lib/i18n.js` and to `pb_hooks/lib/emails.js`.
 
 ## PocketBase backend
@@ -295,7 +307,7 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
     It also has hidden `letter`, `code`, `riddle` and `solution` fields (see the card game above). Codes are random, unique and generated automatically.
   - `users.admin_suits`: the suits a user organises (set by a superuser only; it replaced the yes/no `is_admin`, whose organisers got every suit). `users.is_superadmin`: super admins (set by a superuser only).
   - `site_content` (one record) and `site_photos`: the content of the public site, edited by the super admins (see above).
-  - `app_settings`: key/value settings edited by the organisers, e.g. `signup_code` (never readable through the API).
+  - `app_settings`: key/value settings edited by the super admins: `signup_code`, `superadmin_signup_code` (never readable through the API).
   - `print_designs`: the super admins' choices in the Prints designers (logo, invitation, QR website address), saved as they edit (never readable through the API: `pb_hooks/admin.pb.js` only).
   - `quiz_questions`, `quiz_answers`: the diamonds quiz (organisers only; seeded with two example questions per card). `quiz_attempts`: per user and card, the current question, the questions already faced and the wrong answers (server only).
   - `guess_people`, `guess_hints`: the people of the spades "guess who" and their 13 hints (organisers only; seeded with two example people). `guess_assignments`: the person drawn for each user, its attempts and `found` (server only). `guess_selfies`: one per (user, card), a protected photo or `same_as` the earlier selfie confirmed; created only by the hook, visible to the owner and the organisers.
@@ -310,10 +322,13 @@ Everything the backend needs is in code, so a fresh instance is ready on first s
   - `quiz.pb.js` serves the diamonds quiz: current question, answers, lives and penalties.
   - `guess.pb.js` serves the spades "guess who": the hints of a card (`POST /api/game/guess/{cardId}`), the selfie upload and the "same person as before" confirmation, the status and the final guess.
   - `admin.pb.js` is the organisers' API (letters, riddles, solutions, scenes, quiz questions and answers, people to find, secret code, who organises which suit), each endpoint for the organisers of its suit only (the secret code and the users for super admins).
-  - `signup.pb.js` checks the sign-up secret code.
+  - `signup.pb.js` checks the sign-up secret code (and makes the account a super admin with the super-admin code).
   - `site.pb.js` validates the site content (IBAN checksum, BIC, date with its offset, time zone, a reception with its address and time) and the photo slots, and re-applies the e-mails in the chosen language.
   - `lib/i18n.js` holds the messages the hooks send to the guests, in English and Italian.
   - `riddles.pb.js` serves the riddle behind a QR code and checks answers (`GET /api/game/riddles/{code}`, `POST /api/game/riddles/{code}/solve`), logged-in users only. Shared helpers live in `pb_hooks/lib/`.
+
+- **The e-mails** (confirmation of the address, password reset, and the change-of-address and one-time-code ones PocketBase may send) are designed HTML, in the site's language and **colour palette** (header with the couple's names, a button, the link written out for mail programs that block buttons, the footer). They are built with tables and inline styles, because e-mail programs ignore `<style>` blocks; PocketBase adds a plain-text version to every message. A new language or palette reaches them as soon as the site content is saved.
+- **No "new login" alerts:** the e-mail PocketBase sends when an account logs in from a new device is turned off (`1760400016_disable_login_alerts.js`): guests log in from several devices during the wedding.
 
 > Because the hooks rewrite the e-mail templates on every start and when the site content is saved, **edit them in `pb_hooks/lib/emails.js`**, not in the admin UI.
 
@@ -355,6 +370,8 @@ The frontend container reads it **at start-up** (written to `/env-config.js`), s
 | `PB_SMTP_HOST`, `PB_SMTP_PORT`, `PB_SMTP_USERNAME`, `PB_SMTP_PASSWORD`, `PB_SMTP_TLS` | SMTP server (SMTP is enabled when `PB_SMTP_HOST` is set) |
 | `PB_ORIGINS`                              | Allowed CORS origins, comma separated (default `*`)               |
 | `PB_RATE_LIMIT`                           | `false` disables the built-in rate limiter (default: enabled)     |
+| `PB_SIGNUP_CODE`                          | First guests' sign-up code (quote it in `.env`: `"#wedding"`); not set: a random one, in the log. Then changed from the site |
+| `PB_SUPERADMIN_SIGNUP_CODE`               | First sign-up code that makes the account a super admin (10–50 characters, different from the guests' one); not set: closed. Then changed from the site |
 | `PB_RATE_LIMIT_EXCLUDED_IPS`              | IPs the rate limits don't apply to (e.g. the venue Wi-Fi on the day), comma separated; `-` clears the list |
 | `PB_TRUSTED_PROXY_HEADERS`                | Behind a reverse proxy: header(s) holding the client IP, e.g. `X-Forwarded-For` (set in `deploy/docker-compose.prod.yml`) |
 
