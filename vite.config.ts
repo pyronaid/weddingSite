@@ -23,6 +23,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Off: the cache keeps a module's import.meta.glob results, so a file added to
+    // src/brand/borders/ or src/prints/{decorations,patterns}/ would go untested.
+    fsModuleCache: false,
     css: { modules: { classNameStrategy: 'non-scoped' } },
   },
 });
