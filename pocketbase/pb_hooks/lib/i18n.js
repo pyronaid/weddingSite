@@ -72,6 +72,7 @@ const MESSAGES = {
     timezone_invalid: 'Unknown time zone.',
     reception_incomplete: 'Give the reception an address and a time too (or remove its name).',
     photo_slot_invalid: 'Unknown photo position.',
+    palette_invalid: 'The colours must be written as #rrggbb.',
   },
   it: {
     check_fields: 'Controlla i campi evidenziati.',
@@ -122,6 +123,7 @@ const MESSAGES = {
     timezone_invalid: 'Fuso orario sconosciuto.',
     reception_incomplete: 'Indica anche indirizzo e ora del ricevimento (oppure togline il nome).',
     photo_slot_invalid: 'Posizione della foto sconosciuta.',
+    palette_invalid: 'I colori vanno scritti come #rrggbb.',
   },
 };
 

@@ -49,6 +49,26 @@ onRecordValidate((e) => {
     if (!record.getString('reception_time')) fail('reception_time', 'reception_incomplete');
   }
 
+  // The colour palette ends up in the page's CSS: only names and "#rrggbb"
+  // colours, normalised to lower case (src/theme/palette.ts lists the names;
+  // any other is ignored by the site). Empty: the default colours.
+  const paletteText = record.getString('palette').trim();
+  if (paletteText && paletteText !== 'null') {
+    let palette;
+    try {
+      palette = JSON.parse(paletteText);
+    } catch {
+      palette = undefined;
+    }
+    const entries = palette && typeof palette === 'object' && !Array.isArray(palette) ? Object.entries(palette) : null;
+    const valid =
+      entries !== null &&
+      entries.length <= 40 &&
+      entries.every(([name, color]) => /^[A-Za-z]{1,30}$/.test(name) && /^#[0-9A-Fa-f]{6}$/.test(String(color)));
+    if (valid) record.set('palette', Object.fromEntries(entries.map(([name, color]) => [name, color.toLowerCase()])));
+    else fail('palette', 'palette_invalid');
+  }
+
   if (Object.keys(errors).length > 0) throw new BadRequestError(t(e.app, 'check_fields'), errors);
   e.next();
 }, 'site_content');

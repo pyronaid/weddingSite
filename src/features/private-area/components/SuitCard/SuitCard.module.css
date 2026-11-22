@@ -11,7 +11,7 @@
   padding: 1rem 0.75rem;
   border-radius: var(--radius-md);
   border: 2px solid transparent;
-  background: var(--white-warm);
+  background: var(--page-light);
   color: var(--text);
   text-decoration: none;
   box-shadow: 0 10px 20px -12px rgba(0, 0, 0, 0.45);
@@ -24,7 +24,7 @@
 }
 
 .red {
-  --suit-colour: var(--pink-600);
+  --suit-colour: var(--accent-strong);
 }
 
 .black {
@@ -32,7 +32,7 @@
 }
 
 .complete {
-  border-color: var(--pink-400);
+  border-color: var(--accent);
 }
 
 .symbol {
@@ -57,7 +57,7 @@
 .caption {
   font-size: 0.78rem;
   text-align: center;
-  color: var(--pink-600);
+  color: var(--accent-strong);
   font-weight: 700;
 }
 
@@ -66,7 +66,7 @@
   height: 4px;
   margin-top: 0.3rem;
   border-radius: 999px;
-  background: var(--pink-100);
+  background: var(--page-band);
   overflow: hidden;
 }
 

@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { defaultContent } from '../../../../config/wedding';
 import { fileLabel } from '../../../../brand/svgFiles';
 import { PATTERNS } from '../../../../prints/art';
+import { DEFAULT_PALETTE, PALETTE_PRESETS, type Palette } from '../../../../theme/palette';
 import {
   AdminError,
   type AdminRepository,
@@ -79,6 +80,10 @@ function fakeRepository(): SiteRepository & { content: SiteContent } {
         photos: defaultContent.photos,
         uploaded: [],
       };
+      return repository.content;
+    }),
+    savePalette: vi.fn(async (palette: Palette) => {
+      repository.content = { ...repository.content, palette };
       return repository.content;
     }),
   };
@@ -381,6 +386,7 @@ describe('site settings (super admin)', () => {
       expect(tabs.map((tab) => tab.textContent)).toEqual([
         'General',
         'Photos',
+        'Colour palette',
         'Organisers',
         'RSVPs',
         'Sign-up code',
@@ -425,6 +431,99 @@ describe('site settings (super admin)', () => {
       expect(router.state.location.pathname).toBe('/area/site/prints');
       // Only the selected tab is in the Tab order.
       expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('tabindex', '-1');
+    });
+  });
+
+  describe('colour palette', () => {
+    const preview = () => screen.getByTestId('palette-preview');
+
+    it('tries colours in the preview only, then saves them for the whole site', async () => {
+      const repository = fakeRepository();
+      const { replace } = renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+
+      const cardBackground = await screen.findByLabelText('Card background');
+      expect(cardBackground).toHaveValue(DEFAULT_PALETTE.cardBg);
+      const save = screen.getByRole('button', { name: 'Save the colours' });
+      expect(save).toBeDisabled();
+      expect(screen.getByText('All the texts are easy to read.')).toBeInTheDocument();
+
+      // The picker, and the code typed by hand (with or without "#").
+      fireEvent.change(cardBackground, { target: { value: '#2F3E5C' } });
+      const code = screen.getByLabelText('Card highlights: colour code');
+      await user.clear(code);
+      await user.type(code, 'b9d4f2');
+      expect(code).toHaveValue('b9d4f2');
+      expect(preview().style.getPropertyValue('--card-bg')).toBe('#2f3e5c');
+      expect(preview().style.getPropertyValue('--card-accent')).toBe('#b9d4f2');
+      expect(screen.getByText('Not saved yet: only the preview shows these colours.')).toBeInTheDocument();
+      // Nothing changes on the site until it is saved.
+      expect(repository.savePalette).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
+
+      await user.click(save);
+      expect(repository.savePalette).toHaveBeenCalledWith({
+        ...DEFAULT_PALETTE,
+        cardBg: '#2f3e5c',
+        cardAccent: '#b9d4f2',
+      });
+      expect(await screen.findByText('Saved: the whole site uses these colours ✓')).toBeInTheDocument();
+      expect(replace).toHaveBeenCalledWith(
+        expect.objectContaining({ palette: expect.objectContaining({ cardBg: '#2f3e5c' }) }),
+      );
+      expect(save).toBeDisabled();
+    });
+
+    it('starts from a ready-made palette, undoes the changes, or goes back to the original colours', async () => {
+      const repository = fakeRepository();
+      repository.content = { ...repository.content, palette: PALETTE_PRESETS.sage };
+      renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+
+      expect(await screen.findByRole('button', { name: 'Sage' })).toHaveAttribute('aria-pressed', 'true');
+      await user.click(screen.getByRole('button', { name: 'Navy' }));
+      expect(screen.getByRole('button', { name: 'Navy' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('Text on the page')).toHaveValue(PALETTE_PRESETS.navy.text);
+
+      await user.click(screen.getByRole('button', { name: 'Undo the changes' }));
+      expect(screen.getByLabelText('Text on the page')).toHaveValue(PALETTE_PRESETS.sage.text);
+      expect(screen.queryByRole('button', { name: 'Undo the changes' })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Back to the original colours' }));
+      expect(screen.getByRole('button', { name: 'Pink (original)' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByLabelText('Card background')).toHaveValue(DEFAULT_PALETTE.cardBg);
+    });
+
+    it('warns when a text would be hard to read, and ignores a code that is not a colour', async () => {
+      const repository = fakeRepository();
+      renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+
+      const code = await screen.findByLabelText('Card text: colour code');
+      await user.clear(code);
+      await user.type(code, '#7a45');
+      // Not a whole colour yet: shown as typed, marked, nothing else changes.
+      expect(code).toHaveAttribute('aria-invalid', 'true');
+      expect(preview().style.getPropertyValue('--card-text')).toBe(DEFAULT_PALETTE.cardText);
+      await user.type(code, '60');
+      expect(preview().style.getPropertyValue('--card-text')).toBe('#7a4560');
+      expect(screen.getByText('Hard to read')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Card text on the card background: contrast 1\.2:1, at least 4\.5:1 is recommended\./),
+      ).toBeInTheDocument();
+      // A warning, not a block: it can still be saved.
+      expect(screen.getByRole('button', { name: 'Save the colours' })).toBeEnabled();
+    });
+
+    it('shows why a save failed', async () => {
+      const repository = fakeRepository();
+      repository.savePalette = vi.fn().mockRejectedValue(new AdminError('network', 'No connection: try again.'));
+      renderPage(repository, vi.fn(), '/area/site/colours');
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Sage' }));
+      await user.click(screen.getByRole('button', { name: 'Save the colours' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('No connection: try again.');
+      expect(screen.getByRole('button', { name: 'Save the colours' })).toBeEnabled();
     });
   });
 

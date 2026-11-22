@@ -1,20 +1,28 @@
-/* Design tokens: change these to re-theme the whole site. */
+/*
+ * Design tokens. The first ten are the colour palette: these are the
+ * defaults, and the super admin can change them (Site settings → Colours,
+ * applied on <html> by src/theme/palette.ts, which has the same defaults).
+ * Everything else is fixed or derived from them.
+ */
 :root {
-  --pink-100: #fde7ef;
-  --pink-200: #f9cfdd;
-  --pink-400: #e88aa8;
-  --pink-600: #c24f78;
-  --white-warm: #fffaf7;
-
+  /* The page: a gradient from the edges to the light bands and back. */
+  --page-edge: #f9cfdd;
+  --page-band: #fde7ef;
+  --page-light: #fffaf7;
+  --text: #4a2537;
+  /* Accents: soft (focus rings, highlights) and strong (titles, links). */
+  --accent: #e88aa8;
+  --accent-strong: #c24f78;
   /* Info cards use a contrasting fill for easy reading on the gradient. */
   --card-bg: #6d3350;
   --card-text: #fff7f2;
   --card-muted: #f3d6e1;
   --card-accent: #ffc2d6;
-  --card-surface: rgba(255, 255, 255, 0.1);
-  --card-border: rgba(255, 255, 255, 0.22);
 
-  --text: #4a2537;
+  /* Derived: they follow the card colours (a light card gets dark lines). */
+  --card-surface: color-mix(in srgb, var(--card-text) 10%, transparent);
+  --card-border: color-mix(in srgb, var(--card-text) 22%, transparent);
+
   --danger: #ffb3b3;
   --success: #c7f5d5;
 
@@ -29,8 +37,9 @@
 
   --radius-lg: 24px;
   --radius-md: 14px;
-  --shadow-card: 0 30px 60px -20px rgba(109, 51, 80, 0.45), 0 10px 20px -10px rgba(0, 0, 0, 0.2);
-  --shadow-photo: 0 20px 40px -15px rgba(109, 51, 80, 0.5);
+  --shadow-card:
+    0 30px 60px -20px color-mix(in srgb, var(--card-bg) 45%, transparent), 0 10px 20px -10px rgba(0, 0, 0, 0.2);
+  --shadow-photo: 0 20px 40px -15px color-mix(in srgb, var(--card-bg) 50%, transparent);
 
   color-scheme: light;
 }
@@ -52,14 +61,14 @@ body {
   font-size: 17px;
   line-height: 1.6;
   color: var(--text);
-  /* Pink -> warm white -> pink gradient that spans the whole page. */
+  /* Edge -> light -> band -> light -> edge: a gradient that spans the whole page. */
   background: linear-gradient(
     180deg,
-    var(--pink-200) 0%,
-    var(--white-warm) 30%,
-    var(--pink-100) 60%,
-    var(--white-warm) 80%,
-    var(--pink-200) 100%
+    var(--page-edge) 0%,
+    var(--page-light) 30%,
+    var(--page-band) 60%,
+    var(--page-light) 80%,
+    var(--page-edge) 100%
   );
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
@@ -75,7 +84,7 @@ a {
 }
 
 :focus-visible {
-  outline: 3px solid var(--pink-400);
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
 

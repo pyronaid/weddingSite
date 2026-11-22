@@ -7,11 +7,13 @@ import { useDocumentTitle } from '../../../../hooks/useDocumentTitle';
 import { useMessages } from '../../../../i18n';
 import { toAdminError } from '../../../../services/admin';
 import type { SiteContent, SiteSettings } from '../../../../services/site';
+import type { Palette } from '../../../../theme/palette';
 import { useSiteContent } from '../../../../site/SiteContentContext';
 import { isSettingsTab, ORGANISE_PATH, SETTINGS_TABS, siteSettingsPath, type SettingsTab } from '../../game/suits';
 import { siteSettingsMessages } from '../../messages/siteSettings';
 import { useAuth } from '../../useAuth';
 import { SignupCodeForm } from '../SignupCodeForm';
+import { PaletteEditor } from './PaletteEditor';
 import { PhotosEditor } from './PhotosEditor';
 import { PrintsPanel } from './prints/PrintsPanel';
 import { RsvpsList } from './RsvpsList';
@@ -23,9 +25,9 @@ type State = { status: 'loading' } | { status: 'ready'; content: SiteContent } |
 
 /**
  * Super admin only, in tabs: the content of the public site (general data,
- * photos), who organises which suit, the RSVPs, the sign-up code and the
+ * photos, colours), who organises which suit, the RSVPs, the sign-up code and the
  * files to print (logo, invitations, clubs posters).
- * The General and Photos tabs edit the latest content from the server (not
+ * The General, Photos and Colours tabs edit the latest content from the server (not
  * the copy cached in the browser); every save updates the whole site at once
  * (a new language re-renders everything in it).
  */
@@ -37,6 +39,7 @@ export function SiteSettingsPage() {
   const tabLabels: Record<SettingsTab, string> = {
     general: t.tabs.general,
     photos: t.tabs.photos,
+    colours: t.tabs.colours,
     organisers: t.tabs.organisers,
     rsvps: t.tabs.rsvps,
     'signup-code': t.tabs.signupCode,
@@ -76,6 +79,12 @@ export function SiteSettingsPage() {
     const saved = await repository.save(settings);
     update(saved);
     return saved;
+  };
+
+  const savePalette = async (palette: Palette) => {
+    const saved = await repository.savePalette(palette);
+    update(saved);
+    return saved.palette;
   };
 
   const contentPanel = (render: (content: SiteContent) => ReactNode) => (
@@ -119,6 +128,7 @@ export function SiteSettingsPage() {
         {tab === 'general' && contentPanel((content) => <SiteSettingsForm content={content} onSave={save} />)}
         {tab === 'photos' &&
           contentPanel((content) => <PhotosEditor content={content} repository={repository} onChange={update} />)}
+        {tab === 'colours' && contentPanel((content) => <PaletteEditor saved={content.palette} onSave={savePalette} />)}
         {tab === 'organisers' && <UsersEditor />}
         {tab === 'rsvps' && <RsvpsList />}
         {tab === 'signup-code' && <SignupCodeForm />}

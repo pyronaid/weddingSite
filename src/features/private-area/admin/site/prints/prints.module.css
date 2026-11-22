@@ -194,7 +194,7 @@
 }
 
 .choiceCard:has(input:focus-visible) {
-  outline: 3px solid var(--pink-400);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -223,7 +223,7 @@
 .range input {
   flex: 1;
   min-width: 0;
-  accent-color: var(--pink-400);
+  accent-color: var(--accent);
 }
 
 .range output {
@@ -288,7 +288,7 @@
 }
 
 .swatch input:focus-visible + span {
-  outline: 3px solid var(--pink-400);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -380,7 +380,7 @@
 }
 
 .adjustButton:focus-visible {
-  outline: 3px solid var(--pink-400);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 

@@ -88,7 +88,7 @@
   height: 2.2em;
   margin-left: 0.3em;
   border-radius: 50%;
-  background: var(--white-warm);
+  background: var(--page-light);
   color: var(--card-bg);
   font-family: var(--font-serif);
   font-size: 1.3rem;

@@ -13,5 +13,12 @@ export function createSiteRepository(): SiteRepository {
   if (pb) return new PocketBaseSiteRepository(pb);
   // No backend configured: the default content, read-only.
   const fail = () => Promise.reject(adminError('not_configured'));
-  return { load: async () => defaultContent, save: fail, uploadPhoto: fail, updatePhotoAlt: fail, resetPhoto: fail };
+  return {
+    load: async () => defaultContent,
+    save: fail,
+    uploadPhoto: fail,
+    updatePhotoAlt: fail,
+    resetPhoto: fail,
+    savePalette: fail,
+  };
 }

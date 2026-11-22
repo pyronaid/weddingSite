@@ -1,4 +1,5 @@
 import type { Photo, PhotoSlot, SiteContent } from '../services/site/types';
+import { DEFAULT_PALETTE } from '../theme/palette';
 
 /**
  * Default content of the site. The real content is edited by the super admin
@@ -75,4 +76,5 @@ export const defaultContent: SiteContent = {
   },
   photos: DEFAULT_PHOTOS,
   uploaded: [],
+  palette: DEFAULT_PALETTE,
 };

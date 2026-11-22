@@ -27,7 +27,7 @@
 }
 
 .brand span {
-  color: var(--pink-600);
+  color: var(--accent-strong);
 }
 
 .main {
@@ -60,7 +60,7 @@
 }
 
 .footer a {
-  color: var(--pink-600);
+  color: var(--accent-strong);
   font-weight: 700;
   text-decoration: none;
 }

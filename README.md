@@ -140,7 +140,7 @@ npm run dev                  # http://localhost:5173
 | `/area` (organisers)         | The same game home, as the *My game* tab next to *Organise* | organisers |
 | `/area/admin/:suit?`         | *Organise* tab: days left, things still to set, then one sub-tab per suit they edit: its cards (red frame = something missing), or the people to find for the spades (+ the site settings link for super admins) | organisers |
 | `/area/admin/cards/:suit/:rank` | One card: letter, clubs riddle/solution, hearts scenes, diamonds quiz; what is still missing; previous/next card | organisers of that suit |
-| `/area/site/:tab?/:sub?`     | Site settings in tabs: general (language, names, date, places, gift), photos, organisers, RSVPs, sign-up code, prints (sub-tabs: logo, invitations, posters) | super admins only |
+| `/area/site/:tab?/:sub?`     | Site settings in tabs: general (language, names, date, places, gift), photos, colour palette, organisers, RSVPs, sign-up code, prints (sub-tabs: logo, invitations, posters) | super admins only |
 | `/area/gallery`              | Photos of every player (hearts), newest first, auto-refreshing | logged-in only  |
 | `/area/login`                | Login                                   | guests only     |
 | `/area/signup`               | Sign up → "check your inbox"            | guests only     |
@@ -257,6 +257,7 @@ Super admins are users with **`is_superadmin`** switched on: admin UI (`/_/`) �
 | --- | --- | --- |
 | **General** | `/area/site` or `/area/site/general` | language, the couple, date, places, gift (IBAN) |
 | **Photos** | `/area/site/photos` | every photo of the site |
+| **Colour palette** | `/area/site/colours` | the colours of the whole site ([below](#colour-palette)) |
 | **Organisers** | `/area/site/organisers` | who organises which suit |
 | **RSVPs** | `/area/site/rsvps` | the replies to the invitation and the headcount |
 | **Sign-up code** | `/area/site/signup-code` | the secret code guests need to register (3–50 characters) |
@@ -277,7 +278,7 @@ The *RSVPs* tab shows the **headcount** on top (people coming, replies yes / no,
 
 How it is stored and loaded:
 
-- `site_content` holds **one** record; `site_photos` one record per replaced photo (a slot without one shows the default). Anyone can read them (they are the public page); only super admins can write them (collection rules), and `pb_hooks/site.pb.js` validates every save.
+- `site_content` holds **one** record (its `palette` field: the colours, see below); `site_photos` one record per replaced photo (a slot without one shows the default). Anyone can read them (they are the public page); only super admins can write them (collection rules), and `pb_hooks/site.pb.js` validates every save.
 - The site loads the content once ([`SiteContentProvider`](src/site/SiteContentProvider.tsx)) and **caches it in the browser**: returning visitors see the page at once while it refreshes in the background. First-time visitors see a short loading screen (never the default names); after 6 s without an answer, or if PocketBase cannot be reached, the defaults are shown.
 
 ### Languages
@@ -287,6 +288,9 @@ How it is stored and loaded:
 - **Dates** are formatted for the language (`en-GB`, `it-IT`); card names follow it too ("6 of spades", "6 di picche").
 - Changing the language **re-renders the whole app at once** (`LanguageBoundary`) and updates `<html lang>`.
 - **Server messages** (`pb_hooks/lib/i18n.js`) and the **e-mails** (`pb_hooks/lib/emails.js`, re-applied when the content is saved) follow the same setting. PocketBase's own generic field messages (e.g. "Cannot be blank") stay in English.
+- <a id="colour-palette"></a>**Colour palette** (`/area/site/colours`): ten colours paint the whole site, the public page, the private area and the game: the page background (top and bottom, middle band, light bands), the text on the page, a soft and a strong accent, and the info cards (background, text, secondary text, highlights). Start from a ready-made palette (pink, the original; sage, lavender, navy, champagne, black and white) and change any colour with the picker or its `#rrggbb` code. The preview shows the draft only; **Save the colours** changes them for every visitor at once (and on this page). A warning lists any text that would be hard to read (WCAG contrast: 4.5:1 for text, 3:1 for titles and highlights); it does not stop the save.
+  - **How it works:** the colours are the CSS custom properties of `src/styles/global.css` (`--page-edge`, `--card-bg`…: the defaults); [`src/theme/palette.ts`](src/theme/palette.ts) lists them with the same defaults (a test keeps the two in step), the presets and the contrast checks. They are saved in `site_content.palette` (JSON, only names and `#rrggbb` colours: `pb_hooks/site.pb.js` refuses anything else, since they end up in the page's CSS) and loaded with the rest of the content; the site sets them on `<html>` before the page is painted, and from the browser's cached copy for returning visitors (no pink flash). Card surfaces, borders and shadows are derived from them (`color-mix()`), so a light card gets dark lines. Error, success and game colours (stars, collected cards) stay as they are; so do the default photos (they are pictures: replace them in the Photos tab).
+  - **Adding a colour:** use a new custom property in `global.css`, and add it to `PALETTE_KEYS`, `PALETTE_VARS`, `DEFAULT_PALETTE` and the presets in `palette.ts`, and its name to `messages/palette.ts`. The server needs no change.
 - **Adding a language:** add it to `LANGUAGES` in `src/i18n/language.ts` and to `LOCALES`; TypeScript then lists every dictionary missing it. Add it to the `language` select of `site_content` (a new migration), to `pb_hooks/lib/i18n.js` and to `pb_hooks/lib/emails.js`.
 
 ## PocketBase backend
