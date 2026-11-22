@@ -4,11 +4,15 @@ import { serif } from '../brand/glyphs/serif';
 import { DEFAULT_MONOGRAM, monogramParts } from '../brand/monogram';
 import { defaultContent } from '../config/wedding';
 import { printMessages } from '../features/private-area/messages/prints';
+import type { ImageFile } from '../brand/imageFiles';
 import { parseSvgFile, type SvgFile } from '../brand/svgFiles';
-import { DECORATIONS, loadInvitationArt, PATTERNS, type InvitationArt } from './art';
+import { DEFAULT_PALETTE, PALETTE_PRESETS } from '../theme/palette';
+import { DECORATIONS, loadInvitationArt, PATTERNS, withPictures, type InvitationArt } from './art';
 import {
+  decorationResolution,
   DEFAULT_INVITATION,
   invitationSvg,
+  NO_CORNER_ADJUSTMENT,
   PATTERN_OPACITY,
   patternLayer,
   sanitizeInvitation,
@@ -36,7 +40,7 @@ const LEAF = file(
 );
 const DOTS = file('dots', '<svg viewBox="0 0 40 20"><circle fill="#999" r="2"/><circle fill="white" r="1"/></svg>');
 const fakeArt = (decorations: SvgFile[] = [LEAF], patterns: SvgFile[] = [DOTS]): InvitationArt => ({
-  decorations: new Map(decorations.map((item) => [item.id, item])),
+  decorations: new Map(decorations.map((item) => [item.id, { kind: 'drawing' as const, file: item }])),
   patterns: new Map(patterns.map((item) => [item.id, item])),
 });
 
@@ -131,7 +135,8 @@ describe('invitations', () => {
       expect(svg).toContain(
         '<svg width="79.8" height="39.9" viewBox="0 0 100 50" preserveAspectRatio="xMinYMin meet">',
       );
-      expect(svg).toContain('<g transform="translate(210 297) rotate(180)">');
+      expect(svg).toContain('<g transform="translate(0 0) scale(1)">');
+      expect(svg).toContain('<g transform="translate(210 297) rotate(180) scale(1)">');
       expect(svg).toContain('fill="#123456" d="M0 0h9v9z"');
       expect(svg).toContain('fill="#ffffff" d="M1 1h2v2z"');
       expect(svg).not.toContain('#7d9a6a');
@@ -152,9 +157,104 @@ describe('invitations', () => {
         const svg = invitation({ decoration, decorationColor: '#123456' });
         expect(art.decorations.has(decoration)).toBe(true);
         expect(svg).toContain('rotate(180)');
-        expect(svg).toContain('#123456');
+        // Drawings take the chosen colour; pictures keep theirs, embedded once.
+        if (art.decorations.get(decoration)!.kind === 'drawing') expect(svg).toContain('#123456');
+        else expect(svg.match(/xlink:href="data:image\/(webp|png);base64,/g)).toHaveLength(1);
       },
     );
+
+    describe('pictures (PNG, WebP)', () => {
+      const PICTURE: ImageFile = {
+        id: 'peonies',
+        label: 'Peonies',
+        href: 'data:image/webp;base64,UklGRg==',
+        width: 2400,
+        height: 1200,
+      };
+      const withPicture = (): InvitationArt => ({
+        decorations: new Map([['peonies', { kind: 'picture', file: PICTURE }]]),
+        patterns: new Map(),
+      });
+
+      it('is embedded once, used in both corners, in its own colours and proportions', () => {
+        const svg = invitation({ decoration: 'peonies', decorationColor: '#123456' }, { art: withPicture() });
+        expect(svg).toContain(
+          `<defs><image id="invitation-decoration" width="79.8" height="39.9" preserveAspectRatio="xMinYMin meet" xlink:href="${PICTURE.href}"/></defs>`,
+        );
+        expect(svg.match(/<use xlink:href="#invitation-decoration"\/>/g)).toHaveLength(2);
+        expect(svg).toContain('xmlns:xlink="http://www.w3.org/1999/xlink"');
+        expect(svg).not.toContain('#123456');
+      });
+
+      it('says how sharp it prints in each corner', () => {
+        // 2400 px over 79.8 mm (A4 portrait): 764 dpi; three times as big: 255.
+        expect(
+          decorationResolution(
+            {
+              ...DEFAULT_INVITATION,
+              decoration: 'peonies',
+              decorationAdjustments: [NO_CORNER_ADJUSTMENT, { x: 0, y: 0, size: 300 }],
+            },
+            withPicture(),
+          ),
+        ).toEqual([764, 255]);
+        // Drawings are always sharp.
+        expect(decorationResolution({ ...DEFAULT_INVITATION, decoration: 'leaf' }, fakeArt())).toBeNull();
+      });
+
+      it('changes only the pictures when asked (e.g. PNG copies for an SVG file)', async () => {
+        const art = await withPictures(
+          { ...withPicture(), decorations: new Map([...withPicture().decorations, ...fakeArt().decorations]) },
+          () => 'data:image/png;base64,iVBORw0KGgo=',
+        );
+        expect(art.decorations.get('peonies')).toMatchObject({ file: { href: 'data:image/png;base64,iVBORw0KGgo=' } });
+        expect(art.decorations.get('leaf')).toEqual(fakeArt().decorations.get('leaf'));
+      });
+    });
+
+    describe('moved and resized by hand, in each corner', () => {
+      it('moves in the card directions and grows from its corner, in steps of the short side', () => {
+        const svg = invitation(
+          {
+            decoration: 'leaf',
+            decorationAdjustments: [
+              { x: 1, y: 2, size: 150 },
+              { x: -3, y: -1, size: 50 },
+            ],
+          },
+          { art: fakeArt() },
+        );
+        // A step is 2% of 210 mm: 4.2 mm.
+        expect(svg).toContain('<g transform="translate(4.2 8.4) scale(1.5)">');
+        // The bottom-right one goes left and up on the card, though it is turned round.
+        expect(svg).toContain('<g transform="translate(197.4 292.8) rotate(180) scale(0.5)">');
+      });
+
+      it('checks saved moves: whole steps within the limits, or not moved', () => {
+        const saved = (decorationAdjustments: unknown) =>
+          sanitizeInvitation({ decorationAdjustments }, 'en').decorationAdjustments;
+        expect(saved(undefined)).toEqual([NO_CORNER_ADJUSTMENT, NO_CORNER_ADJUSTMENT]);
+        expect(
+          saved([
+            { x: 50, y: -50, size: 300 },
+            { x: 1, y: 1, size: 25 },
+          ]),
+        ).toEqual([
+          { x: 50, y: -50, size: 300 },
+          { x: 1, y: 1, size: 25 },
+        ]);
+        for (const wrong of [
+          { x: 51, y: 0, size: 100 },
+          { x: 0.5, y: 0, size: 100 },
+          { x: 0, y: 0, size: 20 },
+          { x: 0, y: 0, size: 102 },
+          { x: '1', y: 0, size: 100 },
+          'up',
+        ]) {
+          expect(saved([wrong, wrong])).toEqual([NO_CORNER_ADJUSTMENT, NO_CORNER_ADJUSTMENT]);
+        }
+      });
+    });
   });
 
   describe('background pattern (files)', () => {
@@ -198,6 +298,50 @@ describe('invitations', () => {
     it.each(PATTERNS.filter((pattern) => pattern !== 'none'))('draws the file %s', (pattern) => {
       expect(art.patterns.has(pattern)).toBe(true);
       expect(invitation({ pattern })).toContain('mask="url(#invitation-pattern-mask)"');
+    });
+  });
+
+  describe('colours of the site palette', () => {
+    const sage = PALETTE_PRESETS.sage;
+    // No logo, decorations or pattern: they keep the colours chosen in the designer.
+    const plain = (palette: typeof sage) =>
+      invitation(
+        { logo: false, decoration: 'none', background: '#f6d3df' },
+        { content: { ...defaultContent, palette }, logo: undefined },
+      );
+    const accentOn = (svg: string, label: string) =>
+      expect(svg).toMatch(new RegExp(`fill="${sage.accentStrong}"[^>]*>${label}<`));
+
+    it('takes the strong accent for the "&", the labels, the lines, the website and the hashtag', () => {
+      const svg = plain(sage);
+      expect(svg).toContain(`>Giulia <tspan fill="${sage.accentStrong}">&amp;</tspan> Marco</text>`);
+      accentOn(svg, 'CEREMONY');
+      accentOn(svg, 'RECEPTION');
+      accentOn(svg, 'gioevale\\.com');
+      accentOn(svg, defaultContent.couple.hashtag);
+      // The solid line under the date, and the dotted one above the QR code.
+      const accentLines = (svg.match(/<line [^>]*>/g) ?? []).filter((line) =>
+        line.includes(`stroke="${sage.accentStrong}"`),
+      );
+      expect(accentLines.some((line) => !line.includes('dasharray'))).toBe(true);
+      expect(accentLines.some((line) => line.includes('dasharray'))).toBe(true);
+    });
+
+    it('takes the title, text and paper colours too, leaving none of the original ones', () => {
+      const svg = plain(sage);
+      expect(svg).toMatch(new RegExp(`fill="${sage.cardBg}"[^>]*>You are invited<`));
+      expect(svg).toMatch(new RegExp(`fill="${sage.text}"[^>]*>at 16:00<`));
+      expect(svg).toContain(`stop-color="${sage.pageLight}"`);
+      for (const original of ['#c24f78', '#6d3350', '#4a2537', '#7a5566', '#fffaf7']) {
+        expect(svg, original).not.toContain(original);
+      }
+    });
+
+    it('looks as before with the original palette', () => {
+      const svg = plain(DEFAULT_PALETTE);
+      expect(svg).toContain('>Giulia <tspan fill="#c24f78">&amp;</tspan> Marco</text>');
+      expect(svg).toMatch(/fill="#6d3350"[^>]*>You are invited</);
+      expect(svg).toContain('stop-color="#fffaf7"');
     });
   });
 

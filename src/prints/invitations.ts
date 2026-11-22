@@ -4,7 +4,8 @@ import { formatDeadline, formatWeddingDate } from '../lib/format';
 import type { SiteContent, Venue } from '../services/site';
 import { paint, stencil, viewBoxOf, type SvgFile } from '../brand/svgFiles';
 import { isDecoration, isPattern, type Decoration, type InvitationArt, type Pattern } from './art';
-import { escapeXml, nestSvg, PRINT_COLORS, PRINT_FONTS, text, wrapText } from './svg';
+import { mixColours, sanitizePalette, type Palette } from '../theme/palette';
+import { escapeXml, nestSvg, PRINT_FONTS, text, wrapText } from './svg';
 
 export type { Decoration, InvitationArt, Pattern } from './art';
 
@@ -33,13 +34,34 @@ export interface InvitationDesign {
   /** Tint of the background shading; null: plain white. */
   background: string | null;
   decoration: Decoration;
+  /** For drawings: pictures keep their own colours. */
   decorationColor: string;
+  /** Moves and size of the decoration: top left, bottom right (see CORNER_ADJUST). */
+  decorationAdjustments: [CornerAdjustment, CornerAdjustment];
   /** A background pattern, drawn faintly over the whole card. */
   pattern: Pattern;
   patternColor: string;
   /** How strong the pattern is: a percentage (see PATTERN_OPACITY). */
   patternOpacity: number;
 }
+
+/**
+ * A corner decoration moved or resized by hand: whole steps, in the card's
+ * directions (▲ is up on the card for both corners). Nothing keeps it on the
+ * card: what goes past the edge is cut off.
+ */
+export interface CornerAdjustment {
+  /** Steps right (negative: left). */
+  x: number;
+  /** Steps down (negative: up). */
+  y: number;
+  /** Percent of the normal size, grown or shrunk from its corner. */
+  size: number;
+}
+
+/** A step is a share of the card's short side, so it looks the same on any card size. */
+export const CORNER_ADJUST = { moveStep: 0.02, maxSteps: 50, sizeStep: 5, minSize: 25, maxSize: 300 };
+export const NO_CORNER_ADJUSTMENT: CornerAdjustment = { x: 0, y: 0, size: 100 };
 
 /** The pattern's opacity, in percent: faint by default, so the texts stay easy to read. */
 export const PATTERN_OPACITY = { min: 5, max: 100, step: 5, initial: 15 };
@@ -59,6 +81,7 @@ export const DEFAULT_INVITATION: InvitationDesign = {
   background: null,
   decoration: 'plants',
   decorationColor: '#7d9a6a',
+  decorationAdjustments: [NO_CORNER_ADJUSTMENT, NO_CORNER_ADJUSTMENT],
   pattern: 'none',
   patternColor: '#6d3350',
   patternOpacity: PATTERN_OPACITY.initial,
@@ -86,10 +109,52 @@ export function sanitizeInvitation(raw: unknown, language: Language): Invitation
     background: r.background === null ? null : sanitizeColor(r.background, '') || d.background,
     decoration: isDecoration(r.decoration) ? r.decoration : d.decoration,
     decorationColor: sanitizeColor(r.decorationColor, d.decorationColor),
+    decorationAdjustments: [
+      sanitizeCornerAdjustment(Array.isArray(r.decorationAdjustments) ? r.decorationAdjustments[0] : undefined),
+      sanitizeCornerAdjustment(Array.isArray(r.decorationAdjustments) ? r.decorationAdjustments[1] : undefined),
+    ],
     pattern: isPattern(r.pattern) ? r.pattern : d.pattern,
     patternColor: sanitizeColor(r.patternColor, d.patternColor),
     patternOpacity: isPatternOpacity(r.patternOpacity) ? r.patternOpacity : d.patternOpacity,
   };
+}
+
+/** Whole steps within the limits, or not moved at all. */
+function sanitizeCornerAdjustment(raw: unknown): CornerAdjustment {
+  const r: Record<string, unknown> = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const step = (value: unknown) =>
+    typeof value === 'number' && Number.isInteger(value) && Math.abs(value) <= CORNER_ADJUST.maxSteps;
+  const size =
+    typeof r.size === 'number' &&
+    Number.isInteger(r.size) &&
+    r.size >= CORNER_ADJUST.minSize &&
+    r.size <= CORNER_ADJUST.maxSize &&
+    r.size % CORNER_ADJUST.sizeStep === 0;
+  return step(r.x) && step(r.y) && size
+    ? { x: r.x as number, y: r.y as number, size: r.size as number }
+    : NO_CORNER_ADJUSTMENT;
+}
+
+/** The decoration's normal width on a card, in millimetres (before any resize). */
+const decorationBaseWidth = (size: InvitationSize) => {
+  const { width, height } = INVITATION_SIZES[size];
+  return Math.min(width, height) * (width > height ? 0.42 : 0.38);
+};
+
+/**
+ * How sharp a picture decoration prints: dots per inch at its printed size,
+ * for each corner (null for drawings, which are always sharp).
+ */
+export function decorationResolution(
+  design: InvitationDesign,
+  art: InvitationArt | undefined,
+): [number, number] | null {
+  const decoration = design.decoration === 'none' ? undefined : art?.decorations.get(design.decoration);
+  if (decoration?.kind !== 'picture') return null;
+  const base = decorationBaseWidth(design.size);
+  const dpi = (adjustment: CornerAdjustment) =>
+    Math.round(decoration.file.width / ((base * adjustment.size) / 100 / 25.4));
+  return [dpi(design.decorationAdjustments[0]), dpi(design.decorationAdjustments[1])];
 }
 
 const isPatternOpacity = (value: unknown): value is number =>
@@ -136,6 +201,26 @@ export function patternLayer(
     `<defs>${defs}<mask id="${idPrefix}-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}">${shapes}</mask></defs>` +
     `<rect width="${width}" height="${height}" fill="${color}" fill-opacity="${round(opacity / 100)}" mask="url(#${idPrefix}-mask)"/>`
   );
+}
+
+/**
+ * The card's colours, from the site's palette (Site settings → Colour palette):
+ * the original palette gives the original card. The logo, the decorations and
+ * the pattern keep the colours chosen in the designer.
+ */
+export function cardColours(palette: Palette) {
+  return {
+    /** Times, places, the couple's names. */
+    ink: palette.text,
+    /** The "&", CEREMONY / RECEPTION, the lines, the website, the hashtag. */
+    accent: palette.accentStrong,
+    /** The title. */
+    title: palette.cardBg,
+    /** Subtitle, addresses, the name lines, the QR code text: the text, lighter. */
+    muted: mixColours(palette.text, '#ffffff', 0.25),
+    /** The middle of the shaded background. */
+    paper: palette.pageLight,
+  };
 }
 
 /** The texts printed on the card, in its language. */
@@ -204,14 +289,15 @@ export function invitationSvg({
   art,
 }: InvitationInput): string {
   const { width, height } = INVITATION_SIZES[design.size];
-  const { ink, accent, frame: plum, muted, paper } = PRINT_COLORS;
+  // From the palette, checked (content cached by an older version has none).
+  const { ink, accent, title, muted, paper } = cardColours(sanitizePalette(content.palette));
   const landscape = width > height;
   const square = width === height;
 
   // Millimetres per base unit, known once the layout is measured.
   let s = 1;
   const t = (value: string, x: number, y: number, style: Parameters<typeof text>[3]) =>
-    text(value, x, y, { ...style, size: style.size * s });
+    text(value, x, y, { fill: ink, ...style, size: style.size * s });
   const block = (blockWidth: number, blockHeight: number, draw: Block['draw']): Block => ({
     width: blockWidth,
     height: blockHeight,
@@ -290,7 +376,7 @@ export function invitationSvg({
   if (heading) {
     intro.push(
       block(Math.min(130, heading.length * 4), 12, (cx, top) =>
-        t(heading, cx, top + 8 * s, { size: 9, font: PRINT_FONTS.serif, italic: true, weight: 600, fill: plum }),
+        t(heading, cx, top + 8 * s, { size: 9, font: PRINT_FONTS.serif, italic: true, weight: 600, fill: title }),
       ),
     );
   }
@@ -449,7 +535,7 @@ export function invitationSvg({
   const drawn = layout.draw(width / 2, (height - layout.height * s) / 2);
 
   // Background: plain paper, or a soft shading from the two decorated corners.
-  const defs = design.background
+  let defs = design.background
     ? `<defs><linearGradient id="invitation-shade" x1="0" y1="0" x2="1" y2="1">` +
       `<stop offset="0" stop-color="${design.background}"/><stop offset="0.48" stop-color="${paper}"/>` +
       `<stop offset="0.52" stop-color="${paper}"/><stop offset="1" stop-color="${design.background}"/></linearGradient></defs>`
@@ -462,22 +548,43 @@ export function invitationSvg({
     ? patternLayer(patternFile, design.patternColor, design.patternOpacity, width, height, 'invitation-pattern')
     : '';
 
-  // Side decorations: top left, and the same turned round at the bottom right.
-  const decorationFile = design.decoration === 'none' ? undefined : art?.decorations.get(design.decoration);
+  // Side decorations: top left, and the same turned round at the bottom right,
+  // each moved and resized by hand. Whatever goes past the card is cut off.
+  const decoration = design.decoration === 'none' ? undefined : art?.decorations.get(design.decoration);
   let decorations = '';
-  if (decorationFile) {
-    const box = viewBoxOf(decorationFile);
-    const decorationWidth = Math.min(width, height) * (landscape ? 0.42 : 0.38);
-    const decorationHeight = box.width > 0 ? round((decorationWidth * box.height) / box.width) : decorationWidth;
-    const corner = (idPrefix: string) =>
-      `<svg width="${round(decorationWidth)}" height="${decorationHeight}" viewBox="${decorationFile.viewBox}" preserveAspectRatio="xMinYMin meet">` +
-      `${paint(decorationFile, design.decorationColor, idPrefix, { keepWhite: true })}</svg>`;
+  if (decoration) {
+    const decorationWidth = decorationBaseWidth(design.size);
+    const ratio =
+      decoration.kind === 'drawing'
+        ? (({ width: w, height: h }) => (w > 0 ? h / w : 1))(viewBoxOf(decoration.file))
+        : decoration.file.height / decoration.file.width;
+    const decorationHeight = round(decorationWidth * ratio);
+    const box = `width="${round(decorationWidth)}" height="${decorationHeight}"`;
+    // A picture is embedded once and used by both corners (it can weigh a few hundred kB).
+    if (decoration.kind === 'picture') {
+      defs += `<defs><image id="invitation-decoration" ${box} preserveAspectRatio="xMinYMin meet" xlink:href="${decoration.file.href}"/></defs>`;
+    }
+    const drawing = (idPrefix: string) =>
+      decoration.kind === 'picture'
+        ? `<use xlink:href="#invitation-decoration"/>`
+        : `<svg ${box} viewBox="${decoration.file.viewBox}" preserveAspectRatio="xMinYMin meet">` +
+          `${paint(decoration.file, design.decorationColor, idPrefix, { keepWhite: true })}</svg>`;
+    const step = Math.min(width, height) * CORNER_ADJUST.moveStep;
+    const place = ({ x, y, size }: CornerAdjustment) => ({
+      dx: round(x * step),
+      dy: round(y * step),
+      scale: size / 100,
+    });
+    const topLeft = place(design.decorationAdjustments[0]);
+    const bottomRight = place(design.decorationAdjustments[1]);
+    // Moved on the card first, then turned and resized around its own corner.
     decorations =
-      corner('invitation-decoration-1') +
-      `<g transform="translate(${width} ${height}) rotate(180)">${corner('invitation-decoration-2')}</g>`;
+      `<g transform="translate(${topLeft.dx} ${topLeft.dy}) scale(${topLeft.scale})">${drawing('invitation-decoration-1')}</g>` +
+      `<g transform="translate(${round(width + bottomRight.dx)} ${round(height + bottomRight.dy)}) rotate(180) scale(${bottomRight.scale})">` +
+      `${drawing('invitation-decoration-2')}</g>`;
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}">
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}mm" height="${height}mm" viewBox="0 0 ${width} ${height}">
 <title>${escapeXml(`${one} & ${two}`)}</title>
 ${defs}${background}
 ${pattern}

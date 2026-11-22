@@ -153,3 +153,26 @@ export async function svgToPng(svg: string, widthPx: number): Promise<Blob> {
     URL.revokeObjectURL(url);
   }
 }
+
+/**
+ * A picture (data URI) as a PNG data URI, the same size. SVG files for print
+ * shops carry PNG: design programs do not all open WebP inside an SVG.
+ * The picture as it was if the browser cannot convert it.
+ */
+export async function pictureAsPng(dataUri: string): Promise<string> {
+  if (dataUri.startsWith('data:image/png')) return dataUri;
+  try {
+    const image = new Image();
+    image.src = dataUri;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) return dataUri;
+    context.drawImage(image, 0, 0);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return dataUri;
+  }
+}

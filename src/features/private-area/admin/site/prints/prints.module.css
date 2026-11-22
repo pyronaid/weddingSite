@@ -207,10 +207,33 @@
   background: #fffaf7;
 }
 
-.thumb svg {
+.thumb svg,
+.thumb img {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.thumb img {
+  object-fit: contain;
+}
+
+/* The decorations' corners: a caption and their buttons, side by side. */
+.corners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+}
+
+.corner {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}
+
+.cornerTitle {
+  font-size: 0.9rem;
+  color: var(--card-muted);
 }
 
 /* A slider with its value next to it (the pattern's strength). */

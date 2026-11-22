@@ -4,11 +4,14 @@ import { loadGlyphFonts } from '../../../../../brand/glyphs';
 import { monogramParts } from '../../../../../brand/monogram';
 import { fileLabel, paint } from '../../../../../brand/svgFiles';
 import { getLanguage, isLanguage, LANGUAGES, LOCALES, useMessages, type Language } from '../../../../../i18n';
-import { DECORATIONS, loadInvitationArt, PATTERNS, type InvitationArt } from '../../../../../prints/art';
+import { DECORATIONS, loadInvitationArt, PATTERNS, withPictures, type InvitationArt } from '../../../../../prints/art';
 import {
+  CORNER_ADJUST,
+  decorationResolution,
   DEFAULT_INVITATION,
   INVITATION_SIZES,
   invitationSvg,
+  NO_CORNER_ADJUSTMENT,
   PATTERN_OPACITY,
   patternLayer,
   sanitizeInvitation,
@@ -16,7 +19,7 @@ import {
   type InvitationSize,
   type NameLines,
 } from '../../../../../prints/invitations';
-import { download, printDocument, printHtml, svgFile, svgToPng } from '../../../../../prints/output';
+import { download, pictureAsPng, printDocument, printHtml, svgFile, svgToPng } from '../../../../../prints/output';
 import { qrSvg } from '../../../../../prints/qr';
 import { toAdminError } from '../../../../../services/admin';
 import type { SiteContent } from '../../../../../services/site';
@@ -27,6 +30,7 @@ import { useAuth } from '../../../useAuth';
 import { useAdminRepository } from '../../AdminRepositoryContext';
 import { ColorPicker } from './ColorPicker';
 import { ExportButton } from './ExportButton';
+import { NudgeControls } from './NudgeControls';
 import styles from './prints.module.css';
 import { SaveStatus } from './SaveStatus';
 import { useLogoDesign } from './useLogoDesign';
@@ -41,8 +45,22 @@ interface Data {
   content: SiteContent;
   signupCode: string;
   qr: string;
-  /** The decoration and pattern files. */
+  /** The decoration and pattern files, the pictures embedded (for the files made). */
   art: InvitationArt;
+  /** The same, the pictures as in-memory addresses: the preview is drawn again at every change. */
+  previewArt: InvitationArt;
+}
+
+/** A picture's in-memory copy, for the preview (the embedded one where the browser has none). */
+async function previewAddress(href: string, made: string[]): Promise<string> {
+  if (typeof URL.createObjectURL !== 'function') return href;
+  try {
+    const address = URL.createObjectURL(await (await fetch(href)).blob());
+    made.push(address);
+    return address;
+  } catch {
+    return href;
+  }
 }
 
 /** The piece of a pattern shown on its button, in millimetres of the card. */
@@ -77,18 +95,22 @@ export function InvitationDesigner({ url }: { url: string }) {
 
   useEffect(() => {
     let current = true;
+    const previewAddresses: string[] = [];
     // Always the latest settings: what the site shows now.
     Promise.all([
       siteRepository.load(),
       repository.getSettings(),
       qrSvg(url),
       loadGlyphFonts(),
-      loadInvitationArt(),
+      loadInvitationArt().then(async (art) => ({
+        art,
+        previewArt: await withPictures(art, (href) => previewAddress(href, previewAddresses)),
+      })),
     ]).then(
-      ([content, settings, qr, glyphs, art]) => {
+      ([content, settings, qr, glyphs, { art, previewArt }]) => {
         if (!current) return;
         setFonts(glyphs);
-        setState({ status: 'ready', data: { content, signupCode: settings.signupCode, qr, art } });
+        setState({ status: 'ready', data: { content, signupCode: settings.signupCode, qr, art, previewArt } });
       },
       (reason: unknown) => {
         if (!current) return;
@@ -99,6 +121,7 @@ export function InvitationDesigner({ url }: { url: string }) {
     );
     return () => {
       current = false;
+      previewAddresses.forEach((address) => URL.revokeObjectURL(address));
     };
   }, [siteRepository, repository, auth, url, attempt]);
 
@@ -107,7 +130,8 @@ export function InvitationDesigner({ url }: { url: string }) {
   const card = printMessages[language].card;
 
   const data = state.status === 'ready' ? state.data : null;
-  const svg =
+  /** The card with these pictures: in-memory ones for the preview, embedded ones for the files. */
+  const cardWith = (art: InvitationArt) =>
     data && fonts && saved.design
       ? invitationSvg({
           design: { ...design, language },
@@ -118,9 +142,21 @@ export function InvitationDesigner({ url }: { url: string }) {
           signupCode: data.signupCode,
           locale: LOCALES[language],
           texts: card,
-          art: data.art,
+          art,
         })
       : null;
+  const svg = data ? cardWith(data.previewArt) : null;
+  const exported = () => cardWith(data!.art)!;
+  const decorationArt = design.decoration === 'none' ? undefined : data?.art.decorations.get(design.decoration);
+  const resolution = decorationResolution(design, data?.art);
+  /** A new decoration starts in its corners (its moves were made for the previous one). */
+  const chooseDecoration = (decoration: string) =>
+    change({ decoration, decorationAdjustments: [NO_CORNER_ADJUSTMENT, NO_CORNER_ADJUSTMENT] });
+  const adjustCorner = (corner: 0 | 1, next: InvitationDesign['decorationAdjustments'][number]) => {
+    const decorationAdjustments: InvitationDesign['decorationAdjustments'] = [...design.decorationAdjustments];
+    decorationAdjustments[corner] = next;
+    change({ decorationAdjustments });
+  };
   const size = INVITATION_SIZES[design.size];
   const file = `invitation-${design.size}`;
 
@@ -202,7 +238,7 @@ export function InvitationDesigner({ url }: { url: string }) {
               busy={busy}
               id="print"
               disabled={!svg}
-              onClick={() => void run('print', () => printHtml(printDocument([svg!], size, inv.name)))}
+              onClick={() => void run('print', () => printHtml(printDocument([exported()], size, inv.name)))}
             />
             <ExportButton
               label={t.svg}
@@ -210,7 +246,13 @@ export function InvitationDesigner({ url }: { url: string }) {
               busy={busy}
               id="svg"
               disabled={!svg}
-              onClick={() => download(`${file}.svg`, svgFile(svg!))}
+              onClick={() =>
+                void run('svg', async () => {
+                  // PNG pictures inside: design programs do not all open WebP in an SVG.
+                  const art = await withPictures(data!.art, pictureAsPng);
+                  download(`${file}.svg`, svgFile(cardWith(art)!));
+                })
+              }
             />
             <ExportButton
               label={t.png}
@@ -219,7 +261,7 @@ export function InvitationDesigner({ url }: { url: string }) {
               id="png"
               disabled={!svg}
               onClick={() =>
-                void run('png', async () => download(`${file}.png`, await svgToPng(svg!, pngWidth(design.size))))
+                void run('png', async () => download(`${file}.png`, await svgToPng(exported(), pngWidth(design.size))))
               }
             />
             <button
@@ -234,75 +276,81 @@ export function InvitationDesigner({ url }: { url: string }) {
 
         {/* Disabled until the saved choices are there: nothing edited is lost or overwritten. */}
         <fieldset className={styles.options} disabled={!saved.design}>
-          <fieldset className={styles.choices}>
-            <legend>{inv.size}</legend>
-            {SIZES.map((value) => (
-              <label key={value} className={styles.choice}>
-                <input
-                  type="radio"
-                  name={`${id}-size`}
-                  checked={design.size === value}
-                  onChange={() => change({ size: value })}
-                />
-                {inv.sizes[value]}
-              </label>
-            ))}
-          </fieldset>
-
-          <div className={formStyles.field}>
-            <label htmlFor={`${id}-language`}>{inv.language}</label>
-            <select
-              id={`${id}-language`}
-              value={language}
-              aria-describedby={`${id}-language-hint`}
-              onChange={(event) => isLanguage(event.target.value) && change({ language: event.target.value })}
-            >
-              {LANGUAGES.map((value) => (
-                <option key={value} value={value}>
-                  {languageNames[value]}
-                </option>
-              ))}
-            </select>
-            <span id={`${id}-language-hint`} className={formStyles.hint}>
-              {inv.languageHint}
-            </span>
-          </div>
+          {design.decoration !== 'none' && (
+            <fieldset className={styles.choices}>
+              <legend>{inv.corners}</legend>
+              <p className={formStyles.hint}>{inv.cornersHint}</p>
+              <div className={styles.corners}>
+                {([0, 1] as const).map((corner) => (
+                  <div key={corner} className={styles.corner}>
+                    <span className={styles.cornerTitle}>{inv.cornerTitles[corner]}</span>
+                    <NudgeControls
+                      which={inv.cornerAdjust.which[corner]}
+                      value={design.decorationAdjustments[corner]}
+                      limits={CORNER_ADJUST}
+                      labels={inv.cornerAdjust}
+                      onChange={(next) => adjustCorner(corner, next)}
+                    />
+                  </div>
+                ))}
+              </div>
+              {resolution &&
+                ([0, 1] as const)
+                  .filter((corner) => resolution[corner] < 200)
+                  .map((corner) => (
+                    <p key={corner} role="status" className={styles.letterNote}>
+                      {inv.lowResolution(inv.cornerAdjust.which[corner], resolution[corner])}
+                    </p>
+                  ))}
+            </fieldset>
+          )}
 
           <fieldset className={styles.choices}>
-            <legend>{inv.names}</legend>
-            {NAME_LINES.map((value) => (
-              <label key={value} className={styles.choice}>
-                <input
-                  type="radio"
-                  name={`${id}-names`}
-                  checked={design.names === value}
-                  onChange={() => change({ names: value })}
-                />
-                {inv.nameLines[value]}
-              </label>
-            ))}
+            <legend>{inv.decoration}</legend>
+            {DECORATIONS.map((value) => {
+              const decoration = data?.previewArt.decorations.get(value);
+              return (
+                <label key={value} className={`${styles.choice} ${styles.choiceCard}`}>
+                  <input
+                    type="radio"
+                    name={`${id}-decoration`}
+                    checked={design.decoration === value}
+                    onChange={() => chooseDecoration(value)}
+                  />
+                  <span className={styles.thumb}>
+                    {decoration?.kind === 'drawing' && (
+                      <svg
+                        viewBox={decoration.file.viewBox}
+                        aria-hidden="true"
+                        // Our own files, cleaned when read (svgFiles.ts).
+                        dangerouslySetInnerHTML={{
+                          __html: paint(decoration.file, design.decorationColor, `${id}-decoration`, {
+                            keepWhite: true,
+                          }),
+                        }}
+                      />
+                    )}
+                    {decoration?.kind === 'picture' && (
+                      <img src={decoration.file.href} alt="" loading="lazy" decoding="async" />
+                    )}
+                  </span>
+                  <span>{value === 'none' ? inv.noDecoration : fileLabel(value)}</span>
+                </label>
+              );
+            })}
           </fieldset>
-
-          {textOption('heading', inv.heading, card.heading[design.names])}
-          {textOption('subheading', inv.subheading, card.to)}
-
-          <label className={styles.check}>
-            <input type="checkbox" checked={design.logo} onChange={(event) => change({ logo: event.target.checked })} />
-            {inv.logo}
-          </label>
-          <label className={styles.check}>
-            <input type="checkbox" checked={design.qr} onChange={(event) => change({ qr: event.target.checked })} />
-            {inv.qr}
-          </label>
-          {design.qr && textOption('qrText', inv.qrText, card.website, true)}
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={design.signupCode}
-              onChange={(event) => change({ signupCode: event.target.checked })}
-            />
-            {inv.signupCode}
-          </label>
+          {design.decoration !== 'none' &&
+            (decorationArt?.kind === 'picture' ? (
+              <p className={formStyles.hint}>{inv.ownColours}</p>
+            ) : (
+              <ColorPicker
+                legend={inv.decorationColour}
+                value={design.decorationColor}
+                onChange={(decorationColor) => change({ decorationColor })}
+                swatches={SWATCHES}
+                names={t.colours.names}
+              />
+            ))}
 
           <fieldset className={styles.choices}>
             <legend>{inv.background}</legend>
@@ -332,45 +380,6 @@ export function InvitationDesigner({ url }: { url: string }) {
               onChange={(background) => change({ background })}
               swatches={BACKGROUND_SWATCHES}
               names={t.colours.backgrounds}
-            />
-          )}
-
-          <fieldset className={styles.choices}>
-            <legend>{inv.decoration}</legend>
-            {DECORATIONS.map((value) => {
-              const decoration = data?.art.decorations.get(value);
-              return (
-                <label key={value} className={`${styles.choice} ${styles.choiceCard}`}>
-                  <input
-                    type="radio"
-                    name={`${id}-decoration`}
-                    checked={design.decoration === value}
-                    onChange={() => change({ decoration: value })}
-                  />
-                  <span className={styles.thumb}>
-                    {decoration && (
-                      <svg
-                        viewBox={decoration.viewBox}
-                        aria-hidden="true"
-                        // Our own files, cleaned when read (svgFiles.ts).
-                        dangerouslySetInnerHTML={{
-                          __html: paint(decoration, design.decorationColor, `${id}-decoration`, { keepWhite: true }),
-                        }}
-                      />
-                    )}
-                  </span>
-                  <span>{value === 'none' ? inv.noDecoration : fileLabel(value)}</span>
-                </label>
-              );
-            })}
-          </fieldset>
-          {design.decoration !== 'none' && (
-            <ColorPicker
-              legend={inv.decorationColour}
-              value={design.decorationColor}
-              onChange={(decorationColor) => change({ decorationColor })}
-              swatches={SWATCHES}
-              names={t.colours.names}
             />
           )}
 
@@ -441,6 +450,76 @@ export function InvitationDesigner({ url }: { url: string }) {
               </div>
             </>
           )}
+
+          <fieldset className={styles.choices}>
+            <legend>{inv.size}</legend>
+            {SIZES.map((value) => (
+              <label key={value} className={styles.choice}>
+                <input
+                  type="radio"
+                  name={`${id}-size`}
+                  checked={design.size === value}
+                  onChange={() => change({ size: value })}
+                />
+                {inv.sizes[value]}
+              </label>
+            ))}
+          </fieldset>
+
+          <div className={formStyles.field}>
+            <label htmlFor={`${id}-language`}>{inv.language}</label>
+            <select
+              id={`${id}-language`}
+              value={language}
+              aria-describedby={`${id}-language-hint`}
+              onChange={(event) => isLanguage(event.target.value) && change({ language: event.target.value })}
+            >
+              {LANGUAGES.map((value) => (
+                <option key={value} value={value}>
+                  {languageNames[value]}
+                </option>
+              ))}
+            </select>
+            <span id={`${id}-language-hint`} className={formStyles.hint}>
+              {inv.languageHint}
+            </span>
+          </div>
+
+          <fieldset className={styles.choices}>
+            <legend>{inv.names}</legend>
+            {NAME_LINES.map((value) => (
+              <label key={value} className={styles.choice}>
+                <input
+                  type="radio"
+                  name={`${id}-names`}
+                  checked={design.names === value}
+                  onChange={() => change({ names: value })}
+                />
+                {inv.nameLines[value]}
+              </label>
+            ))}
+          </fieldset>
+
+          {textOption('heading', inv.heading, card.heading[design.names])}
+          {textOption('subheading', inv.subheading, card.to)}
+
+          <label className={styles.check}>
+            <input type="checkbox" checked={design.logo} onChange={(event) => change({ logo: event.target.checked })} />
+            {inv.logo}
+          </label>
+          <label className={styles.check}>
+            <input type="checkbox" checked={design.qr} onChange={(event) => change({ qr: event.target.checked })} />
+            {inv.qr}
+          </label>
+          {design.qr && textOption('qrText', inv.qrText, card.website, true)}
+          <label className={styles.check}>
+            <input
+              type="checkbox"
+              checked={design.signupCode}
+              onChange={(event) => change({ signupCode: event.target.checked })}
+            />
+            {inv.signupCode}
+          </label>
         </fieldset>
       </div>
     </section>

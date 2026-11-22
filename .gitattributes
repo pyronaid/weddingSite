@@ -18,3 +18,6 @@ src/brand/borders/*.svg text eol=lf
 # The invitations' decorations and patterns (same files on every checkout).
 src/prints/decorations/*.svg text eol=lf
 src/prints/patterns/*.svg text eol=lf
+# Pictures (decorations, photos): never touched as text.
+*.webp binary
+*.png  binary

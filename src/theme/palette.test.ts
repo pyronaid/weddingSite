@@ -3,6 +3,7 @@ import {
   applyPalette,
   contrastProblems,
   contrastRatio,
+  mixColours,
   DEFAULT_PALETTE,
   PALETTE_KEYS,
   PALETTE_PRESET_IDS,
@@ -63,6 +64,13 @@ describe('colour palette', () => {
     applyPalette(DEFAULT_PALETTE);
     expect(root.getPropertyValue('--card-bg')).toBe('');
     expect(document.querySelector('meta[name="theme-color"]')!.getAttribute('content')).toBe('#f9cfdd');
+  });
+
+  it('mixes two colours', () => {
+    expect(mixColours('#000000', '#ffffff', 0)).toBe('#000000');
+    expect(mixColours('#000000', '#ffffff', 1)).toBe('#ffffff');
+    expect(mixColours('#000000', '#ffffff', 0.5)).toBe('#808080');
+    expect(mixColours('#4a2537', '#ffffff', 0.25)).toBe('#775c69');
   });
 
   it('gives the CSS custom properties for a preview', () => {

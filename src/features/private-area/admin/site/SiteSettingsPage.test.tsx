@@ -1216,6 +1216,91 @@ describe('site settings (super admin)', () => {
         expect(card()).not.toContain('invitation-pattern');
       });
 
+      it('lists the choices decorations first, then background, pattern, and the card itself', async () => {
+        open('/invitations');
+        const user = userEvent.setup();
+        await ready();
+        await user.click(
+          within(screen.getByRole('group', { name: 'Side decorations' })).getByRole('radio', { name: 'Plants' }),
+        );
+        await user.click(
+          within(screen.getByRole('group', { name: 'Pattern' })).getByRole('radio', {
+            name: fileLabel(PATTERNS[1]),
+          }),
+        );
+        const options = [
+          screen.getByRole('group', { name: 'Position and size of the decorations' }),
+          screen.getByRole('group', { name: 'Side decorations' }),
+          screen.getByRole('group', { name: 'Colour of the decorations' }),
+          screen.getByRole('group', { name: 'Background' }),
+          screen.getByRole('group', { name: 'Pattern' }),
+          screen.getByRole('group', { name: 'Colour of the pattern' }),
+          screen.getByLabelText('Strength of the pattern'),
+          screen.getByRole('group', { name: 'Size' }),
+          screen.getByLabelText('Language of the invitation'),
+          screen.getByLabelText('Title', { exact: true }),
+          screen.getByRole('checkbox', { name: /Show the QR code/ }),
+        ];
+        // Each one after the one before it in the page.
+        for (let i = 1; i < options.length; i++) {
+          expect(options[i - 1].compareDocumentPosition(options[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        }
+      });
+
+      it('uses watercolour pictures in their own colours, and moves and resizes each corner', async () => {
+        const designs: DesignStore = {};
+        open('/invitations', fakeAdmin({}, designs));
+        const user = userEvent.setup();
+        await ready();
+        const decorations = screen.getByRole('group', { name: 'Side decorations' });
+
+        // A drawing: the colour can be chosen.
+        await user.click(within(decorations).getByRole('radio', { name: 'Plants' }));
+        expect(screen.getByRole('group', { name: 'Colour of the decorations' })).toBeInTheDocument();
+
+        // A picture: its own colours, embedded once and used in both corners.
+        await user.click(within(decorations).getByRole('radio', { name: 'Watercolour peonies' }));
+        expect(screen.queryByRole('group', { name: 'Colour of the decorations' })).not.toBeInTheDocument();
+        expect(screen.getByText('This decoration keeps its own colours.')).toBeInTheDocument();
+        expect(card().match(/<use xlink:href="#invitation-decoration"/g)).toHaveLength(2);
+
+        // Each corner has its own buttons, in the card's directions.
+        const topLeft = screen.getByRole('group', { name: 'Position and size of the top-left decoration' });
+        const bottomRight = screen.getByRole('group', { name: 'Position and size of the bottom-right decoration' });
+        await user.click(within(topLeft).getByRole('button', { name: 'Make the top-left decoration bigger' }));
+        await user.click(within(topLeft).getByRole('button', { name: 'Move the top-left decoration right' }));
+        await user.click(within(bottomRight).getByRole('button', { name: 'Move the bottom-right decoration up' }));
+        // A step is 2% of 210 mm; the top left grows by 5%.
+        expect(card()).toContain('transform="translate(4.2 0) scale(1.05)"');
+        expect(card()).toContain('transform="translate(210 292.8) rotate(180) scale(1)"');
+        await waitFor(
+          () =>
+            expect(designs.invitation).toMatchObject({
+              decoration: 'watercolour_peonies',
+              decorationAdjustments: [
+                { x: 1, y: 0, size: 105 },
+                { x: 0, y: -1, size: 100 },
+              ],
+            }),
+          { timeout: 3000 },
+        );
+
+        // Nothing stops it at the edge: it can go off the card.
+        const smaller = within(bottomRight).getByRole('button', { name: 'Make the bottom-right decoration smaller' });
+        expect(smaller).toBeEnabled();
+        await user.click(
+          within(bottomRight).getByRole('button', { name: 'Put the bottom-right decoration back where it was' }),
+        );
+        expect(card()).toContain('transform="translate(210 297) rotate(180) scale(1)"');
+
+        // Another decoration starts again in its corners.
+        await user.click(within(decorations).getByRole('radio', { name: 'Watercolour tropical' }));
+        expect(card()).toContain('transform="translate(0 0) scale(1)"');
+        expect(
+          screen.queryByRole('button', { name: 'Put the top-left decoration back where it was' }),
+        ).not.toBeInTheDocument();
+      });
+
       it('shows the logo designed in the Logo tab, or none', async () => {
         open('/invitations', fakeAdmin({}, { logo: { letters: ['A', 'B'], font: 'sans' } }));
         const user = userEvent.setup();
