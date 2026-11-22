@@ -2,6 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { defaultContent } from '../../../../config/wedding';
+import { fileLabel } from '../../../../brand/svgFiles';
+import { PATTERNS } from '../../../../prints/art';
 import {
   AdminError,
   type AdminRepository,
@@ -1029,6 +1031,40 @@ describe('site settings (super admin)', () => {
           within(screen.getByRole('group', { name: 'Side decorations' })).getByRole('radio', { name: 'None' }),
         );
         expect(card()).not.toContain('rotate(180)');
+      });
+
+      it('adds a faint background pattern from the files, in any colour and strength, saved with the design', async () => {
+        const designs: DesignStore = {};
+        open('/invitations', fakeAdmin({}, designs));
+        const user = userEvent.setup();
+        await ready();
+        const patterns = screen.getByRole('group', { name: 'Pattern' });
+        // "None", then one choice per file, named after it.
+        expect(within(patterns).getAllByRole('radio')).toHaveLength(PATTERNS.length);
+        expect(within(patterns).getByRole('radio', { name: 'None' })).toBeChecked();
+        expect(card()).not.toContain('invitation-pattern');
+        expect(screen.queryByLabelText('Strength of the pattern')).not.toBeInTheDocument();
+
+        const first = PATTERNS[1];
+        await user.click(within(patterns).getByRole('radio', { name: fileLabel(first) }));
+        expect(card()).toContain('fill="#6d3350" fill-opacity="0.15" mask="url(#invitation-pattern-mask)"');
+        const strength = screen.getByLabelText('Strength of the pattern');
+        expect(strength).toHaveValue('15');
+        fireEvent.change(strength, { target: { value: '40' } });
+        expect(card()).toContain('fill-opacity="0.4" mask="url(#invitation-pattern-mask)"');
+        expect(screen.getByText('40%')).toBeInTheDocument();
+        await user.click(
+          within(screen.getByRole('group', { name: 'Colour of the pattern' })).getByRole('radio', { name: 'Gold' }),
+        );
+        expect(card()).toContain('fill="#b08d48" fill-opacity="0.4" mask="url(#invitation-pattern-mask)"');
+        await waitFor(
+          () =>
+            expect(designs.invitation).toMatchObject({ pattern: first, patternColor: '#b08d48', patternOpacity: 40 }),
+          { timeout: 3000 },
+        );
+
+        await user.click(within(patterns).getByRole('radio', { name: 'None' }));
+        expect(card()).not.toContain('invitation-pattern');
       });
 
       it('shows the logo designed in the Logo tab, or none', async () => {

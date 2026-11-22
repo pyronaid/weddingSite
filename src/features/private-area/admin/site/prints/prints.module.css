@@ -213,6 +213,25 @@
   height: 100%;
 }
 
+/* A slider with its value next to it (the pattern's strength). */
+.range {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.range input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--pink-400);
+}
+
+.range output {
+  min-width: 3rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .separatorSample {
   min-width: 1.2rem;
   font-family: var(--font-serif);

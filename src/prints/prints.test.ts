@@ -4,10 +4,13 @@ import { serif } from '../brand/glyphs/serif';
 import { DEFAULT_MONOGRAM, monogramParts } from '../brand/monogram';
 import { defaultContent } from '../config/wedding';
 import { printMessages } from '../features/private-area/messages/prints';
-import { DECORATIONS, spray } from './decorations';
+import { parseSvgFile, type SvgFile } from '../brand/svgFiles';
+import { DECORATIONS, loadInvitationArt, PATTERNS, type InvitationArt } from './art';
 import {
   DEFAULT_INVITATION,
   invitationSvg,
+  PATTERN_OPACITY,
+  patternLayer,
   sanitizeInvitation,
   type InvitationDesign,
   type InvitationInput,
@@ -20,6 +23,23 @@ const QR =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" shape-rendering="crispEdges"><path d="M0 0h7v7H0z"/></svg>';
 const logo = monogramParts(DEFAULT_MONOGRAM, { script, sans, serif }, 'test');
 
+let art: InvitationArt;
+beforeAll(async () => {
+  art = await loadInvitationArt();
+});
+
+const file = (id: string, source: string) => parseSvgFile(id, source)!;
+/** Small files, so the tests do not depend on the artwork in the folders. */
+const LEAF = file(
+  'leaf',
+  '<svg viewBox="0 0 100 50"><path id="a" fill="#7d9a6a" d="M0 0h9v9z"/><path fill="#fff" d="M1 1h2v2z"/></svg>',
+);
+const DOTS = file('dots', '<svg viewBox="0 0 40 20"><circle fill="#999" r="2"/><circle fill="white" r="1"/></svg>');
+const fakeArt = (decorations: SvgFile[] = [LEAF], patterns: SvgFile[] = [DOTS]): InvitationArt => ({
+  decorations: new Map(decorations.map((item) => [item.id, item])),
+  patterns: new Map(patterns.map((item) => [item.id, item])),
+});
+
 const invitation = (design: Partial<InvitationDesign> = {}, input: Partial<InvitationInput> = {}) => {
   const full = { ...DEFAULT_INVITATION, ...design };
   return invitationSvg({
@@ -31,6 +51,7 @@ const invitation = (design: Partial<InvitationDesign> = {}, input: Partial<Invit
     signupCode: '#wedding',
     locale: full.language === 'it' ? 'it-IT' : 'en-GB',
     texts: printMessages[full.language].card,
+    art,
     ...input,
   });
 };
@@ -103,15 +124,81 @@ describe('invitations', () => {
     expect(invitation()).toContain('<rect width="210" height="297" fill="#ffffff"/>');
   });
 
-  it.each(DECORATIONS.filter((decoration) => decoration !== 'none'))('decorates two corners with %s', (decoration) => {
-    const svg = invitation({ decoration, decorationColor: '#123456' });
-    expect(svg).toContain('#123456');
-    expect(svg).toContain('rotate(180)');
-    expect(spray(decoration, '#123456')).not.toBe('');
+  describe('side decorations (files)', () => {
+    it('draws the file in two corners, in the chosen colour, white parts kept white', () => {
+      const svg = invitation({ decoration: 'leaf', decorationColor: '#123456' }, { art: fakeArt() });
+      // Top left, 38% of the short side wide, keeping the file's proportions.
+      expect(svg).toContain(
+        '<svg width="79.8" height="39.9" viewBox="0 0 100 50" preserveAspectRatio="xMinYMin meet">',
+      );
+      expect(svg).toContain('<g transform="translate(210 297) rotate(180)">');
+      expect(svg).toContain('fill="#123456" d="M0 0h9v9z"');
+      expect(svg).toContain('fill="#ffffff" d="M1 1h2v2z"');
+      expect(svg).not.toContain('#7d9a6a');
+      // Each corner's ids its own.
+      expect(svg).toContain('id="invitation-decoration-1-leaf-a"');
+      expect(svg).toContain('id="invitation-decoration-2-leaf-a"');
+    });
+
+    it('draws none for "none", for a file that is gone, or before the files are loaded', () => {
+      expect(invitation({ decoration: 'none' }, { art: fakeArt() })).not.toContain('rotate(180)');
+      expect(invitation({ decoration: 'gone' }, { art: fakeArt() })).not.toContain('rotate(180)');
+      expect(invitation({ decoration: 'leaf' }, { art: undefined })).not.toContain('rotate(180)');
+    });
+
+    it.each(DECORATIONS.filter((decoration) => decoration !== 'none'))(
+      'decorates two corners with the file %s',
+      (decoration) => {
+        const svg = invitation({ decoration, decorationColor: '#123456' });
+        expect(art.decorations.has(decoration)).toBe(true);
+        expect(svg).toContain('rotate(180)');
+        expect(svg).toContain('#123456');
+      },
+    );
   });
 
-  it('has no decorations when asked', () => {
-    expect(invitation({ decoration: 'none' })).not.toContain('rotate(180)');
+  describe('background pattern (files)', () => {
+    it('is not there by default', () => {
+      expect(DEFAULT_INVITATION.pattern).toBe('none');
+      expect(invitation({}, { art: fakeArt() })).not.toContain('invitation-pattern');
+      expect(invitation({ pattern: 'gone' }, { art: fakeArt() })).not.toContain('invitation-pattern');
+    });
+
+    it('covers the card through a mask, in its colour and strength, under the decorations and the texts', () => {
+      const svg = invitation(
+        { pattern: 'dots', patternColor: '#123456', patternOpacity: 20, decoration: 'leaf' },
+        { art: fakeArt() },
+      );
+      expect(svg).toContain(
+        '<rect width="210" height="297" fill="#123456" fill-opacity="0.2" mask="url(#invitation-pattern-mask)"/>',
+      );
+      // Drawn parts show, white parts hide what is behind them.
+      expect(svg).toContain('<circle fill="#ffffff" r="2"/><circle fill="#000000" r="1"/>');
+      const at = (needle: string) => svg.indexOf(needle);
+      expect(at('<rect width="210" height="297" fill="#ffffff"/>')).toBeLessThan(at('invitation-pattern-mask'));
+      expect(at('invitation-pattern-mask')).toBeLessThan(at('rotate(180)'));
+      expect(at('rotate(180)')).toBeLessThan(at('CEREMONY'));
+    });
+
+    it('repeats in tiles of a set size on every card, or covers the card once', () => {
+      // Default: 150 mm wide tiles, keeping the file's proportions.
+      expect(patternLayer(DOTS, '#000000', 15, 210, 297, 'p')).toContain(
+        '<pattern id="p-tile" patternUnits="userSpaceOnUse" width="150" height="75">',
+      );
+      const small = file('small', '<svg data-tile="40" viewBox="0 0 40 20"><circle r="2"/></svg>');
+      expect(patternLayer(small, '#000000', 15, 150, 150, 'p')).toContain('width="40" height="20"');
+      const once = file('once', '<svg data-fit="cover" viewBox="0 0 40 20"><circle r="2"/></svg>');
+      const cover = patternLayer(once, '#000000', 15, 150, 150, 'p');
+      expect(cover).not.toContain('<pattern');
+      expect(cover).toContain(
+        '<svg width="150" height="150" viewBox="0 0 40 20" preserveAspectRatio="xMidYMid slice">',
+      );
+    });
+
+    it.each(PATTERNS.filter((pattern) => pattern !== 'none'))('draws the file %s', (pattern) => {
+      expect(art.patterns.has(pattern)).toBe(true);
+      expect(invitation({ pattern })).toContain('mask="url(#invitation-pattern-mask)"');
+    });
   });
 
   it('centres the ceremony alone when there is no reception', () => {
@@ -162,6 +249,9 @@ describe('sanitizeInvitation', () => {
           background: '#D9E4CF',
           decoration: 'roots',
           decorationColor: 'url(javascript:x)',
+          pattern: 'gone',
+          patternColor: '#ABCDEF',
+          patternOpacity: 23,
         },
         'en',
       ),
@@ -173,8 +263,20 @@ describe('sanitizeInvitation', () => {
       qr: false,
       background: '#d9e4cf',
       decoration: 'roots',
+      patternColor: '#abcdef',
     });
     expect(sanitizeInvitation({ background: '<b>' }, 'en').background).toBeNull();
+    expect(sanitizeInvitation({ decoration: 'gone' }, 'en').decoration).toBe(DEFAULT_INVITATION.decoration);
+  });
+
+  it('keeps a pattern only if its file is there, and a strength only in whole steps', () => {
+    const pattern = PATTERNS.find((value) => value !== 'none')!;
+    expect(sanitizeInvitation({ pattern }, 'en').pattern).toBe(pattern);
+    const strength = (patternOpacity: unknown) => sanitizeInvitation({ patternOpacity }, 'en').patternOpacity;
+    expect(strength(40)).toBe(40);
+    expect(strength(PATTERN_OPACITY.min)).toBe(PATTERN_OPACITY.min);
+    expect(strength(PATTERN_OPACITY.max)).toBe(PATTERN_OPACITY.max);
+    for (const wrong of [0, 23, 105, 12.5, '40', null]) expect(strength(wrong)).toBe(PATTERN_OPACITY.initial);
   });
 });
 

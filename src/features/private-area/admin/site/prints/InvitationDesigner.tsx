@@ -2,12 +2,15 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import formStyles from '../../../../../components/Form/Form.module.css';
 import { loadGlyphFonts } from '../../../../../brand/glyphs';
 import { monogramParts } from '../../../../../brand/monogram';
+import { fileLabel, paint } from '../../../../../brand/svgFiles';
 import { getLanguage, isLanguage, LANGUAGES, LOCALES, useMessages, type Language } from '../../../../../i18n';
-import { DECORATIONS, spray } from '../../../../../prints/decorations';
+import { DECORATIONS, loadInvitationArt, PATTERNS, type InvitationArt } from '../../../../../prints/art';
 import {
   DEFAULT_INVITATION,
   INVITATION_SIZES,
   invitationSvg,
+  PATTERN_OPACITY,
+  patternLayer,
   sanitizeInvitation,
   type InvitationDesign,
   type InvitationSize,
@@ -38,14 +41,19 @@ interface Data {
   content: SiteContent;
   signupCode: string;
   qr: string;
+  /** The decoration and pattern files. */
+  art: InvitationArt;
 }
+
+/** The piece of a pattern shown on its button, in millimetres of the card. */
+const PATTERN_SAMPLE = 60;
 
 type State = { status: 'loading' } | { status: 'ready'; data: Data } | { status: 'error'; message: string };
 
 /**
  * The invitation designer: size, language, the line for the names, title and
- * subtitle, the logo, the QR code section, the background and the side
- * decorations. The card is made from the site settings; the preview follows
+ * subtitle, the logo, the QR code section, the background, the side
+ * decorations and a background pattern. The card is made from the site settings; the preview follows
  * every choice.
  */
 export function InvitationDesigner({ url }: { url: string }) {
@@ -70,11 +78,17 @@ export function InvitationDesigner({ url }: { url: string }) {
   useEffect(() => {
     let current = true;
     // Always the latest settings: what the site shows now.
-    Promise.all([siteRepository.load(), repository.getSettings(), qrSvg(url), loadGlyphFonts()]).then(
-      ([content, settings, qr, glyphs]) => {
+    Promise.all([
+      siteRepository.load(),
+      repository.getSettings(),
+      qrSvg(url),
+      loadGlyphFonts(),
+      loadInvitationArt(),
+    ]).then(
+      ([content, settings, qr, glyphs, art]) => {
         if (!current) return;
         setFonts(glyphs);
-        setState({ status: 'ready', data: { content, signupCode: settings.signupCode, qr } });
+        setState({ status: 'ready', data: { content, signupCode: settings.signupCode, qr, art } });
       },
       (reason: unknown) => {
         if (!current) return;
@@ -104,6 +118,7 @@ export function InvitationDesigner({ url }: { url: string }) {
           signupCode: data.signupCode,
           locale: LOCALES[language],
           texts: card,
+          art: data.art,
         })
       : null;
   const size = INVITATION_SIZES[design.size];
@@ -322,22 +337,32 @@ export function InvitationDesigner({ url }: { url: string }) {
 
           <fieldset className={styles.choices}>
             <legend>{inv.decoration}</legend>
-            {DECORATIONS.map((value) => (
-              <label key={value} className={`${styles.choice} ${styles.choiceCard}`}>
-                <input
-                  type="radio"
-                  name={`${id}-decoration`}
-                  checked={design.decoration === value}
-                  onChange={() => change({ decoration: value })}
-                />
-                <span className={styles.thumb}>
-                  <svg viewBox="-6 -6 80 80" aria-hidden="true">
-                    <g dangerouslySetInnerHTML={{ __html: spray(value, design.decorationColor) }} />
-                  </svg>
-                </span>
-                <span>{inv.decorations[value]}</span>
-              </label>
-            ))}
+            {DECORATIONS.map((value) => {
+              const decoration = data?.art.decorations.get(value);
+              return (
+                <label key={value} className={`${styles.choice} ${styles.choiceCard}`}>
+                  <input
+                    type="radio"
+                    name={`${id}-decoration`}
+                    checked={design.decoration === value}
+                    onChange={() => change({ decoration: value })}
+                  />
+                  <span className={styles.thumb}>
+                    {decoration && (
+                      <svg
+                        viewBox={decoration.viewBox}
+                        aria-hidden="true"
+                        // Our own files, cleaned when read (svgFiles.ts).
+                        dangerouslySetInnerHTML={{
+                          __html: paint(decoration, design.decorationColor, `${id}-decoration`, { keepWhite: true }),
+                        }}
+                      />
+                    )}
+                  </span>
+                  <span>{value === 'none' ? inv.noDecoration : fileLabel(value)}</span>
+                </label>
+              );
+            })}
           </fieldset>
           {design.decoration !== 'none' && (
             <ColorPicker
@@ -347,6 +372,74 @@ export function InvitationDesigner({ url }: { url: string }) {
               swatches={SWATCHES}
               names={t.colours.names}
             />
+          )}
+
+          <fieldset className={styles.choices}>
+            <legend>{inv.pattern}</legend>
+            {PATTERNS.map((value) => {
+              const pattern = data?.art.patterns.get(value);
+              return (
+                <label key={value} className={`${styles.choice} ${styles.choiceCard}`}>
+                  <input
+                    type="radio"
+                    name={`${id}-pattern`}
+                    checked={design.pattern === value}
+                    onChange={() => change({ pattern: value })}
+                  />
+                  <span className={styles.thumb}>
+                    {pattern && (
+                      // At full strength, so it can be told apart; the card shows the chosen strength.
+                      <svg
+                        viewBox={`0 0 ${PATTERN_SAMPLE} ${PATTERN_SAMPLE}`}
+                        aria-hidden="true"
+                        dangerouslySetInnerHTML={{
+                          __html: patternLayer(
+                            pattern,
+                            design.patternColor,
+                            100,
+                            PATTERN_SAMPLE,
+                            PATTERN_SAMPLE,
+                            `${id}-pattern-${value}`,
+                          ),
+                        }}
+                      />
+                    )}
+                  </span>
+                  <span>{value === 'none' ? inv.noPattern : fileLabel(value)}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+          {design.pattern !== 'none' && (
+            <>
+              <ColorPicker
+                legend={inv.patternColour}
+                value={design.patternColor}
+                onChange={(patternColor) => change({ patternColor })}
+                swatches={SWATCHES}
+                names={t.colours.names}
+              />
+              <div className={formStyles.field}>
+                <label htmlFor={`${id}-pattern-opacity`}>{inv.patternOpacity}</label>
+                <div className={styles.range}>
+                  <input
+                    id={`${id}-pattern-opacity`}
+                    type="range"
+                    min={PATTERN_OPACITY.min}
+                    max={PATTERN_OPACITY.max}
+                    step={PATTERN_OPACITY.step}
+                    value={design.patternOpacity}
+                    aria-describedby={`${id}-pattern-opacity-hint`}
+                    aria-valuetext={`${design.patternOpacity}%`}
+                    onChange={(event) => change({ patternOpacity: Number(event.target.value) })}
+                  />
+                  <output htmlFor={`${id}-pattern-opacity`}>{design.patternOpacity}%</output>
+                </div>
+                <span id={`${id}-pattern-opacity-hint`} className={formStyles.hint}>
+                  {inv.patternHint}
+                </span>
+              </div>
+            </>
           )}
         </fieldset>
       </div>
