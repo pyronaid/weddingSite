@@ -276,23 +276,36 @@ export function InvitationDesigner({ url }: { url: string }) {
 
         {/* Disabled until the saved choices are there: nothing edited is lost or overwritten. */}
         <fieldset className={styles.options} disabled={!saved.design}>
-          {design.decoration !== 'none' && (
+          {(design.decoration !== 'none' || design.logo) && (
             <fieldset className={styles.choices}>
               <legend>{inv.corners}</legend>
               <p className={formStyles.hint}>{inv.cornersHint}</p>
               <div className={styles.corners}>
-                {([0, 1] as const).map((corner) => (
-                  <div key={corner} className={styles.corner}>
-                    <span className={styles.cornerTitle}>{inv.cornerTitles[corner]}</span>
+                {design.decoration !== 'none' &&
+                  ([0, 1] as const).map((corner) => (
+                    <div key={corner} className={styles.corner}>
+                      <span className={styles.cornerTitle}>{inv.cornerTitles[corner]}</span>
+                      <NudgeControls
+                        which={inv.cornerAdjust.which[corner]}
+                        value={design.decorationAdjustments[corner]}
+                        limits={CORNER_ADJUST}
+                        labels={inv.cornerAdjust}
+                        onChange={(next) => adjustCorner(corner, next)}
+                      />
+                    </div>
+                  ))}
+                {design.logo && (
+                  <div className={styles.corner}>
+                    <span className={styles.cornerTitle}>{inv.logoTitle}</span>
                     <NudgeControls
-                      which={inv.cornerAdjust.which[corner]}
-                      value={design.decorationAdjustments[corner]}
+                      which={inv.logoTitle}
+                      value={design.logoAdjustment}
                       limits={CORNER_ADJUST}
-                      labels={inv.cornerAdjust}
-                      onChange={(next) => adjustCorner(corner, next)}
+                      labels={inv.logoAdjust}
+                      onChange={(logoAdjustment) => change({ logoAdjustment })}
                     />
                   </div>
-                ))}
+                )}
               </div>
               {resolution &&
                 ([0, 1] as const)

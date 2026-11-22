@@ -1229,7 +1229,7 @@ describe('site settings (super admin)', () => {
           }),
         );
         const options = [
-          screen.getByRole('group', { name: 'Position and size of the decorations' }),
+          screen.getByRole('group', { name: 'Position and size of the decorations and the logo' }),
           screen.getByRole('group', { name: 'Side decorations' }),
           screen.getByRole('group', { name: 'Colour of the decorations' }),
           screen.getByRole('group', { name: 'Background' }),
@@ -1245,6 +1245,34 @@ describe('site settings (super admin)', () => {
         for (let i = 1; i < options.length; i++) {
           expect(options[i - 1].compareDocumentPosition(options[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         }
+      });
+
+      it('moves and resizes the logo too, while it is shown', async () => {
+        const designs: DesignStore = {};
+        open('/invitations', fakeAdmin({}, designs));
+        const user = userEvent.setup();
+        await ready();
+        await user.click(
+          within(screen.getByRole('group', { name: 'Side decorations' })).getByRole('radio', { name: 'None' }),
+        );
+        // No decoration, but the logo: the section is there, with the logo alone.
+        const section = screen.getByRole('group', { name: 'Position and size of the decorations and the logo' });
+        expect(within(section).queryByRole('group', { name: /top-left decoration/ })).not.toBeInTheDocument();
+        const logo = within(section).getByRole('group', { name: 'Position and size of the logo' });
+        await user.click(within(logo).getByRole('button', { name: 'Make the logo bigger' }));
+        await user.click(within(logo).getByRole('button', { name: 'Move the logo down' }));
+        expect(card()).toMatch(/scale\(1\.05\) translate\(/);
+        await waitFor(() => expect(designs.invitation).toMatchObject({ logoAdjustment: { x: 0, y: 1, size: 105 } }), {
+          timeout: 3000,
+        });
+        await user.click(within(logo).getByRole('button', { name: 'Put the logo back where it was' }));
+        expect(card()).not.toMatch(/scale\(1\.05\) translate\(/);
+
+        // Without the logo, nothing to move.
+        await user.click(screen.getByRole('checkbox', { name: /Show the logo/ }));
+        expect(
+          screen.queryByRole('group', { name: 'Position and size of the decorations and the logo' }),
+        ).not.toBeInTheDocument();
       });
 
       it('uses watercolour pictures in their own colours, and moves and resizes each corner', async () => {

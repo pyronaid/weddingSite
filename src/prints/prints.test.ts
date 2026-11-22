@@ -230,6 +230,34 @@ describe('invitations', () => {
         expect(svg).toContain('<g transform="translate(197.4 292.8) rotate(180) scale(0.5)">');
       });
 
+      it('moves the logo and resizes it around its centre, the rest of the card staying put', () => {
+        const before = invitation({ decoration: 'none' }, { art: fakeArt() });
+        const after = invitation(
+          { decoration: 'none', logoAdjustment: { x: 2, y: -1, size: 150 } },
+          { art: fakeArt() },
+        );
+        const transform =
+          /<g transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(1\.5\) translate\(([-\d.]+) ([-\d.]+)\)">/.exec(after);
+        expect(transform).not.toBeNull();
+        const [, tx, ty, cx, cy] = transform!.map(Number);
+        // Two steps right and one up (4.2 mm each), around the logo's own middle.
+        expect(tx + cx).toBeCloseTo(8.4, 5);
+        expect(ty + cy).toBeCloseTo(-4.2, 5);
+        // Only the logo changes: the texts are where they were.
+        const texts = (svg: string) => svg.match(/<text [^>]*>/g);
+        expect(texts(after)).toEqual(texts(before));
+        // Not moved: drawn as before, without a transform.
+        expect(before).not.toContain('scale(1) translate(');
+        expect(sanitizeInvitation({ logoAdjustment: { x: 2, y: -1, size: 150 } }, 'en').logoAdjustment).toEqual({
+          x: 2,
+          y: -1,
+          size: 150,
+        });
+        expect(sanitizeInvitation({ logoAdjustment: { x: 0, y: 0, size: 400 } }, 'en').logoAdjustment).toEqual(
+          NO_CORNER_ADJUSTMENT,
+        );
+      });
+
       it('checks saved moves: whole steps within the limits, or not moved', () => {
         const saved = (decorationAdjustments: unknown) =>
           sanitizeInvitation({ decorationAdjustments }, 'en').decorationAdjustments;
