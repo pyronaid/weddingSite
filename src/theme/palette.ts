@@ -151,6 +151,15 @@ export function applyPalette(palette: Palette, doc: Document = document) {
   doc.querySelector('meta[name="theme-color"]')?.setAttribute('content', palette.pageEdge);
 }
 
+/** `a` moved towards `b` by `amount` (0: a, 1: b), both "#rrggbb": for colours derived from the palette. */
+export function mixColours(a: string, b: string, amount: number): string {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return `#${[1, 3, 5]
+    .map((i) => Math.round(channel(a, i) + (channel(b, i) - channel(a, i)) * amount))
+    .map((value) => value.toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
 /** WCAG relative luminance of "#rrggbb". */
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => {

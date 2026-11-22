@@ -4,7 +4,8 @@ import { formatDeadline, formatWeddingDate } from '../lib/format';
 import type { SiteContent, Venue } from '../services/site';
 import { paint, stencil, viewBoxOf, type SvgFile } from '../brand/svgFiles';
 import { isDecoration, isPattern, type Decoration, type InvitationArt, type Pattern } from './art';
-import { escapeXml, nestSvg, PRINT_COLORS, PRINT_FONTS, text, wrapText } from './svg';
+import { mixColours, sanitizePalette, type Palette } from '../theme/palette';
+import { escapeXml, nestSvg, PRINT_FONTS, text, wrapText } from './svg';
 
 export type { Decoration, InvitationArt, Pattern } from './art';
 
@@ -138,6 +139,26 @@ export function patternLayer(
   );
 }
 
+/**
+ * The card's colours, from the site's palette (Site settings → Colour palette):
+ * the original palette gives the original card. The logo, the decorations and
+ * the pattern keep the colours chosen in the designer.
+ */
+export function cardColours(palette: Palette) {
+  return {
+    /** Times, places, the couple's names. */
+    ink: palette.text,
+    /** The "&", CEREMONY / RECEPTION, the lines, the website, the hashtag. */
+    accent: palette.accentStrong,
+    /** The title. */
+    title: palette.cardBg,
+    /** Subtitle, addresses, the name lines, the QR code text: the text, lighter. */
+    muted: mixColours(palette.text, '#ffffff', 0.25),
+    /** The middle of the shaded background. */
+    paper: palette.pageLight,
+  };
+}
+
 /** The texts printed on the card, in its language. */
 export interface CardTexts {
   guest: string;
@@ -204,14 +225,15 @@ export function invitationSvg({
   art,
 }: InvitationInput): string {
   const { width, height } = INVITATION_SIZES[design.size];
-  const { ink, accent, frame: plum, muted, paper } = PRINT_COLORS;
+  // From the palette, checked (content cached by an older version has none).
+  const { ink, accent, title, muted, paper } = cardColours(sanitizePalette(content.palette));
   const landscape = width > height;
   const square = width === height;
 
   // Millimetres per base unit, known once the layout is measured.
   let s = 1;
   const t = (value: string, x: number, y: number, style: Parameters<typeof text>[3]) =>
-    text(value, x, y, { ...style, size: style.size * s });
+    text(value, x, y, { fill: ink, ...style, size: style.size * s });
   const block = (blockWidth: number, blockHeight: number, draw: Block['draw']): Block => ({
     width: blockWidth,
     height: blockHeight,
@@ -290,7 +312,7 @@ export function invitationSvg({
   if (heading) {
     intro.push(
       block(Math.min(130, heading.length * 4), 12, (cx, top) =>
-        t(heading, cx, top + 8 * s, { size: 9, font: PRINT_FONTS.serif, italic: true, weight: 600, fill: plum }),
+        t(heading, cx, top + 8 * s, { size: 9, font: PRINT_FONTS.serif, italic: true, weight: 600, fill: title }),
       ),
     );
   }

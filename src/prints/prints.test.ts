@@ -5,6 +5,7 @@ import { DEFAULT_MONOGRAM, monogramParts } from '../brand/monogram';
 import { defaultContent } from '../config/wedding';
 import { printMessages } from '../features/private-area/messages/prints';
 import { parseSvgFile, type SvgFile } from '../brand/svgFiles';
+import { DEFAULT_PALETTE, PALETTE_PRESETS } from '../theme/palette';
 import { DECORATIONS, loadInvitationArt, PATTERNS, type InvitationArt } from './art';
 import {
   DEFAULT_INVITATION,
@@ -198,6 +199,50 @@ describe('invitations', () => {
     it.each(PATTERNS.filter((pattern) => pattern !== 'none'))('draws the file %s', (pattern) => {
       expect(art.patterns.has(pattern)).toBe(true);
       expect(invitation({ pattern })).toContain('mask="url(#invitation-pattern-mask)"');
+    });
+  });
+
+  describe('colours of the site palette', () => {
+    const sage = PALETTE_PRESETS.sage;
+    // No logo, decorations or pattern: they keep the colours chosen in the designer.
+    const plain = (palette: typeof sage) =>
+      invitation(
+        { logo: false, decoration: 'none', background: '#f6d3df' },
+        { content: { ...defaultContent, palette }, logo: undefined },
+      );
+    const accentOn = (svg: string, label: string) =>
+      expect(svg).toMatch(new RegExp(`fill="${sage.accentStrong}"[^>]*>${label}<`));
+
+    it('takes the strong accent for the "&", the labels, the lines, the website and the hashtag', () => {
+      const svg = plain(sage);
+      expect(svg).toContain(`>Giulia <tspan fill="${sage.accentStrong}">&amp;</tspan> Marco</text>`);
+      accentOn(svg, 'CEREMONY');
+      accentOn(svg, 'RECEPTION');
+      accentOn(svg, 'gioevale\\.com');
+      accentOn(svg, defaultContent.couple.hashtag);
+      // The solid line under the date, and the dotted one above the QR code.
+      const accentLines = (svg.match(/<line [^>]*>/g) ?? []).filter((line) =>
+        line.includes(`stroke="${sage.accentStrong}"`),
+      );
+      expect(accentLines.some((line) => !line.includes('dasharray'))).toBe(true);
+      expect(accentLines.some((line) => line.includes('dasharray'))).toBe(true);
+    });
+
+    it('takes the title, text and paper colours too, leaving none of the original ones', () => {
+      const svg = plain(sage);
+      expect(svg).toMatch(new RegExp(`fill="${sage.cardBg}"[^>]*>You are invited<`));
+      expect(svg).toMatch(new RegExp(`fill="${sage.text}"[^>]*>at 16:00<`));
+      expect(svg).toContain(`stop-color="${sage.pageLight}"`);
+      for (const original of ['#c24f78', '#6d3350', '#4a2537', '#7a5566', '#fffaf7']) {
+        expect(svg, original).not.toContain(original);
+      }
+    });
+
+    it('looks as before with the original palette', () => {
+      const svg = plain(DEFAULT_PALETTE);
+      expect(svg).toContain('>Giulia <tspan fill="#c24f78">&amp;</tspan> Marco</text>');
+      expect(svg).toMatch(/fill="#6d3350"[^>]*>You are invited</);
+      expect(svg).toContain('stop-color="#fffaf7"');
     });
   });
 
