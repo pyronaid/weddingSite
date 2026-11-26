@@ -2,12 +2,12 @@ import { isLanguage, type Language } from '../i18n';
 import { oneOf, sanitizeColor } from '../brand/monogram';
 import { formatDeadline, formatWeddingDate } from '../lib/format';
 import type { SiteContent, Venue } from '../services/site';
-import { paint, stencil, viewBoxOf, type SvgFile } from '../brand/svgFiles';
-import { isDecoration, isPattern, type Decoration, type InvitationArt, type Pattern } from './art';
+import { paint, stencil, viewBoxOf } from '../brand/svgFiles';
+import { isDecoration, isPattern, type Decoration, type InvitationArt, type Pattern, type PatternArt } from './art';
 import { mixColours, sanitizePalette, type Palette } from '../theme/palette';
 import { escapeXml, nestSvg, PRINT_FONTS, text, wrapText } from './svg';
 
-export type { Decoration, InvitationArt, Pattern } from './art';
+export type { Decoration, InvitationArt, Pattern, PatternArt } from './art';
 
 /** Sizes in millimetres. */
 export const INVITATION_SIZES = {
@@ -72,6 +72,8 @@ export const NO_CORNER_ADJUSTMENT: CornerAdjustment = { x: 0, y: 0, size: 100 };
 export const PATTERN_OPACITY = { min: 5, max: 100, step: 5, initial: 15 };
 /** A pattern tile's width on the card, in millimetres, when its file does not say (data-tile). */
 export const PATTERN_TILE = 150;
+/** Picture patterns are tiles printed at this resolution: their pixels give their size on the card. */
+export const PICTURE_DPI = 300;
 
 export const DEFAULT_INVITATION: InvitationDesign = {
   size: 'a4-portrait',
@@ -180,13 +182,25 @@ const round = (value: number) => Math.round(value * 1000) / 1000;
  * on a white or a shaded background alike.
  */
 export function patternLayer(
-  file: SvgFile,
+  pattern: PatternArt,
   color: string,
   opacity: number,
   width: number,
   height: number,
   idPrefix: string,
 ): string {
+  if (pattern.kind === 'picture') {
+    // Its own colours, at the chosen strength: one tile at 300 dpi, repeated.
+    const { file } = pattern;
+    const tile = round(Math.min(1000, Math.max(10, (file.width / PICTURE_DPI) * 25.4)));
+    const tileHeight = round((tile * file.height) / file.width);
+    return (
+      `<defs><pattern id="${idPrefix}-tile" patternUnits="userSpaceOnUse" width="${tile}" height="${tileHeight}">` +
+      `<image width="${tile}" height="${tileHeight}" preserveAspectRatio="none" xlink:href="${file.href}"/></pattern></defs>` +
+      `<rect width="${width}" height="${height}" fill="url(#${idPrefix}-tile)" opacity="${round(opacity / 100)}"/>`
+    );
+  }
+  const { file } = pattern;
   const box = viewBoxOf(file);
   if (!(box.width > 0 && box.height > 0)) return '';
   const drawing = stencil(file, idPrefix);

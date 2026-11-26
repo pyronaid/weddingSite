@@ -148,6 +148,7 @@ export function InvitationDesigner({ url }: { url: string }) {
   const svg = data ? cardWith(data.previewArt) : null;
   const exported = () => cardWith(data!.art)!;
   const decorationArt = design.decoration === 'none' ? undefined : data?.art.decorations.get(design.decoration);
+  const patternArt = design.pattern === 'none' ? undefined : data?.art.patterns.get(design.pattern);
   const resolution = decorationResolution(design, data?.art);
   /** A new decoration starts in its corners (its moves were made for the previous one). */
   const chooseDecoration = (decoration: string) =>
@@ -399,7 +400,7 @@ export function InvitationDesigner({ url }: { url: string }) {
           <fieldset className={styles.choices}>
             <legend>{inv.pattern}</legend>
             {PATTERNS.map((value) => {
-              const pattern = data?.art.patterns.get(value);
+              const pattern = data?.previewArt.patterns.get(value);
               return (
                 <label key={value} className={`${styles.choice} ${styles.choiceCard}`}>
                   <input
@@ -434,13 +435,17 @@ export function InvitationDesigner({ url }: { url: string }) {
           </fieldset>
           {design.pattern !== 'none' && (
             <>
-              <ColorPicker
-                legend={inv.patternColour}
-                value={design.patternColor}
-                onChange={(patternColor) => change({ patternColor })}
-                swatches={SWATCHES}
-                names={t.colours.names}
-              />
+              {patternArt?.kind === 'picture' ? (
+                <p className={formStyles.hint}>{inv.patternOwnColours}</p>
+              ) : (
+                <ColorPicker
+                  legend={inv.patternColour}
+                  value={design.patternColor}
+                  onChange={(patternColor) => change({ patternColor })}
+                  swatches={SWATCHES}
+                  names={t.colours.names}
+                />
+              )}
               <div className={formStyles.field}>
                 <label htmlFor={`${id}-pattern-opacity`}>{inv.patternOpacity}</label>
                 <div className={styles.range}>

@@ -41,7 +41,7 @@ const LEAF = file(
 const DOTS = file('dots', '<svg viewBox="0 0 40 20"><circle fill="#999" r="2"/><circle fill="white" r="1"/></svg>');
 const fakeArt = (decorations: SvgFile[] = [LEAF], patterns: SvgFile[] = [DOTS]): InvitationArt => ({
   decorations: new Map(decorations.map((item) => [item.id, { kind: 'drawing' as const, file: item }])),
-  patterns: new Map(patterns.map((item) => [item.id, item])),
+  patterns: new Map(patterns.map((item) => [item.id, { kind: 'drawing' as const, file: item }])),
 });
 
 const invitation = (design: Partial<InvitationDesign> = {}, input: Partial<InvitationInput> = {}) => {
@@ -310,22 +310,64 @@ describe('invitations', () => {
 
     it('repeats in tiles of a set size on every card, or covers the card once', () => {
       // Default: 150 mm wide tiles, keeping the file's proportions.
-      expect(patternLayer(DOTS, '#000000', 15, 210, 297, 'p')).toContain(
+      expect(patternLayer({ kind: 'drawing', file: DOTS }, '#000000', 15, 210, 297, 'p')).toContain(
         '<pattern id="p-tile" patternUnits="userSpaceOnUse" width="150" height="75">',
       );
       const small = file('small', '<svg data-tile="40" viewBox="0 0 40 20"><circle r="2"/></svg>');
-      expect(patternLayer(small, '#000000', 15, 150, 150, 'p')).toContain('width="40" height="20"');
+      expect(patternLayer({ kind: 'drawing', file: small }, '#000000', 15, 150, 150, 'p')).toContain(
+        'width="40" height="20"',
+      );
       const once = file('once', '<svg data-fit="cover" viewBox="0 0 40 20"><circle r="2"/></svg>');
-      const cover = patternLayer(once, '#000000', 15, 150, 150, 'p');
+      const cover = patternLayer({ kind: 'drawing', file: once }, '#000000', 15, 150, 150, 'p');
       expect(cover).not.toContain('<pattern');
       expect(cover).toContain(
         '<svg width="150" height="150" viewBox="0 0 40 20" preserveAspectRatio="xMidYMid slice">',
       );
     });
 
+    it('draws a picture pattern in its own colours: a 300 dpi tile, at the chosen strength', () => {
+      const picture: ImageFile = {
+        id: 'petals',
+        label: 'Petals',
+        href: 'data:image/webp;base64,UklGRg==',
+        width: 1772,
+        height: 886,
+      };
+      const art: InvitationArt = { ...fakeArt(), patterns: new Map([['petals', { kind: 'picture', file: picture }]]) };
+      const svg = invitation({ pattern: 'petals', patternColor: '#123456', patternOpacity: 40 }, { art });
+      // 1772 px at 300 dpi: 150 mm wide (and half as tall).
+      expect(svg).toContain(
+        `<pattern id="invitation-pattern-tile" patternUnits="userSpaceOnUse" width="150.029" height="75.015"><image width="150.029" height="75.015" preserveAspectRatio="none" xlink:href="${picture.href}"/></pattern>`,
+      );
+      expect(svg).toContain('<rect width="210" height="297" fill="url(#invitation-pattern-tile)" opacity="0.4"/>');
+      // No colour mask: the picture keeps its colours.
+      expect(svg).not.toContain('invitation-pattern-mask');
+      expect(svg).not.toContain('#123456');
+    });
+
+    it('gives picture patterns a PNG copy too, for an SVG file', async () => {
+      const picture: ImageFile = {
+        id: 'p',
+        label: 'P',
+        href: 'data:image/webp;base64,UklGRg==',
+        width: 10,
+        height: 10,
+      };
+      const art = await withPictures(
+        { ...fakeArt(), patterns: new Map([['p', { kind: 'picture', file: picture }]]) },
+        () => 'data:image/png;base64,iVBORw0KGgo=',
+      );
+      expect(art.patterns.get('p')).toMatchObject({ file: { href: 'data:image/png;base64,iVBORw0KGgo=' } });
+    });
+
     it.each(PATTERNS.filter((pattern) => pattern !== 'none'))('draws the file %s', (pattern) => {
       expect(art.patterns.has(pattern)).toBe(true);
-      expect(invitation({ pattern })).toContain('mask="url(#invitation-pattern-mask)"');
+      // Drawings through the colour mask, pictures in their own colours.
+      expect(invitation({ pattern })).toContain(
+        art.patterns.get(pattern)!.kind === 'drawing'
+          ? 'mask="url(#invitation-pattern-mask)"'
+          : 'fill="url(#invitation-pattern-tile)" opacity=',
+      );
     });
   });
 

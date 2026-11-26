@@ -1247,6 +1247,21 @@ describe('site settings (super admin)', () => {
         }
       });
 
+      it('draws picture patterns in their own colours, at the chosen strength', async () => {
+        open('/invitations');
+        const user = userEvent.setup();
+        await ready();
+        const patterns = screen.getByRole('group', { name: 'Pattern' });
+        await user.click(within(patterns).getByRole('radio', { name: 'Pattern 08' }));
+        expect(screen.queryByRole('group', { name: 'Colour of the pattern' })).not.toBeInTheDocument();
+        expect(screen.getByText(/This pattern keeps its own colours/)).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Strength of the pattern'), { target: { value: '50' } });
+        expect(card()).toContain('fill="url(#invitation-pattern-tile)" opacity="0.5"');
+        // A drawing again: its colour can be chosen.
+        await user.click(within(patterns).getByRole('radio', { name: 'Pattern 01' }));
+        expect(screen.getByRole('group', { name: 'Colour of the pattern' })).toBeInTheDocument();
+      });
+
       it('moves and resizes the logo too, while it is shown', async () => {
         const designs: DesignStore = {};
         open('/invitations', fakeAdmin({}, designs));
