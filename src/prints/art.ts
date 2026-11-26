@@ -11,11 +11,16 @@ import { byName, fileLabel, svgFolder, type SvgFile } from '../brand/svgFiles';
  *     watercolours, in their own colours. Big enough to print: 300 dpi at the
  *     size they are printed (about 2400 pixels covers a corner made twice as
  *     big on an A4); the designer warns below 200 dpi;
- * - ./patterns/: background patterns, in one colour (any), drawn faintly in
- *   the chosen colour; white parts hide what is behind them and the card
- *   shows through. A pattern repeats in tiles `data-tile` millimetres wide
- *   (default 150), or covers the whole card once with `data-fit="cover"`
- *   (artwork that does not repeat seamlessly).
+ * - ./patterns/: background patterns, either
+ *   - SVG drawings in one colour (any), drawn faintly in the chosen colour;
+ *     white parts hide what is behind them and the card shows through. A
+ *     drawing repeats in tiles `data-tile` millimetres wide (default 150), or
+ *     covers the whole card once with `data-fit="cover"` (artwork that does
+ *     not repeat seamlessly); or
+ *   - PNG or WebP pictures (e.g. watercolours), in their own colours, at the
+ *     chosen strength. A picture is one tile printed at 300 dpi: its size in
+ *     pixels is its size on the card (1772 px wide: 150 mm). It must repeat
+ *     seamlessly.
  *
  * The drawings can be big: they are downloaded only by the invitation
  * designer (`loadInvitationArt`), while their names are known at once.
@@ -26,7 +31,17 @@ const decorationDrawings = svgFolder(
 const decorationPictures = imageFolder(
   import.meta.glob<string>('./decorations/*.{png,webp}', { query: '?inline', import: 'default' }),
 );
-const patternFiles = svgFolder(import.meta.glob<string>('./patterns/*.svg', { query: '?raw', import: 'default' }));
+const patternDrawings = svgFolder(import.meta.glob<string>('./patterns/*.svg', { query: '?raw', import: 'default' }));
+const patternPictures = imageFolder(
+  import.meta.glob<string>('./patterns/*.{png,webp}', { query: '?inline', import: 'default' }),
+);
+
+/** Drawings and pictures of a folder, as one list of choices by name (a drawing wins over a picture of the same name). */
+const byNameOnce = (...lists: string[][]) =>
+  [...new Set(lists.flat())]
+    .map((id) => ({ id, label: fileLabel(id) }))
+    .sort(byName)
+    .map((file) => file.id);
 
 /** "none", or the name of a file in ./decorations/ without its extension. */
 export type Decoration = string;
@@ -34,38 +49,39 @@ export type Decoration = string;
 export type Pattern = string;
 
 /** "none" first, then the files by name. */
-export const DECORATIONS: Decoration[] = [
-  'none',
-  // A drawing and a picture with the same name: one choice (the drawing).
-  ...[...new Set([...decorationDrawings.ids, ...decorationPictures.ids])]
-    .map((id) => ({ id, label: fileLabel(id) }))
-    .sort(byName)
-    .map((file) => file.id),
-];
-export const PATTERNS: Pattern[] = ['none', ...patternFiles.ids];
+export const DECORATIONS: Decoration[] = ['none', ...byNameOnce(decorationDrawings.ids, decorationPictures.ids)];
+export const PATTERNS: Pattern[] = ['none', ...byNameOnce(patternDrawings.ids, patternPictures.ids)];
 
 export const isDecoration = (value: unknown): value is Decoration =>
   value === 'none' || decorationDrawings.has(value) || decorationPictures.has(value);
-export const isPattern = (value: unknown): value is Pattern => value === 'none' || patternFiles.has(value);
+export const isPattern = (value: unknown): value is Pattern =>
+  value === 'none' || patternDrawings.has(value) || patternPictures.has(value);
+
+/** A background pattern: a drawing (in the chosen colour) or a picture (its own colours). */
+export type PatternArt = { kind: 'drawing'; file: SvgFile } | { kind: 'picture'; file: ImageFile };
 
 /** A side decoration: a drawing (repainted in the chosen colour) or a picture (its own colours). */
 export type DecorationArt = { kind: 'drawing'; file: SvgFile } | { kind: 'picture'; file: ImageFile };
 
 export interface InvitationArt {
   decorations: Map<string, DecorationArt>;
-  patterns: Map<string, SvgFile>;
+  patterns: Map<string, PatternArt>;
 }
 
 /** Every decoration and pattern, downloaded once. */
 export async function loadInvitationArt(): Promise<InvitationArt> {
-  const [drawings, pictures, patterns] = await Promise.all([
+  const [drawings, pictures, patternDrawn, patternPictured] = await Promise.all([
     decorationDrawings.load(),
     decorationPictures.load(),
-    patternFiles.load(),
+    patternDrawings.load(),
+    patternPictures.load(),
   ]);
   const decorations = new Map<string, DecorationArt>();
   for (const [id, file] of pictures) decorations.set(id, { kind: 'picture', file });
   for (const [id, file] of drawings) decorations.set(id, { kind: 'drawing', file });
+  const patterns = new Map<string, PatternArt>();
+  for (const [id, file] of patternPictured) patterns.set(id, { kind: 'picture', file });
+  for (const [id, file] of patternDrawn) patterns.set(id, { kind: 'drawing', file });
   return { decorations, patterns };
 }
 
@@ -74,14 +90,11 @@ export async function withPictures(
   art: InvitationArt,
   convert: (href: string) => Promise<string> | string,
 ): Promise<InvitationArt> {
+  const swap = async <T extends DecorationArt | PatternArt>(item: T): Promise<T> =>
+    item.kind === 'picture' ? { ...item, file: { ...item.file, href: await convert(item.file.href) } } : item;
   const decorations = new Map<string, DecorationArt>();
-  for (const [id, decoration] of art.decorations) {
-    decorations.set(
-      id,
-      decoration.kind === 'picture'
-        ? { kind: 'picture', file: { ...decoration.file, href: await convert(decoration.file.href) } }
-        : decoration,
-    );
-  }
-  return { ...art, decorations };
+  for (const [id, decoration] of art.decorations) decorations.set(id, await swap(decoration));
+  const patterns = new Map<string, PatternArt>();
+  for (const [id, pattern] of art.patterns) patterns.set(id, await swap(pattern));
+  return { decorations, patterns };
 }

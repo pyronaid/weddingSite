@@ -177,6 +177,7 @@ const en = {
     /** The others are named after their files (src/prints/patterns/). */
     noPattern: 'None',
     patternColour: 'Colour of the pattern',
+    patternOwnColours: 'This pattern keeps its own colours: the strength makes it lighter or stronger.',
     patternOpacity: 'Strength of the pattern',
     patternHint: 'Keep it faint, so the texts stay easy to read.',
     name: 'Invitation',
@@ -363,6 +364,7 @@ export const printMessages: Dictionary<typeof en> = {
       pattern: 'Motivo di sfondo',
       noPattern: 'Nessuno',
       patternColour: 'Colore del motivo',
+      patternOwnColours: 'Questo motivo mantiene i suoi colori: l’intensità lo rende più leggero o più forte.',
       patternOpacity: 'Intensità del motivo',
       patternHint: 'Tienilo leggero, così i testi restano facili da leggere.',
       name: 'Partecipazione',
