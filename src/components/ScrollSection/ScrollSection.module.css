@@ -51,10 +51,13 @@
 }
 
 .photo {
+  /* One knob for every photo's size, frame included: the proportions stay the same.
+     They grow within their column (towards the page edge), so the card keeps its width. */
+  --scale: 1.1;
   margin: 0;
-  width: 88%;
+  width: calc(88% * var(--scale));
   background: #fff;
-  padding: 8px 8px 30px;
+  padding: calc(8px * var(--scale)) calc(8px * var(--scale)) calc(30px * var(--scale));
   border-radius: 6px;
   box-shadow: var(--shadow-photo);
   will-change: transform, opacity;
@@ -118,7 +121,7 @@
   }
 
   .photo {
-    width: min(42%, 180px);
+    width: min(calc(42% * var(--scale)), calc(180px * var(--scale)));
   }
 
   .photo + .photo,
