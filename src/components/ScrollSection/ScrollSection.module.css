@@ -53,7 +53,7 @@
 .photo {
   /* One knob for every photo's size, frame included: the proportions stay the same.
      They grow within their column (towards the page edge), so the card keeps its width. */
-  --scale: 1.1;
+  --scale: 1.21;
   margin: 0;
   width: calc(88% * var(--scale));
   background: #fff;
@@ -81,6 +81,33 @@
   aspect-ratio: 3 / 4;
   object-fit: cover;
   border-radius: 2px;
+}
+
+/*
+ * Medium screens: too little room beside the card for the photos to grow
+ * outwards (they would be cut off at the screen edge), so they grow inwards,
+ * slipping under the card's edge (the card stays on top, at its full width).
+ */
+@media (min-width: 901px) and (max-width: 1280px) {
+  .left {
+    justify-self: start;
+    align-items: flex-start;
+  }
+
+  .right {
+    justify-self: end;
+    align-items: flex-end;
+  }
+
+  .left .photo + .photo {
+    margin-right: 0;
+    margin-left: 12%;
+  }
+
+  .right .photo:first-child {
+    margin-left: 0;
+    margin-right: 12%;
+  }
 }
 
 /* Tablet / mobile: left pair above the card, right pair below it. */
@@ -122,6 +149,8 @@
 
   .photo {
     width: min(calc(42% * var(--scale)), calc(180px * var(--scale)));
+    /* Full size even when the pair is wider than the screen: they overlap a little instead. */
+    flex-shrink: 0;
   }
 
   .photo + .photo,
@@ -137,5 +166,11 @@
 
   .right .photo:first-child {
     margin-top: 1.5rem;
+  }
+
+  /* A pair wider than the screen overlaps by just what is needed (nothing when it fits). */
+  .left .photo + .photo,
+  .right .photo + .photo {
+    margin-left: min(0px, calc(100% - 2 * min(calc(42% * var(--scale)), calc(180px * var(--scale))) - 1rem));
   }
 }
